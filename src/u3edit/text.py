@@ -47,8 +47,21 @@ def cmd_view(args) -> None:
     print()
 
 
+def cmd_edit(args) -> None:
+    """Launch TUI text editor."""
+    from .tui import require_prompt_toolkit
+    require_prompt_toolkit()
+    from .tui.text_editor import TextEditor
+
+    with open(args.file, 'rb') as f:
+        data = f.read()
+
+    editor = TextEditor(args.file, data)
+    editor.run()
+
+
 def register_parser(subparsers) -> None:
-    p = subparsers.add_parser('text', help='Game text viewer')
+    p = subparsers.add_parser('text', help='Game text viewer/editor')
     sub = p.add_subparsers(dest='text_command')
 
     p_view = sub.add_parser('view', help='View game text strings')
@@ -56,12 +69,17 @@ def register_parser(subparsers) -> None:
     p_view.add_argument('--json', action='store_true', help='Output as JSON')
     p_view.add_argument('--output', '-o', help='Output file (for --json)')
 
+    p_edit = sub.add_parser('edit', help='Edit game text (TUI)')
+    p_edit.add_argument('file', help='TEXT file path')
+
 
 def dispatch(args) -> None:
     if args.text_command == 'view':
         cmd_view(args)
+    elif args.text_command == 'edit':
+        cmd_edit(args)
     else:
-        print("Usage: u3edit text view ...", file=sys.stderr)
+        print("Usage: u3edit text {view|edit} ...", file=sys.stderr)
 
 
 def main() -> None:

@@ -202,9 +202,23 @@ def cmd_legend(args) -> None:
     print()
 
 
+def cmd_edit(args) -> None:
+    """Launch TUI map editor."""
+    from .tui import require_prompt_toolkit
+    require_prompt_toolkit()
+    from .tui.map_editor import MapEditor
+
+    with open(args.file, 'rb') as f:
+        data = f.read()
+
+    is_dungeon = len(data) <= MAP_DUNGEON_SIZE
+    editor = MapEditor(args.file, data, is_dungeon)
+    editor.run()
+
+
 def register_parser(subparsers) -> None:
     """Register map subcommands on a CLI subparser group."""
-    p = subparsers.add_parser('map', help='Map viewer')
+    p = subparsers.add_parser('map', help='Map viewer/editor')
     sub = p.add_subparsers(dest='map_command')
 
     p_view = sub.add_parser('view', help='View a map file')
@@ -221,6 +235,9 @@ def register_parser(subparsers) -> None:
 
     sub.add_parser('legend', help='Print tile legend')
 
+    p_edit = sub.add_parser('edit', help='Edit a map (TUI)')
+    p_edit.add_argument('file', help='MAP file path')
+
 
 def dispatch(args) -> None:
     """Dispatch map subcommand."""
@@ -230,8 +247,10 @@ def dispatch(args) -> None:
         cmd_overview(args)
     elif args.map_command == 'legend':
         cmd_legend(args)
+    elif args.map_command == 'edit':
+        cmd_edit(args)
     else:
-        print("Usage: u3edit map {view|overview|legend} ...", file=sys.stderr)
+        print("Usage: u3edit map {view|overview|legend|edit} ...", file=sys.stderr)
 
 
 def main() -> None:

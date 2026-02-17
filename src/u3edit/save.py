@@ -63,9 +63,18 @@ class PartyState:
     def party_size(self) -> int:
         return self.raw[4]
 
+    @party_size.setter
+    def party_size(self, val: int) -> None:
+        self.raw[4] = max(0, min(4, val))
+
     @property
     def slot_ids(self) -> list[int]:
         return [self.raw[5 + i] for i in range(4)]
+
+    @slot_ids.setter
+    def slot_ids(self, ids: list[int]) -> None:
+        for i, sid in enumerate(ids[:4]):
+            self.raw[5 + i] = max(0, min(19, sid))
 
     def to_dict(self) -> dict:
         return {
@@ -167,6 +176,10 @@ def cmd_edit(args) -> None:
         party.x = args.x; modified = True
     if args.y is not None:
         party.y = args.y; modified = True
+    if args.party_size is not None:
+        party.party_size = args.party_size; modified = True
+    if args.slot_ids is not None:
+        party.slot_ids = args.slot_ids; modified = True
 
     if modified:
         output = args.output if args.output else prty_path
@@ -193,6 +206,8 @@ def register_parser(subparsers) -> None:
     p_edit.add_argument('--transport', help='Transport: horse, ship, foot')
     p_edit.add_argument('--x', type=int, help='X coordinate (0-63)')
     p_edit.add_argument('--y', type=int, help='Y coordinate (0-63)')
+    p_edit.add_argument('--party-size', type=int, help='Party size (0-4)')
+    p_edit.add_argument('--slot-ids', type=int, nargs='+', help='Roster slot IDs (e.g., 0 1 2 3)')
     p_edit.add_argument('--output', '-o', help='Output file (default: overwrite PRTY)')
 
 

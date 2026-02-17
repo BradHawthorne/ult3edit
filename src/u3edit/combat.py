@@ -139,8 +139,21 @@ def cmd_view(args) -> None:
         print()
 
 
+def cmd_edit(args) -> None:
+    """Launch TUI combat map editor."""
+    from .tui import require_prompt_toolkit
+    require_prompt_toolkit()
+    from .tui.combat_editor import CombatEditor
+
+    with open(args.file, 'rb') as f:
+        data = f.read()
+
+    editor = CombatEditor(args.file, data)
+    editor.run()
+
+
 def register_parser(subparsers) -> None:
-    p = subparsers.add_parser('combat', help='Combat battlefield viewer')
+    p = subparsers.add_parser('combat', help='Combat battlefield viewer/editor')
     sub = p.add_subparsers(dest='combat_command')
 
     p_view = sub.add_parser('view', help='View combat maps')
@@ -148,12 +161,17 @@ def register_parser(subparsers) -> None:
     p_view.add_argument('--json', action='store_true', help='Output as JSON')
     p_view.add_argument('--output', '-o', help='Output file (for --json)')
 
+    p_edit = sub.add_parser('edit', help='Edit a combat map (TUI)')
+    p_edit.add_argument('file', help='CON file path')
+
 
 def dispatch(args) -> None:
     if args.combat_command == 'view':
         cmd_view(args)
+    elif args.combat_command == 'edit':
+        cmd_edit(args)
     else:
-        print("Usage: u3edit combat view ...", file=sys.stderr)
+        print("Usage: u3edit combat {view|edit} ...", file=sys.stderr)
 
 
 def main() -> None:

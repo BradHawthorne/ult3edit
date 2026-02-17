@@ -23,6 +23,7 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
+tui = ["prompt_toolkit>=3.0"]
 
 [project.scripts]
 u3edit = "u3edit.cli:main"
