@@ -79,5 +79,13 @@ class TestCLI:
         )
         assert result.returncode == 0
         for cmd in ['roster', 'bestiary', 'map', 'tlk', 'combat',
-                     'save', 'special', 'text', 'spell', 'equip', 'disk']:
+                     'save', 'special', 'text', 'spell', 'equip', 'disk', 'edit']:
             assert cmd in result.stdout, f"Missing subcommand '{cmd}' in help"
+
+    def test_edit_missing_image(self):
+        result = subprocess.run(
+            [sys.executable, '-m', 'u3edit', 'edit', '/nonexistent/fake.po'],
+            capture_output=True, text=True
+        )
+        assert result.returncode != 0
+        assert 'not found' in result.stderr.lower() or 'error' in result.stderr.lower()

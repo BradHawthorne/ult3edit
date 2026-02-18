@@ -33,14 +33,23 @@ from . import disk
 
 def _cmd_unified_edit(args) -> None:
     """Launch the unified tabbed TUI editor for a disk image."""
+    import os
+    if not os.path.isfile(args.image):
+        print(f"Error: Disk image not found: {args.image}", file=sys.stderr)
+        sys.exit(1)
+
     from .tui import require_prompt_toolkit
     require_prompt_toolkit()
     from .tui.game_session import GameSession
     from .tui.app import UnifiedApp
 
-    with GameSession(args.image) as session:
-        app = UnifiedApp(session)
-        app.run()
+    try:
+        with GameSession(args.image) as session:
+            app = UnifiedApp(session)
+            app.run()
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def main() -> None:

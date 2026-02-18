@@ -9,7 +9,9 @@ DrillDownTab: file selector → embedded editor → back.
 from prompt_toolkit.layout import HSplit, Window, FormattedTextControl
 from prompt_toolkit.layout.containers import DynamicContainer
 from prompt_toolkit.layout.controls import UIControl, UIContent
-from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.key_binding import KeyBindings, merge_key_bindings, \
+    ConditionalKeyBindings
+from prompt_toolkit.filters import Condition
 
 
 class TileEditorTab:
@@ -143,32 +145,64 @@ class DrillDownTab:
         dynamic = DynamicContainer(get_container)
 
         # --- Keybindings ---
-        kb = KeyBindings()
+        # Selector keybindings (only active when no sub-editor is open)
+        selector_kb = KeyBindings()
+        in_selector = Condition(lambda: tab.active_editor is None)
 
-        @kb.add('up')
+        @selector_kb.add('up')
         def _up(event):
-            if not tab.active_editor and tab.file_list:
+            if tab.file_list:
                 tab.selected_index = max(0, tab.selected_index - 1)
 
-        @kb.add('down')
+        @selector_kb.add('down')
         def _down(event):
-            if not tab.active_editor and tab.file_list:
+            if tab.file_list:
                 tab.selected_index = min(len(tab.file_list) - 1,
                                          tab.selected_index + 1)
 
-        @kb.add('enter')
+        @selector_kb.add('enter')
         def _open(event):
-            if not tab.active_editor and tab.file_list:
+            if tab.file_list:
                 tab._open_editor()
 
-        @kb.add('escape')
+        # Escape: return to selector (always active, saves dirty sub-editor)
+        nav_kb = KeyBindings()
+
+        @nav_kb.add('escape')
         def _back(event):
             if tab.active_editor:
+                if tab.active_editor.is_dirty:
+                    tab.active_editor.save()
                 tab.active_editor = None
                 tab._editor_container = None
                 tab._editor_kb = None
 
-        return dynamic, kb
+        # Sub-editor keybindings: dynamically forwarded via _DynamicEditorBindings
+        class _DynamicEditorBindings:
+            """Proxy that delegates to the current sub-editor's keybindings."""
+            def _update_cache(self):
+                pass
+
+            @property
+            def _version(self):
+                kb = tab._editor_kb
+                return id(kb) if kb else 0
+
+            @property
+            def bindings(self):
+                kb = tab._editor_kb
+                return kb.bindings if kb else []
+
+        in_editor = Condition(lambda: tab.active_editor is not None)
+        editor_proxy = _DynamicEditorBindings()
+        editor_cond = ConditionalKeyBindings(editor_proxy, in_editor)
+
+        merged = merge_key_bindings([
+            nav_kb,
+            ConditionalKeyBindings(selector_kb, in_selector),
+            editor_cond,
+        ])
+        return dynamic, merged
 
     def _open_editor(self):
         """Open the editor for the currently selected file."""

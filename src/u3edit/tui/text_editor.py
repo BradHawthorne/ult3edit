@@ -150,8 +150,10 @@ class TextEditor:
                 default=rec.text,
             ).run()
             if result is not None:
-                rec.text = result[:rec.max_len].upper()
-                editor.dirty = True
+                new_text = result[:rec.max_len].upper()
+                if new_text != rec.text:
+                    rec.text = new_text
+                    editor.dirty = True
 
         if not embedded:
             @kb.add('c-s')

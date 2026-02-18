@@ -14,48 +14,56 @@ def _monster_label(monster, index):
             f'DEF:{monster.defense:3d}  SPD:{monster.speed:3d}')
 
 
+def _byte_clamp(v):
+    """Parse string as int (auto-detect hex with 0x/$) and clamp 0-255."""
+    s = v.strip()
+    if s.startswith('$'):
+        s = '0x' + s[1:]
+    return max(0, min(255, int(s, 0)))
+
+
 def _monster_fields(monster):
     """Generate FormField list for editing a monster."""
     return [
         FormField('Tile 1',
                    lambda: f'${monster.tile1:02X} ({monster.name})',
-                   lambda v: setattr(monster, 'tile1', int(v, 0)),
+                   lambda v: setattr(monster, 'tile1', _byte_clamp(v)),
                    fmt='int'),
         FormField('Tile 2',
                    lambda: f'${monster.tile2:02X}',
-                   lambda v: setattr(monster, 'tile2', int(v, 0)),
+                   lambda v: setattr(monster, 'tile2', _byte_clamp(v)),
                    fmt='int'),
         FormField('HP',
                    lambda: monster.hp,
-                   lambda v: setattr(monster, 'hp', max(0, min(255, int(v)))),
+                   lambda v: setattr(monster, 'hp', _byte_clamp(v)),
                    fmt='int'),
         FormField('Attack',
                    lambda: monster.attack,
-                   lambda v: setattr(monster, 'attack', max(0, min(255, int(v)))),
+                   lambda v: setattr(monster, 'attack', _byte_clamp(v)),
                    fmt='int'),
         FormField('Defense',
                    lambda: monster.defense,
-                   lambda v: setattr(monster, 'defense', max(0, min(255, int(v)))),
+                   lambda v: setattr(monster, 'defense', _byte_clamp(v)),
                    fmt='int'),
         FormField('Speed',
                    lambda: monster.speed,
-                   lambda v: setattr(monster, 'speed', max(0, min(255, int(v)))),
+                   lambda v: setattr(monster, 'speed', _byte_clamp(v)),
                    fmt='int'),
         FormField('Flags 1',
                    lambda: f'${monster.flags1:02X} ({monster.flag_desc})',
-                   lambda v: setattr(monster, 'flags1', int(v, 0)),
+                   lambda v: setattr(monster, 'flags1', _byte_clamp(v)),
                    fmt='int'),
         FormField('Flags 2',
                    lambda: f'${monster.flags2:02X}',
-                   lambda v: setattr(monster, 'flags2', int(v, 0)),
+                   lambda v: setattr(monster, 'flags2', _byte_clamp(v)),
                    fmt='int'),
         FormField('Ability 1',
                    lambda: f'${monster.ability1:02X} ({monster.ability_desc})',
-                   lambda v: setattr(monster, 'ability1', int(v, 0)),
+                   lambda v: setattr(monster, 'ability1', _byte_clamp(v)),
                    fmt='int'),
         FormField('Ability 2',
                    lambda: f'${monster.ability2:02X}',
-                   lambda v: setattr(monster, 'ability2', int(v, 0)),
+                   lambda v: setattr(monster, 'ability2', _byte_clamp(v)),
                    fmt='int'),
     ]
 

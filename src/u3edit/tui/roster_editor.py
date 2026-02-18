@@ -2,7 +2,7 @@
 
 from ..constants import (
     CHAR_RECORD_SIZE, CHAR_MAX_SLOTS, ROSTER_FILE_SIZE,
-    RACES, CLASSES, GENDERS, STATUS_CODES, WEAPONS, ARMORS,
+    RACES, CLASSES,
 )
 from ..roster import Character
 from .form_editor import FormField, FormEditorTab
@@ -25,16 +25,16 @@ def _character_fields(char):
                              lambda: char.name,
                              lambda v: setattr(char, 'name', v)))
     fields.append(FormField('Race',
-                             lambda: char.race_name,
+                             lambda: char.race,
                              lambda v: setattr(char, 'race', v)))
     fields.append(FormField('Class',
-                             lambda: char.class_name,
+                             lambda: char.char_class,
                              lambda v: setattr(char, 'char_class', v)))
     fields.append(FormField('Gender',
-                             lambda: char.gender_name,
+                             lambda: char.gender,
                              lambda v: setattr(char, 'gender', v)))
     fields.append(FormField('Status',
-                             lambda: char.status_name,
+                             lambda: char.status,
                              lambda v: setattr(char, 'status', v)))
     fields.append(FormField('STR',
                              lambda: char.strength,
@@ -93,13 +93,11 @@ def _character_fields(char):
                              lambda v: setattr(char, 'torches', int(v)),
                              fmt='int'))
     fields.append(FormField('Weapon',
-                             lambda: WEAPONS[char.equipped_weapon]
-                             if char.equipped_weapon < len(WEAPONS) else '?',
+                             lambda: char.equipped_weapon,
                              lambda v: setattr(char, 'equipped_weapon', int(v)),
                              fmt='int'))
     fields.append(FormField('Armor',
-                             lambda: ARMORS[char.equipped_armor]
-                             if char.equipped_armor < len(ARMORS) else '?',
+                             lambda: char.equipped_armor,
                              lambda v: setattr(char, 'equipped_armor', int(v)),
                              fmt='int'))
     return fields

@@ -21,6 +21,38 @@ class TestTileEditorTab:
         state.dirty = True
         assert tab.is_dirty
 
+    def test_save_clears_dirty(self):
+        state = EditorState(data=bytearray(256), width=16, height=16)
+        saved = []
+        editor = BaseTileEditor(state, '/tmp/test',
+                                save_callback=lambda d: saved.append(d))
+        tab = TileEditorTab(editor)
+        state.dirty = True
+        tab.save()
+        assert not tab.is_dirty
+        assert len(saved) == 1
+
+
+class MockEditor:
+    """Mock editor for DrillDownTab tests."""
+
+    def __init__(self):
+        self._dirty = False
+        self._saved = False
+
+    @property
+    def is_dirty(self):
+        return self._dirty
+
+    def build_ui(self):
+        from prompt_toolkit.layout import Window
+        from prompt_toolkit.key_binding import KeyBindings
+        return Window(), KeyBindings()
+
+    def save(self):
+        self._saved = True
+        self._dirty = False
+
 
 class TestDrillDownTab:
     def _make_tab(self, file_list=None):
@@ -35,22 +67,6 @@ class TestDrillDownTab:
                 def cb(data):
                     pass
                 return cb
-
-        class MockEditor:
-            def __init__(self):
-                self._dirty = False
-
-            @property
-            def is_dirty(self):
-                return self._dirty
-
-            def build_ui(self):
-                # Return minimal stubs
-                from prompt_toolkit.layout import Window
-                return Window(), None
-
-            def save(self):
-                self._dirty = False
 
         def factory(fname, data, save_cb):
             return MockEditor()
@@ -79,7 +95,6 @@ class TestDrillDownTab:
         tab = self._make_tab()
         tab._open_editor()
         assert tab.active_editor is not None
-        # Simulate Escape
         tab.active_editor = None
         tab._editor_container = None
         assert tab.active_editor is None
@@ -96,3 +111,20 @@ class TestDrillDownTab:
         assert not tab.is_dirty
         tab._open_editor()  # Should be a no-op
         assert tab.active_editor is None
+
+    def test_save_propagates_to_editor(self):
+        tab = self._make_tab()
+        tab._open_editor()
+        tab.active_editor._dirty = True
+        tab.save()
+        assert tab.active_editor._saved
+        assert not tab.active_editor._dirty
+
+    def test_save_noop_without_editor(self):
+        tab = self._make_tab()
+        tab.save()  # Should not crash
+
+    def test_is_dirty_false_in_selector(self):
+        """is_dirty should be False when no editor is open."""
+        tab = self._make_tab()
+        assert not tab.is_dirty

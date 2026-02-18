@@ -155,18 +155,22 @@ class FormEditorTab:
         @kb.add('up')
         def _up(event):
             if tab.editing_fields:
-                tab.selected_field = max(0, tab.selected_field - 1)
+                if tab._current_fields:
+                    tab.selected_field = max(0, tab.selected_field - 1)
             else:
-                tab.selected_record = max(0, tab.selected_record - 1)
+                if tab.records:
+                    tab.selected_record = max(0, tab.selected_record - 1)
 
         @kb.add('down')
         def _down(event):
             if tab.editing_fields:
-                tab.selected_field = min(len(tab._current_fields) - 1,
-                                         tab.selected_field + 1)
+                if tab._current_fields:
+                    tab.selected_field = min(len(tab._current_fields) - 1,
+                                             tab.selected_field + 1)
             else:
-                tab.selected_record = min(len(tab.records) - 1,
-                                          tab.selected_record + 1)
+                if tab.records:
+                    tab.selected_record = min(len(tab.records) - 1,
+                                              tab.selected_record + 1)
 
         @kb.add('enter')
         def _enter(event):
@@ -176,10 +180,14 @@ class FormEditorTab:
                 # Enter field editing mode
                 rec = tab.records[tab.selected_record]
                 tab._current_fields = tab.field_factory(rec)
+                if not tab._current_fields:
+                    return
                 tab.selected_field = 0
                 tab.editing_fields = True
             else:
                 # Edit the selected field
+                if not tab._current_fields:
+                    return
                 field = tab._current_fields[tab.selected_field]
                 current_val = str(field.getter())
                 result = input_dialog(
@@ -188,8 +196,11 @@ class FormEditorTab:
                     default=current_val,
                 ).run()
                 if result is not None and result != current_val:
-                    field.setter(result)
-                    tab.dirty = True
+                    try:
+                        field.setter(result)
+                        tab.dirty = True
+                    except (ValueError, TypeError):
+                        pass  # Invalid input, ignore
 
         @kb.add('escape')
         def _back(event):

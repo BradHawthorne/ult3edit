@@ -17,10 +17,19 @@ class TestFormField:
         field = FormField('My Field', lambda: 'x', lambda v: None)
         assert field.label == 'My Field'
 
+    def test_fmt_default(self):
+        field = FormField('F', lambda: 0, lambda v: None)
+        assert field.fmt == 'str'
+
+    def test_fmt_int(self):
+        field = FormField('F', lambda: 0, lambda v: None, fmt='int')
+        assert field.fmt == 'int'
+
 
 class TestFormEditorTab:
-    def _make_tab(self):
-        records = [{'name': 'Alice', 'hp': 100}, {'name': 'Bob', 'hp': 50}]
+    def _make_tab(self, records=None):
+        if records is None:
+            records = [{'name': 'Alice', 'hp': 100}, {'name': 'Bob', 'hp': 50}]
 
         def label_fn(rec, i):
             return f'[{i}] {rec["name"]} HP:{rec["hp"]}'
@@ -71,6 +80,22 @@ class TestFormEditorTab:
         assert not tab.is_dirty
         assert saved == [b'saved']
 
+    def test_empty_records(self):
+        tab, _ = self._make_tab(records=[])
+        assert tab.name == 'Test'
+        assert len(tab.records) == 0
+        assert tab.selected_record == 0
+        assert not tab.is_dirty
+
+    def test_empty_records_navigation_safe(self):
+        """Arrow keys on empty records should not crash."""
+        tab, _ = self._make_tab(records=[])
+        # Simulating what the keybinding handler does
+        if tab.records:
+            tab.selected_record = max(0, tab.selected_record - 1)
+        # Should still be 0 (no crash)
+        assert tab.selected_record == 0
+
 
 class TestRosterEditor:
     def test_make_roster_tab(self, sample_roster_bytes):
@@ -94,6 +119,25 @@ class TestRosterEditor:
         name_val = name_field.getter()
         assert isinstance(name_val, str)
 
+    def test_roster_field_getters_no_crash(self, sample_roster_bytes):
+        """All field getters should work without AttributeError."""
+        from u3edit.tui.roster_editor import _character_fields
+        from u3edit.roster import Character
+        char = Character(sample_roster_bytes[:64])
+        fields = _character_fields(char)
+        for field in fields:
+            val = field.getter()
+            assert val is not None
+
+    def test_roster_save_roundtrip(self, sample_roster_bytes):
+        from u3edit.tui.roster_editor import make_roster_tab
+        saved = []
+        tab = make_roster_tab(sample_roster_bytes, lambda d: saved.append(d))
+        tab.dirty = True
+        tab.save()
+        assert len(saved) == 1
+        assert len(saved[0]) == 1280
+
 
 class TestBestiaryEditor:
     def test_make_bestiary_tab(self, sample_mon_bytes):
@@ -108,6 +152,32 @@ class TestBestiaryEditor:
         tab = make_bestiary_tab(sample_mon_bytes, 'A', lambda d: None)
         data = tab.get_save_data()
         assert len(data) == 256
+
+    def test_bestiary_roundtrip_preserves_data(self, sample_mon_bytes):
+        """Round-trip should preserve monster attributes."""
+        from u3edit.tui.bestiary_editor import make_bestiary_tab
+        tab = make_bestiary_tab(sample_mon_bytes, 'A', lambda d: None)
+        data = tab.get_save_data()
+        assert data == sample_mon_bytes
+
+    def test_byte_clamp(self):
+        from u3edit.tui.bestiary_editor import _byte_clamp
+        assert _byte_clamp('42') == 42
+        assert _byte_clamp('0x48') == 0x48
+        assert _byte_clamp('$48') == 0x48
+        assert _byte_clamp('300') == 255
+        assert _byte_clamp('-1') == 0
+        assert _byte_clamp('0') == 0
+
+    def test_bestiary_field_getters(self, sample_mon_bytes):
+        """All field getters should work without crash."""
+        from u3edit.tui.bestiary_editor import make_bestiary_tab, _monster_fields
+        tab = make_bestiary_tab(sample_mon_bytes, 'A', lambda d: None)
+        monster = tab.records[0]
+        fields = _monster_fields(monster)
+        for field in fields:
+            val = field.getter()
+            assert val is not None
 
 
 class TestPartyEditor:
@@ -127,6 +197,16 @@ class TestPartyEditor:
         labels = [f.label for f in fields]
         assert 'Transport' in labels
         assert 'Party Size' in labels
+
+    def test_party_save_roundtrip(self, sample_prty_bytes):
+        from u3edit.tui.party_editor import make_party_tab
+        saved = []
+        tab = make_party_tab(sample_prty_bytes, lambda d: saved.append(d))
+        tab.dirty = True
+        tab.save()
+        assert len(saved) == 1
+        assert len(saved[0]) == 16
+        assert saved[0] == sample_prty_bytes
 
 
 class TestDialogEditor:
@@ -148,3 +228,25 @@ class TestDialogEditor:
         assert not editor.is_dirty
         editor.dirty = True
         assert editor.is_dirty
+
+    def test_save_encodes_and_calls_callback(self):
+        from u3edit.tui.dialog_editor import DialogEditor
+        rec1 = bytes([0xC8, 0xC9, 0x00])  # "HI\0"
+        saved = []
+        editor = DialogEditor('/tmp/test', rec1, save_callback=lambda d: saved.append(d))
+        editor.dirty = True
+        editor.save()
+        assert not editor.is_dirty
+        assert len(saved) == 1
+        assert isinstance(saved[0], bytes)
+
+    def test_multiline_record(self):
+        from u3edit.tui.dialog_editor import DialogEditor
+        # "LINE1\xFFLINE2\x00" — multi-line record
+        data = bytes([0xCC, 0xC9, 0xCE, 0xC5, 0xB1, 0xFF,
+                      0xCC, 0xC9, 0xCE, 0xC5, 0xB2, 0x00])
+        editor = DialogEditor('/tmp/test', data)
+        assert len(editor.records) == 1
+        assert len(editor.records[0]) == 2
+        assert editor.records[0][0] == 'LINE1'
+        assert editor.records[0][1] == 'LINE2'

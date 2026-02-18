@@ -9,7 +9,11 @@ class SpecialEditor(BaseTileEditor):
 
     def __init__(self, file_path: str, data: bytes, save_callback=None):
         self.full_data = bytearray(data)
-        tile_data = bytearray(data[:SPECIAL_MAP_TILES])
+        # Pad tile data to exactly SPECIAL_MAP_TILES if short
+        raw_tiles = data[:SPECIAL_MAP_TILES]
+        if len(raw_tiles) < SPECIAL_MAP_TILES:
+            raw_tiles = raw_tiles + bytes(SPECIAL_MAP_TILES - len(raw_tiles))
+        tile_data = bytearray(raw_tiles)
         state = EditorState(
             data=tile_data,
             width=SPECIAL_MAP_WIDTH,
