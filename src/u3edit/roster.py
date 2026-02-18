@@ -11,14 +11,16 @@ Bug fixes from prototype:
 """
 
 import argparse
+import json
 import os
 import sys
 
-from .bcd import bcd_to_int, bcd16_to_int, int_to_bcd, int_to_bcd16
+from .bcd import bcd_to_int, bcd16_to_int, int_to_bcd, int_to_bcd16, is_valid_bcd
 from .constants import (
     CHAR_RECORD_SIZE, CHAR_MAX_SLOTS, ROSTER_FILE_SIZE,
     RACES, RACE_CODES, CLASSES, CLASS_CODES, GENDERS, STATUS_CODES,
     WEAPONS, ARMORS, MARKS_BITS, CARDS_BITS, RACE_MAX_STATS,
+    CLASS_MAX_WEAPON, CLASS_MAX_ARMOR,
     CHAR_NAME_OFFSET, CHAR_NAME_LENGTH, CHAR_MARKS_CARDS, CHAR_TORCHES,
     CHAR_IN_PARTY, CHAR_STATUS, CHAR_STR, CHAR_DEX, CHAR_INT, CHAR_WIS,
     CHAR_RACE, CHAR_CLASS, CHAR_GENDER, CHAR_MP,
@@ -29,7 +31,7 @@ from .constants import (
     CHAR_WORN_ARMOR, CHAR_ARMOR_START,
     CHAR_READIED_WEAPON, CHAR_WEAPON_START,
 )
-from .fileutil import decode_high_ascii, encode_high_ascii
+from .fileutil import decode_high_ascii, encode_high_ascii, backup_file
 from .json_export import export_json
 
 
@@ -399,50 +401,63 @@ def save_roster(path: str, chars: list[Character], original_data: bytes) -> None
     print(f"Saved to {path}")
 
 
-def cmd_view(args) -> None:
-    chars, _ = load_roster(args.file)
-    filename = os.path.basename(args.file)
+def validate_character(char: Character) -> list[str]:
+    """Check a character for game-rule violations and data integrity issues.
 
-    if args.json:
-        roster = []
-        for i, char in enumerate(chars):
-            if not char.is_empty:
-                d = char.to_dict()
-                d['slot'] = i
-                roster.append(d)
-        export_json(roster, args.output)
-        return
-
-    print(f"\n=== Ultima III Roster: {filename} ({len(chars)} slots) ===\n")
-
-    if args.slot is not None:
-        if args.slot < 0 or args.slot >= len(chars):
-            print(f"Error: Slot {args.slot} out of range (0-{len(chars)-1})", file=sys.stderr)
-            sys.exit(1)
-        chars[args.slot].display(args.slot)
-    else:
-        found = False
-        for i, char in enumerate(chars):
-            if not char.is_empty:
-                char.display(i)
-                found = True
-        if not found:
-            print("  (All slots empty)")
-    print()
-
-
-def cmd_edit(args) -> None:
-    chars, original = load_roster(args.file)
-    if args.slot < 0 or args.slot >= len(chars):
-        print(f"Error: Slot {args.slot} out of range", file=sys.stderr)
-        sys.exit(1)
-
-    char = chars[args.slot]
+    Returns a list of warning strings (empty if everything is valid).
+    """
+    warnings = []
     if char.is_empty:
-        print(f"Error: Slot {args.slot} is empty. Use 'create' to make a new character.",
-              file=sys.stderr)
-        sys.exit(1)
+        return warnings
 
+    # BCD integrity checks
+    bcd_fields = [
+        (CHAR_STR, 'Strength'), (CHAR_DEX, 'Dexterity'),
+        (CHAR_INT, 'Intelligence'), (CHAR_WIS, 'Wisdom'),
+        (CHAR_MP, 'MP'), (CHAR_GEMS, 'Gems'),
+        (CHAR_KEYS, 'Keys'), (CHAR_POWDERS, 'Powders'),
+        (CHAR_TORCHES, 'Torches'), (CHAR_SUB_MORSELS, 'Sub-morsels'),
+        (CHAR_HP_HI, 'HP high'), (CHAR_HP_LO, 'HP low'),
+        (CHAR_MAX_HP_HI, 'MaxHP high'), (CHAR_MAX_HP_LO, 'MaxHP low'),
+        (CHAR_EXP_HI, 'Exp high'), (CHAR_EXP_LO, 'Exp low'),
+        (CHAR_FOOD_HI, 'Food high'), (CHAR_FOOD_LO, 'Food low'),
+        (CHAR_GOLD_HI, 'Gold high'), (CHAR_GOLD_LO, 'Gold low'),
+    ]
+    for offset, label in bcd_fields:
+        if not is_valid_bcd(char.raw[offset]):
+            warnings.append(f"Invalid BCD in {label}: ${char.raw[offset]:02X}")
+
+    # Race stat maximums
+    race = char.race
+    if race in RACE_MAX_STATS:
+        max_str, max_dex, max_int, max_wis = RACE_MAX_STATS[race]
+        if char.strength > max_str:
+            warnings.append(f"STR {char.strength} exceeds {race} max {max_str}")
+        if char.dexterity > max_dex:
+            warnings.append(f"DEX {char.dexterity} exceeds {race} max {max_dex}")
+        if char.intelligence > max_int:
+            warnings.append(f"INT {char.intelligence} exceeds {race} max {max_int}")
+        if char.wisdom > max_wis:
+            warnings.append(f"WIS {char.wisdom} exceeds {race} max {max_wis}")
+
+    # Class equipment restrictions
+    cls = char.char_class
+    weapon_idx = char.raw[CHAR_READIED_WEAPON]
+    armor_idx = char.raw[CHAR_WORN_ARMOR]
+    if cls in CLASS_MAX_WEAPON and weapon_idx > CLASS_MAX_WEAPON[cls]:
+        warnings.append(
+            f"Weapon {WEAPONS[weapon_idx] if weapon_idx < len(WEAPONS) else weapon_idx} "
+            f"exceeds {cls} max ({WEAPONS[CLASS_MAX_WEAPON[cls]]})")
+    if cls in CLASS_MAX_ARMOR and armor_idx > CLASS_MAX_ARMOR[cls]:
+        warnings.append(
+            f"Armor {ARMORS[armor_idx] if armor_idx < len(ARMORS) else armor_idx} "
+            f"exceeds {cls} max ({ARMORS[CLASS_MAX_ARMOR[cls]]})")
+
+    return warnings
+
+
+def _apply_edits(char: Character, args) -> bool:
+    """Apply CLI edit flags to a character. Returns True if anything changed."""
     modified = False
     if args.name is not None:
         char.name = args.name; modified = True
@@ -498,18 +513,111 @@ def cmd_edit(args) -> None:
         char.marks = [m.strip() for m in args.marks.split(',')]; modified = True
     if args.cards is not None:
         char.cards = [c.strip() for c in args.cards.split(',')]; modified = True
+    return modified
 
-    if modified:
+
+def cmd_view(args) -> None:
+    chars, _ = load_roster(args.file)
+    filename = os.path.basename(args.file)
+
+    do_validate = getattr(args, 'validate', False)
+
+    if args.json:
+        roster = []
+        for i, char in enumerate(chars):
+            if not char.is_empty:
+                d = char.to_dict()
+                d['slot'] = i
+                if do_validate:
+                    d['warnings'] = validate_character(char)
+                roster.append(d)
+        export_json(roster, args.output)
+        return
+
+    print(f"\n=== Ultima III Roster: {filename} ({len(chars)} slots) ===\n")
+
+    if args.slot is not None:
+        if args.slot < 0 or args.slot >= len(chars):
+            print(f"Error: Slot {args.slot} out of range (0-{len(chars)-1})", file=sys.stderr)
+            sys.exit(1)
+        chars[args.slot].display(args.slot)
+        if do_validate:
+            for w in validate_character(chars[args.slot]):
+                print(f"  WARNING: {w}", file=sys.stderr)
+    else:
+        found = False
+        for i, char in enumerate(chars):
+            if not char.is_empty:
+                char.display(i)
+                if do_validate:
+                    for w in validate_character(char):
+                        print(f"  WARNING: Slot {i}: {w}", file=sys.stderr)
+                found = True
+        if not found:
+            print("  (All slots empty)")
+    print()
+
+
+def cmd_edit(args) -> None:
+    chars, original = load_roster(args.file)
+    do_validate = getattr(args, 'validate', False)
+    dry_run = getattr(args, 'dry_run', False)
+    do_backup = getattr(args, 'backup', False)
+    edit_all = getattr(args, 'all', False)
+
+    if edit_all:
+        # Bulk edit: apply to all non-empty slots
+        modified = False
+        for i, char in enumerate(chars):
+            if not char.is_empty:
+                if _apply_edits(char, args):
+                    print(f"Modified slot {i}:")
+                    char.display(i)
+                    if do_validate:
+                        for w in validate_character(char):
+                            print(f"  WARNING: {w}", file=sys.stderr)
+                    modified = True
+        if not modified:
+            print("No modifications specified.")
+            return
+    else:
+        if args.slot is None:
+            print("Error: --slot or --all required", file=sys.stderr)
+            sys.exit(1)
+        if args.slot < 0 or args.slot >= len(chars):
+            print(f"Error: Slot {args.slot} out of range", file=sys.stderr)
+            sys.exit(1)
+
+        char = chars[args.slot]
+        if char.is_empty:
+            print(f"Error: Slot {args.slot} is empty. Use 'create' to make a new character.",
+                  file=sys.stderr)
+            sys.exit(1)
+
+        if not _apply_edits(char, args):
+            print("No modifications specified.")
+            return
         print(f"Modified slot {args.slot}:")
         char.display(args.slot)
-        output = args.output if args.output else args.file
-        save_roster(output, chars, original)
-    else:
-        print("No modifications specified.")
+        if do_validate:
+            for w in validate_character(char):
+                print(f"  WARNING: {w}", file=sys.stderr)
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
+
+    output = args.output if args.output else args.file
+    if do_backup and (not args.output or args.output == args.file):
+        backup_file(args.file)
+    save_roster(output, chars, original)
 
 
 def cmd_create(args) -> None:
     chars, original = load_roster(args.file)
+    dry_run = getattr(args, 'dry_run', False)
+    do_backup = getattr(args, 'backup', False)
+
     if args.slot < 0 or args.slot >= len(chars):
         print(f"Error: Slot {args.slot} out of range", file=sys.stderr)
         sys.exit(1)
@@ -537,8 +645,119 @@ def cmd_create(args) -> None:
     chars[args.slot] = char
     print(f"Created character in slot {args.slot}:")
     char.display(args.slot)
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
+
     output = args.output if args.output else args.file
+    if do_backup and (not args.output or args.output == args.file):
+        backup_file(args.file)
     save_roster(output, chars, original)
+
+
+def cmd_import(args) -> None:
+    """Import character data from a JSON file into a roster."""
+    chars, original = load_roster(args.file)
+    do_backup = getattr(args, 'backup', False)
+
+    with open(args.json_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    if not isinstance(data, list):
+        print("Error: JSON must be a list of character objects (with 'slot' field)", file=sys.stderr)
+        sys.exit(1)
+
+    count = 0
+    for entry in data:
+        slot = entry.get('slot')
+        if slot is None or not (0 <= slot < len(chars)):
+            continue
+        char = chars[slot]
+        if char.is_empty:
+            char = Character(bytearray(CHAR_RECORD_SIZE))
+            chars[slot] = char
+        if 'name' in entry:
+            char.name = entry['name']
+        if 'race' in entry:
+            char.race = entry['race']
+        if 'class' in entry:
+            char.char_class = entry['class']
+        if 'gender' in entry:
+            char.gender = entry['gender']
+        if 'status' in entry:
+            char.status = entry['status']
+        stats = entry.get('stats', {})
+        if 'str' in stats:
+            char.strength = stats['str']
+        if 'dex' in stats:
+            char.dexterity = stats['dex']
+        if 'int' in stats:
+            char.intelligence = stats['int']
+        if 'wis' in stats:
+            char.wisdom = stats['wis']
+        if 'hp' in entry:
+            char.hp = entry['hp']
+        if 'max_hp' in entry:
+            char.max_hp = entry['max_hp']
+        if 'mp' in entry:
+            char.mp = entry['mp']
+        if 'exp' in entry:
+            char.exp = entry['exp']
+        if 'gold' in entry:
+            char.gold = entry['gold']
+        if 'food' in entry:
+            char.food = entry['food']
+        if 'gems' in entry:
+            char.gems = entry['gems']
+        if 'keys' in entry:
+            char.keys = entry['keys']
+        if 'powders' in entry:
+            char.powders = entry['powders']
+        if 'torches' in entry:
+            char.torches = entry['torches']
+        if 'marks' in entry:
+            char.marks = entry['marks']
+        if 'cards' in entry:
+            char.cards = entry['cards']
+        count += 1
+
+    output = args.output if args.output else args.file
+    if do_backup and (not args.output or args.output == args.file):
+        backup_file(args.file)
+    save_roster(output, chars, original)
+    print(f"Imported {count} character(s)")
+
+
+def _add_edit_args(p) -> None:
+    """Add common character edit arguments to a parser."""
+    p.add_argument('--name', help='Character name (max 9 chars)')
+    p.add_argument('--str', type=int, help='Strength (0-99)')
+    p.add_argument('--dex', type=int, help='Dexterity (0-99)')
+    p.add_argument('--int', type=int, dest='int_', help='Intelligence (0-99)')
+    p.add_argument('--wis', type=int, help='Wisdom (0-99)')
+    p.add_argument('--hp', type=int, help='Hit points (0-9999)')
+    p.add_argument('--max-hp', type=int, help='Max HP (0-9999)')
+    p.add_argument('--mp', type=int, help='Magic points (0-99)')
+    p.add_argument('--gold', type=int, help='Gold (0-9999)')
+    p.add_argument('--exp', type=int, help='Experience (0-9999)')
+    p.add_argument('--food', type=int, help='Food (0-9999)')
+    p.add_argument('--gems', type=int, help='Gems (0-99)')
+    p.add_argument('--keys', type=int, help='Keys (0-99)')
+    p.add_argument('--powders', type=int, help='Powders (0-99)')
+    p.add_argument('--torches', type=int, help='Torches (0-99)')
+    p.add_argument('--race', help='Race: H(uman) E(lf) D(warf) B(obbit) F(uzzy)')
+    p.add_argument('--class', dest='class_', help='Class: F C W T L I D A R P B')
+    p.add_argument('--status', help='Status: G(ood) P(oisoned) D(ead) A(shes)')
+    p.add_argument('--gender', help='Gender: M(ale) F(emale) O(ther)')
+    p.add_argument('--weapon', type=int, help='Equipped weapon index (0-15)')
+    p.add_argument('--armor', type=int, help='Equipped armor index (0-7)')
+    p.add_argument('--give-weapon', type=int, nargs=2, metavar=('INDEX', 'COUNT'),
+                   help='Set weapon inventory count (index 1-15, count 0-99)')
+    p.add_argument('--give-armor', type=int, nargs=2, metavar=('INDEX', 'COUNT'),
+                   help='Set armor inventory count (index 1-7, count 0-99)')
+    p.add_argument('--marks', help='Marks (comma-separated: Kings,Snake,Fire,Force)')
+    p.add_argument('--cards', help='Cards (comma-separated: Death,Sol,Love,Moons)')
 
 
 def register_parser(subparsers) -> None:
@@ -552,45 +771,27 @@ def register_parser(subparsers) -> None:
     p_view.add_argument('--slot', type=int, help='View specific slot (0-19)')
     p_view.add_argument('--json', action='store_true', help='Output as JSON')
     p_view.add_argument('--output', '-o', help='Output file (for --json)')
+    p_view.add_argument('--validate', action='store_true', help='Check game-rule violations')
 
     # Edit
     p_edit = sub.add_parser('edit', help='Edit a character')
     p_edit.add_argument('file', help='ROST file path')
-    p_edit.add_argument('--slot', type=int, required=True, help='Slot number (0-19)')
+    slot_group = p_edit.add_mutually_exclusive_group(required=True)
+    slot_group.add_argument('--slot', type=int, help='Slot number (0-19)')
+    slot_group.add_argument('--all', action='store_true', help='Edit all non-empty slots')
     p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
-    p_edit.add_argument('--name', help='Character name (max 9 chars)')
-    p_edit.add_argument('--str', type=int, help='Strength (0-99)')
-    p_edit.add_argument('--dex', type=int, help='Dexterity (0-99)')
-    p_edit.add_argument('--int', type=int, dest='int_', help='Intelligence (0-99)')
-    p_edit.add_argument('--wis', type=int, help='Wisdom (0-99)')
-    p_edit.add_argument('--hp', type=int, help='Hit points (0-9999)')
-    p_edit.add_argument('--max-hp', type=int, help='Max HP (0-9999)')
-    p_edit.add_argument('--mp', type=int, help='Magic points (0-99)')
-    p_edit.add_argument('--gold', type=int, help='Gold (0-9999)')
-    p_edit.add_argument('--exp', type=int, help='Experience (0-9999)')
-    p_edit.add_argument('--food', type=int, help='Food (0-9999)')
-    p_edit.add_argument('--gems', type=int, help='Gems (0-99)')
-    p_edit.add_argument('--keys', type=int, help='Keys (0-99)')
-    p_edit.add_argument('--powders', type=int, help='Powders (0-99)')
-    p_edit.add_argument('--torches', type=int, help='Torches (0-99)')
-    p_edit.add_argument('--race', help='Race: H(uman) E(lf) D(warf) B(obbit) F(uzzy)')
-    p_edit.add_argument('--class', dest='class_', help='Class: F C W T L I D A R P B')
-    p_edit.add_argument('--status', help='Status: G(ood) P(oisoned) D(ead) A(shes)')
-    p_edit.add_argument('--gender', help='Gender: M(ale) F(emale) O(ther)')
-    p_edit.add_argument('--weapon', type=int, help='Equipped weapon index (0-15)')
-    p_edit.add_argument('--armor', type=int, help='Equipped armor index (0-7)')
-    p_edit.add_argument('--give-weapon', type=int, nargs=2, metavar=('INDEX', 'COUNT'),
-                         help='Set weapon inventory count (index 1-15, count 0-99)')
-    p_edit.add_argument('--give-armor', type=int, nargs=2, metavar=('INDEX', 'COUNT'),
-                         help='Set armor inventory count (index 1-7, count 0-99)')
-    p_edit.add_argument('--marks', help='Marks (comma-separated: Kings,Snake,Fire,Force)')
-    p_edit.add_argument('--cards', help='Cards (comma-separated: Death,Sol,Love,Moons)')
+    p_edit.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_edit.add_argument('--dry-run', action='store_true', help='Show changes without writing')
+    p_edit.add_argument('--validate', action='store_true', help='Check game-rule violations')
+    _add_edit_args(p_edit)
 
     # Create
     p_create = sub.add_parser('create', help='Create a new character')
     p_create.add_argument('file', help='ROST file path')
     p_create.add_argument('--slot', type=int, required=True, help='Slot number (0-19)')
     p_create.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_create.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_create.add_argument('--dry-run', action='store_true', help='Show changes without writing')
     p_create.add_argument('--name', help='Character name (default: HERO)')
     p_create.add_argument('--race', help='Race: H(uman) E(lf) D(warf) B(obbit) F(uzzy)')
     p_create.add_argument('--class', dest='class_', help='Class: F C W T L I D A R P B')
@@ -601,6 +802,13 @@ def register_parser(subparsers) -> None:
     p_create.add_argument('--wis', type=int, help='Wisdom')
     p_create.add_argument('--force', action='store_true', help='Overwrite existing')
 
+    # Import
+    p_import = sub.add_parser('import', help='Import characters from JSON')
+    p_import.add_argument('file', help='ROST file path')
+    p_import.add_argument('json_file', help='JSON file to import')
+    p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+
 
 def dispatch(args) -> None:
     """Dispatch roster subcommand."""
@@ -610,8 +818,10 @@ def dispatch(args) -> None:
         cmd_edit(args)
     elif args.roster_command == 'create':
         cmd_create(args)
+    elif args.roster_command == 'import':
+        cmd_import(args)
     else:
-        print("Usage: u3edit roster {view|edit|create} ...", file=sys.stderr)
+        print("Usage: u3edit roster {view|edit|create|import} ...", file=sys.stderr)
 
 
 def main() -> None:
@@ -620,38 +830,30 @@ def main() -> None:
         description='Ultima III: Exodus - Character Roster Viewer/Editor')
     sub = parser.add_subparsers(dest='roster_command')
 
-    # Reuse registration but directly on our parser
     p_view = sub.add_parser('view', help='View roster contents')
     p_view.add_argument('file', help='ROST file path')
     p_view.add_argument('--slot', type=int, help='View specific slot (0-19)')
     p_view.add_argument('--json', action='store_true', help='Output as JSON')
     p_view.add_argument('--output', '-o', help='Output file (for --json)')
+    p_view.add_argument('--validate', action='store_true', help='Check game-rule violations')
 
     p_edit = sub.add_parser('edit', help='Edit a character')
     p_edit.add_argument('file', help='ROST file path')
-    p_edit.add_argument('--slot', type=int, required=True)
+    slot_group = p_edit.add_mutually_exclusive_group(required=True)
+    slot_group.add_argument('--slot', type=int, help='Slot number (0-19)')
+    slot_group.add_argument('--all', action='store_true', help='Edit all non-empty slots')
     p_edit.add_argument('--output', '-o')
-    p_edit.add_argument('--name')
-    for flag in ['--str', '--dex', '--wis', '--hp', '--max-hp',
-                 '--mp', '--gold', '--exp', '--food', '--gems', '--keys',
-                 '--powders', '--torches']:
-        p_edit.add_argument(flag, type=int)
-    p_edit.add_argument('--int', type=int, dest='int_')
-    p_edit.add_argument('--race')
-    p_edit.add_argument('--class', dest='class_')
-    p_edit.add_argument('--status')
-    p_edit.add_argument('--gender')
-    p_edit.add_argument('--weapon', type=int)
-    p_edit.add_argument('--armor', type=int)
-    p_edit.add_argument('--give-weapon', type=int, nargs=2, metavar=('INDEX', 'COUNT'))
-    p_edit.add_argument('--give-armor', type=int, nargs=2, metavar=('INDEX', 'COUNT'))
-    p_edit.add_argument('--marks')
-    p_edit.add_argument('--cards')
+    p_edit.add_argument('--backup', action='store_true')
+    p_edit.add_argument('--dry-run', action='store_true')
+    p_edit.add_argument('--validate', action='store_true')
+    _add_edit_args(p_edit)
 
     p_create = sub.add_parser('create', help='Create a new character')
     p_create.add_argument('file')
     p_create.add_argument('--slot', type=int, required=True)
     p_create.add_argument('--output', '-o')
+    p_create.add_argument('--backup', action='store_true')
+    p_create.add_argument('--dry-run', action='store_true')
     p_create.add_argument('--name')
     p_create.add_argument('--race')
     p_create.add_argument('--class', dest='class_')
@@ -661,6 +863,12 @@ def main() -> None:
     p_create.add_argument('--int', type=int, dest='int_')
     p_create.add_argument('--wis', type=int)
     p_create.add_argument('--force', action='store_true')
+
+    p_import = sub.add_parser('import', help='Import characters from JSON')
+    p_import.add_argument('file', help='ROST file path')
+    p_import.add_argument('json_file', help='JSON file to import')
+    p_import.add_argument('--output', '-o')
+    p_import.add_argument('--backup', action='store_true')
 
     args = parser.parse_args()
     dispatch(args)

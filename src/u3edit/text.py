@@ -5,11 +5,12 @@ Contains in-game text strings used by the engine.
 """
 
 import argparse
+import json
 import os
 import sys
 
 from .constants import TEXT_FILE_SIZE
-from .fileutil import decode_high_ascii
+from .fileutil import decode_high_ascii, encode_high_ascii, backup_file
 from .json_export import export_json
 
 
@@ -59,6 +60,37 @@ def cmd_edit(args) -> None:
     editor.run()
 
 
+def cmd_import(args) -> None:
+    """Import game text from JSON."""
+    with open(args.file, 'rb') as f:
+        data = bytearray(f.read())
+    do_backup = getattr(args, 'backup', False)
+
+    with open(args.json_file, 'r', encoding='utf-8') as f:
+        jdata = json.load(f)
+
+    records = jdata if isinstance(jdata, list) else jdata.get('records', [])
+
+    # Rebuild file: pack strings sequentially
+    offset = 0
+    for entry in records:
+        text = entry.get('text', '') if isinstance(entry, dict) else str(entry)
+        encoded = encode_high_ascii(text, len(text))
+        end = offset + len(encoded) + 1  # +1 for null terminator
+        if end > len(data):
+            break
+        data[offset:offset + len(encoded)] = encoded
+        data[offset + len(encoded)] = 0x00
+        offset = end
+
+    output = args.output if args.output else args.file
+    if do_backup and (not args.output or args.output == args.file):
+        backup_file(args.file)
+    with open(output, 'wb') as f:
+        f.write(data)
+    print(f"Imported {len(records)} text records to {output}")
+
+
 def register_parser(subparsers) -> None:
     p = subparsers.add_parser('text', help='Game text viewer/editor')
     sub = p.add_subparsers(dest='text_command')
@@ -71,14 +103,23 @@ def register_parser(subparsers) -> None:
     p_edit = sub.add_parser('edit', help='Edit game text (TUI)')
     p_edit.add_argument('file', help='TEXT file path')
 
+    p_import = sub.add_parser('import', help='Import game text from JSON')
+    p_import.add_argument('file', help='TEXT file path')
+    p_import.add_argument('json_file', help='JSON file to import')
+    p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+
 
 def dispatch(args) -> None:
-    if args.text_command == 'view':
+    cmd = args.text_command
+    if cmd == 'view':
         cmd_view(args)
-    elif args.text_command == 'edit':
+    elif cmd == 'edit':
         cmd_edit(args)
+    elif cmd == 'import':
+        cmd_import(args)
     else:
-        print("Usage: u3edit text {view|edit} ...", file=sys.stderr)
+        print("Usage: u3edit text {view|edit|import} ...", file=sys.stderr)
 
 
 def main() -> None:

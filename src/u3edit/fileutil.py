@@ -2,6 +2,7 @@
 
 import glob
 import os
+import shutil
 
 
 def resolve_game_file(directory: str, prefix: str, letter: str) -> str | None:
@@ -73,6 +74,16 @@ def decode_high_ascii(data: bytes) -> str:
         if 0x20 <= ch < 0x7F:
             chars.append(chr(ch))
     return ''.join(chars).rstrip()
+
+
+def backup_file(path: str) -> str:
+    """Create a .bak backup of a file before overwriting.
+
+    Returns the backup path, or raises FileNotFoundError if original missing.
+    """
+    bak = path + '.bak'
+    shutil.copy2(path, bak)
+    return bak
 
 
 def encode_high_ascii(text: str, length: int) -> bytearray:

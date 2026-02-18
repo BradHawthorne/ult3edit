@@ -81,6 +81,9 @@ def tile_name(byte_val: int, is_dungeon: bool = False) -> str:
     return entry[1] if entry else f'Unknown(${byte_val:02X})'
 
 
+# Reverse lookup: display char -> canonical tile byte (for map import)
+TILE_CHARS_REVERSE = {ch: tile_id for tile_id, (ch, _) in TILES.items()}
+
 # =============================================================================
 # Dungeon Tile Table
 # =============================================================================
@@ -104,6 +107,8 @@ DUNGEON_TILES = {
     0x0E: ('P', 'Pit'),
     0x0F: ('?', 'Unknown'),
 }
+
+DUNGEON_TILE_CHARS_REVERSE = {ch: tile_id for tile_id, (ch, _) in DUNGEON_TILES.items()}
 
 # =============================================================================
 # Character Races and Classes

@@ -9,6 +9,7 @@ Bug fixes from prototype:
 """
 
 import argparse
+import json
 import os
 import sys
 
@@ -19,7 +20,7 @@ from .constants import (
     MON_ATTR_ABILITY1, MON_ATTR_ABILITY2,
     MON_TERRAIN, MON_LETTERS, MONSTER_NAMES, MON_GROUP_NAMES, TILES,
 )
-from .fileutil import resolve_game_file
+from .fileutil import resolve_game_file, backup_file
 from .json_export import export_json
 
 
@@ -232,6 +233,8 @@ def cmd_edit(args) -> None:
     with open(args.file, 'rb') as f:
         original_data = f.read()
     monsters = load_mon_file(args.file)
+    dry_run = getattr(args, 'dry_run', False)
+    do_backup = getattr(args, 'backup', False)
 
     if args.monster < 0 or args.monster >= MON_MONSTERS_PER_FILE:
         print(f"Error: Monster index must be 0-15", file=sys.stderr)
@@ -261,13 +264,66 @@ def cmd_edit(args) -> None:
     if args.ability2 is not None:
         m.ability2 = max(0, min(255, args.ability2)); modified = True
 
-    if modified:
-        output = args.output if args.output else args.file
-        save_mon_file(output, monsters, original_data)
-        print(f"Modified monster #{args.monster}:")
-        m.display(compact=False)
-    else:
+    if not modified:
         print("No modifications specified.")
+        return
+
+    print(f"Modified monster #{args.monster}:")
+    m.display(compact=False)
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
+
+    output = args.output if args.output else args.file
+    if do_backup and (not args.output or args.output == args.file):
+        backup_file(args.file)
+    save_mon_file(output, monsters, original_data)
+
+
+def cmd_import(args) -> None:
+    """Import monster data from JSON into a MON file."""
+    with open(args.file, 'rb') as f:
+        original_data = f.read()
+    monsters = load_mon_file(args.file)
+    do_backup = getattr(args, 'backup', False)
+
+    with open(args.json_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+
+    # Accept either a list of monsters or a dict with 'monsters' key
+    mon_list = data if isinstance(data, list) else data.get('monsters', [])
+    count = 0
+    for entry in mon_list:
+        idx = entry.get('index')
+        if idx is None or not (0 <= idx < MON_MONSTERS_PER_FILE):
+            continue
+        m = monsters[idx]
+        for attr in ('tile1', 'tile2', 'hp', 'attack', 'defense', 'speed',
+                     'flags1', 'flags2', 'ability1', 'ability2'):
+            if attr in entry:
+                setattr(m, attr, max(0, min(255, entry[attr])))
+        count += 1
+
+    output = args.output if args.output else args.file
+    if do_backup and (not args.output or args.output == args.file):
+        backup_file(args.file)
+    save_mon_file(output, monsters, original_data)
+    print(f"Imported {count} monster(s)")
+
+
+def _add_mon_edit_args(p) -> None:
+    """Add common monster edit arguments to a parser."""
+    p.add_argument('--hp', type=int, help='Hit points (0-255)')
+    p.add_argument('--attack', type=int, help='Attack value (0-255)')
+    p.add_argument('--defense', type=int, help='Defense value (0-255)')
+    p.add_argument('--speed', type=int, help='Speed value (0-255)')
+    p.add_argument('--tile1', type=int, help='Tile/sprite byte 1 (0-255)')
+    p.add_argument('--tile2', type=int, help='Tile/sprite byte 2 (0-255)')
+    p.add_argument('--flags1', type=int, help='Flags byte 1 (0-255)')
+    p.add_argument('--flags2', type=int, help='Flags byte 2 (0-255)')
+    p.add_argument('--ability1', type=int, help='Ability byte 1 (0-255)')
+    p.add_argument('--ability2', type=int, help='Ability byte 2 (0-255)')
 
 
 def register_parser(subparsers) -> None:
@@ -288,16 +344,15 @@ def register_parser(subparsers) -> None:
     p_edit.add_argument('file', help='MON file path')
     p_edit.add_argument('--monster', type=int, required=True, help='Monster index (0-15)')
     p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
-    p_edit.add_argument('--hp', type=int, help='Hit points (0-255)')
-    p_edit.add_argument('--attack', type=int, help='Attack value (0-255)')
-    p_edit.add_argument('--defense', type=int, help='Defense value (0-255)')
-    p_edit.add_argument('--speed', type=int, help='Speed value (0-255)')
-    p_edit.add_argument('--tile1', type=int, help='Tile/sprite byte 1 (0-255)')
-    p_edit.add_argument('--tile2', type=int, help='Tile/sprite byte 2 (0-255)')
-    p_edit.add_argument('--flags1', type=int, help='Flags byte 1 (0-255)')
-    p_edit.add_argument('--flags2', type=int, help='Flags byte 2 (0-255)')
-    p_edit.add_argument('--ability1', type=int, help='Ability byte 1 (0-255)')
-    p_edit.add_argument('--ability2', type=int, help='Ability byte 2 (0-255)')
+    p_edit.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_edit.add_argument('--dry-run', action='store_true', help='Show changes without writing')
+    _add_mon_edit_args(p_edit)
+
+    p_import = sub.add_parser('import', help='Import monsters from JSON')
+    p_import.add_argument('file', help='MON file path')
+    p_import.add_argument('json_file', help='JSON file to import')
+    p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
 
 
 def dispatch(args) -> None:
@@ -308,8 +363,10 @@ def dispatch(args) -> None:
         cmd_dump(args)
     elif args.bestiary_command == 'edit':
         cmd_edit(args)
+    elif args.bestiary_command == 'import':
+        cmd_import(args)
     else:
-        print("Usage: u3edit bestiary {view|dump|edit} ...", file=sys.stderr)
+        print("Usage: u3edit bestiary {view|dump|edit|import} ...", file=sys.stderr)
 
 
 def main() -> None:
@@ -331,9 +388,15 @@ def main() -> None:
     p_edit.add_argument('file', help='MON file path')
     p_edit.add_argument('--monster', type=int, required=True)
     p_edit.add_argument('--output', '-o')
-    for attr in ['hp', 'attack', 'defense', 'speed', 'tile1', 'tile2',
-                 'flags1', 'flags2', 'ability1', 'ability2']:
-        p_edit.add_argument(f'--{attr}', type=int)
+    p_edit.add_argument('--backup', action='store_true')
+    p_edit.add_argument('--dry-run', action='store_true')
+    _add_mon_edit_args(p_edit)
+
+    p_import = sub.add_parser('import', help='Import monsters from JSON')
+    p_import.add_argument('file', help='MON file path')
+    p_import.add_argument('json_file', help='JSON file to import')
+    p_import.add_argument('--output', '-o')
+    p_import.add_argument('--backup', action='store_true')
 
     args = parser.parse_args()
     dispatch(args)

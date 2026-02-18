@@ -9,14 +9,16 @@ Bug fixes from prototype:
 """
 
 import argparse
+import json
 import os
 import sys
 
 from .constants import (
     MAP_NAMES, MAP_LETTERS, MAP_OVERWORLD_SIZE, MAP_DUNGEON_SIZE,
     tile_char, tile_name, TILES, DUNGEON_TILES,
+    TILE_CHARS_REVERSE, DUNGEON_TILE_CHARS_REVERSE,
 )
-from .fileutil import resolve_game_file
+from .fileutil import resolve_game_file, backup_file
 from .json_export import export_json
 
 
@@ -216,6 +218,194 @@ def cmd_edit(args) -> None:
     editor.run()
 
 
+def _get_map_slice(data: bytearray, is_dungeon: bool, level: int | None):
+    """Return (slice_data, offset, width, height) for the working region."""
+    if is_dungeon:
+        lvl = level if level is not None else 0
+        base = lvl * 256
+        return data[base:base + 256], base, 16, 16
+    return data, 0, 64, len(data) // 64
+
+
+def cmd_set(args) -> None:
+    """Set a single tile at (x, y)."""
+    with open(args.file, 'rb') as f:
+        data = bytearray(f.read())
+    is_dungeon = len(data) <= MAP_DUNGEON_SIZE
+    dry_run = getattr(args, 'dry_run', False)
+    do_backup = getattr(args, 'backup', False)
+
+    _, base, width, height = _get_map_slice(data, is_dungeon, getattr(args, 'level', None))
+
+    if not (0 <= args.x < width and 0 <= args.y < height):
+        print(f"Error: ({args.x}, {args.y}) out of bounds ({width}x{height})", file=sys.stderr)
+        sys.exit(1)
+
+    offset = base + args.y * width + args.x
+    old_val = data[offset]
+    data[offset] = args.tile
+    print(f"Set ({args.x}, {args.y}): ${old_val:02X} -> ${args.tile:02X}")
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
+
+    output = args.output if args.output else args.file
+    if do_backup and (not args.output or args.output == args.file):
+        backup_file(args.file)
+    with open(output, 'wb') as f:
+        f.write(data)
+    print(f"Saved to {output}")
+
+
+def cmd_fill(args) -> None:
+    """Fill a rectangular region with a tile value."""
+    with open(args.file, 'rb') as f:
+        data = bytearray(f.read())
+    is_dungeon = len(data) <= MAP_DUNGEON_SIZE
+    dry_run = getattr(args, 'dry_run', False)
+    do_backup = getattr(args, 'backup', False)
+
+    _, base, width, height = _get_map_slice(data, is_dungeon, getattr(args, 'level', None))
+
+    x1 = max(0, min(args.x1, width - 1))
+    y1 = max(0, min(args.y1, height - 1))
+    x2 = max(x1, min(args.x2, width - 1))
+    y2 = max(y1, min(args.y2, height - 1))
+
+    count = 0
+    for y in range(y1, y2 + 1):
+        for x in range(x1, x2 + 1):
+            data[base + y * width + x] = args.tile
+            count += 1
+    print(f"Filled {count} tiles in ({x1},{y1})-({x2},{y2}) with ${args.tile:02X}")
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
+
+    output = args.output if args.output else args.file
+    if do_backup and (not args.output or args.output == args.file):
+        backup_file(args.file)
+    with open(output, 'wb') as f:
+        f.write(data)
+    print(f"Saved to {output}")
+
+
+def cmd_replace(args) -> None:
+    """Replace all occurrences of one tile with another."""
+    with open(args.file, 'rb') as f:
+        data = bytearray(f.read())
+    is_dungeon = len(data) <= MAP_DUNGEON_SIZE
+    dry_run = getattr(args, 'dry_run', False)
+    do_backup = getattr(args, 'backup', False)
+    from_tile = getattr(args, 'from_tile')
+    to_tile = getattr(args, 'to_tile')
+
+    _, base, width, height = _get_map_slice(data, is_dungeon, getattr(args, 'level', None))
+
+    count = 0
+    for y in range(height):
+        for x in range(width):
+            offset = base + y * width + x
+            if data[offset] == from_tile:
+                data[offset] = to_tile
+                count += 1
+    print(f"Replaced {count} tiles: ${from_tile:02X} -> ${to_tile:02X}")
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
+
+    output = args.output if args.output else args.file
+    if do_backup and (not args.output or args.output == args.file):
+        backup_file(args.file)
+    with open(output, 'wb') as f:
+        f.write(data)
+    print(f"Saved to {output}")
+
+
+def cmd_find(args) -> None:
+    """Find all locations of a tile type."""
+    with open(args.file, 'rb') as f:
+        data = f.read()
+    is_dungeon = len(data) <= MAP_DUNGEON_SIZE
+
+    _, base, width, height = _get_map_slice(data, is_dungeon, getattr(args, 'level', None))
+
+    locations = []
+    for y in range(height):
+        for x in range(width):
+            offset = base + y * width + x
+            if data[offset] == args.tile:
+                locations.append((x, y))
+
+    if getattr(args, 'json', False):
+        result = {
+            'tile': args.tile,
+            'tile_name': tile_name(args.tile, is_dungeon),
+            'count': len(locations),
+            'locations': [{'x': x, 'y': y} for x, y in locations],
+        }
+        export_json(result, getattr(args, 'output', None))
+        return
+
+    name = tile_name(args.tile, is_dungeon)
+    print(f"\nTile ${args.tile:02X} ({name}): {len(locations)} found\n")
+    for x, y in locations:
+        print(f"  ({x}, {y})")
+    print()
+
+
+def cmd_import(args) -> None:
+    """Import a map from JSON (tile char grid)."""
+    with open(args.file, 'rb') as f:
+        data = bytearray(f.read())
+    is_dungeon = len(data) <= MAP_DUNGEON_SIZE
+    do_backup = getattr(args, 'backup', False)
+
+    with open(args.json_file, 'r', encoding='utf-8') as f:
+        jdata = json.load(f)
+
+    reverse = DUNGEON_TILE_CHARS_REVERSE if is_dungeon else TILE_CHARS_REVERSE
+
+    if is_dungeon and 'levels' in jdata:
+        for level_data in jdata['levels']:
+            lvl = level_data.get('level', 1) - 1
+            tiles = level_data.get('tiles', [])
+            base = lvl * 256
+            for y, row in enumerate(tiles[:16]):
+                for x, name in enumerate(row[:16]):
+                    ch = name[0] if len(name) == 1 else tile_char(0, is_dungeon=True)
+                    byte_val = reverse.get(ch, 0)
+                    data[base + y * 16 + x] = byte_val
+    else:
+        tiles = jdata.get('tiles', [])
+        width = jdata.get('width', 64)
+        for y, row in enumerate(tiles):
+            for x, name in enumerate(row):
+                ch = name[0] if len(name) == 1 else tile_char(0)
+                byte_val = reverse.get(ch, 0x04)
+                offset = y * width + x
+                if offset < len(data):
+                    data[offset] = byte_val
+
+    output = args.output if args.output else args.file
+    if do_backup and (not args.output or args.output == args.file):
+        backup_file(args.file)
+    with open(output, 'wb') as f:
+        f.write(data)
+    print(f"Imported map to {output}")
+
+
+def _add_map_write_args(p) -> None:
+    """Add common write arguments for map edit commands."""
+    p.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p.add_argument('--dry-run', action='store_true', help='Show changes without writing')
+    p.add_argument('--level', type=int, help='Dungeon level (0-7, default: 0)')
+
+
 def register_parser(subparsers) -> None:
     """Register map subcommands on a CLI subparser group."""
     p = subparsers.add_parser('map', help='Map viewer/editor')
@@ -238,19 +428,66 @@ def register_parser(subparsers) -> None:
     p_edit = sub.add_parser('edit', help='Edit a map (TUI)')
     p_edit.add_argument('file', help='MAP file path')
 
+    p_set = sub.add_parser('set', help='Set a single tile')
+    p_set.add_argument('file', help='MAP file path')
+    p_set.add_argument('--x', type=int, required=True, help='X coordinate')
+    p_set.add_argument('--y', type=int, required=True, help='Y coordinate')
+    p_set.add_argument('--tile', type=int, required=True, help='Tile byte value')
+    _add_map_write_args(p_set)
+
+    p_fill = sub.add_parser('fill', help='Fill a rectangular region')
+    p_fill.add_argument('file', help='MAP file path')
+    p_fill.add_argument('--x1', type=int, required=True, help='Start X')
+    p_fill.add_argument('--y1', type=int, required=True, help='Start Y')
+    p_fill.add_argument('--x2', type=int, required=True, help='End X')
+    p_fill.add_argument('--y2', type=int, required=True, help='End Y')
+    p_fill.add_argument('--tile', type=int, required=True, help='Tile byte value')
+    _add_map_write_args(p_fill)
+
+    p_replace = sub.add_parser('replace', help='Replace all occurrences of a tile')
+    p_replace.add_argument('file', help='MAP file path')
+    p_replace.add_argument('--from', type=int, required=True, dest='from_tile', help='Tile to replace')
+    p_replace.add_argument('--to', type=int, required=True, dest='to_tile', help='Replacement tile')
+    _add_map_write_args(p_replace)
+
+    p_find = sub.add_parser('find', help='Find all locations of a tile type')
+    p_find.add_argument('file', help='MAP file path')
+    p_find.add_argument('--tile', type=int, required=True, help='Tile byte value to find')
+    p_find.add_argument('--level', type=int, help='Dungeon level (0-7)')
+    p_find.add_argument('--json', action='store_true', help='Output as JSON')
+    p_find.add_argument('--output', '-o', help='Output file (for --json)')
+
+    p_import = sub.add_parser('import', help='Import map from JSON')
+    p_import.add_argument('file', help='MAP file path')
+    p_import.add_argument('json_file', help='JSON file to import')
+    p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+
 
 def dispatch(args) -> None:
     """Dispatch map subcommand."""
-    if args.map_command == 'view':
+    cmd = args.map_command
+    if cmd == 'view':
         cmd_view(args)
-    elif args.map_command == 'overview':
+    elif cmd == 'overview':
         cmd_overview(args)
-    elif args.map_command == 'legend':
+    elif cmd == 'legend':
         cmd_legend(args)
-    elif args.map_command == 'edit':
+    elif cmd == 'edit':
         cmd_edit(args)
+    elif cmd == 'set':
+        cmd_set(args)
+    elif cmd == 'fill':
+        cmd_fill(args)
+    elif cmd == 'replace':
+        cmd_replace(args)
+    elif cmd == 'find':
+        cmd_find(args)
+    elif cmd == 'import':
+        cmd_import(args)
     else:
-        print("Usage: u3edit map {view|overview|legend|edit} ...", file=sys.stderr)
+        print("Usage: u3edit map {view|overview|legend|edit|set|fill|replace|find|import} ...",
+              file=sys.stderr)
 
 
 def main() -> None:

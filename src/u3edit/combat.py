@@ -9,6 +9,7 @@ CON files: 192 bytes. Structure:
 """
 
 import argparse
+import json
 import os
 import sys
 
@@ -17,9 +18,9 @@ from .constants import (
     CON_MAP_WIDTH, CON_MAP_HEIGHT, CON_MAP_TILES,
     CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET, CON_MONSTER_COUNT,
     CON_PC_X_OFFSET, CON_PC_Y_OFFSET, CON_PC_COUNT,
-    tile_char,
+    tile_char, TILE_CHARS_REVERSE,
 )
-from .fileutil import resolve_game_file
+from .fileutil import resolve_game_file, backup_file
 from .json_export import export_json
 
 
@@ -152,6 +153,40 @@ def cmd_edit(args) -> None:
     editor.run()
 
 
+def cmd_import(args) -> None:
+    """Import a combat map from JSON."""
+    with open(args.file, 'rb') as f:
+        data = bytearray(f.read())
+    do_backup = getattr(args, 'backup', False)
+
+    with open(args.json_file, 'r', encoding='utf-8') as f:
+        jdata = json.load(f)
+
+    # Import tiles
+    tiles = jdata.get('tiles', [])
+    for y, row in enumerate(tiles[:CON_MAP_HEIGHT]):
+        for x, ch in enumerate(row[:CON_MAP_WIDTH]):
+            offset = y * CON_MAP_WIDTH + x
+            data[offset] = TILE_CHARS_REVERSE.get(ch, 0x20)
+
+    # Import monster positions
+    for i, m in enumerate(jdata.get('monsters', [])[:CON_MONSTER_COUNT]):
+        data[CON_MONSTER_X_OFFSET + i] = m.get('x', 0)
+        data[CON_MONSTER_Y_OFFSET + i] = m.get('y', 0)
+
+    # Import PC positions
+    for i, p in enumerate(jdata.get('pcs', [])[:CON_PC_COUNT]):
+        data[CON_PC_X_OFFSET + i] = p.get('x', 0)
+        data[CON_PC_Y_OFFSET + i] = p.get('y', 0)
+
+    output = args.output if args.output else args.file
+    if do_backup and (not args.output or args.output == args.file):
+        backup_file(args.file)
+    with open(output, 'wb') as f:
+        f.write(data)
+    print(f"Imported combat map to {output}")
+
+
 def register_parser(subparsers) -> None:
     p = subparsers.add_parser('combat', help='Combat battlefield viewer/editor')
     sub = p.add_subparsers(dest='combat_command')
@@ -164,14 +199,23 @@ def register_parser(subparsers) -> None:
     p_edit = sub.add_parser('edit', help='Edit a combat map (TUI)')
     p_edit.add_argument('file', help='CON file path')
 
+    p_import = sub.add_parser('import', help='Import combat map from JSON')
+    p_import.add_argument('file', help='CON file path')
+    p_import.add_argument('json_file', help='JSON file to import')
+    p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+
 
 def dispatch(args) -> None:
-    if args.combat_command == 'view':
+    cmd = args.combat_command
+    if cmd == 'view':
         cmd_view(args)
-    elif args.combat_command == 'edit':
+    elif cmd == 'edit':
         cmd_edit(args)
+    elif cmd == 'import':
+        cmd_import(args)
     else:
-        print("Usage: u3edit combat {view|edit} ...", file=sys.stderr)
+        print("Usage: u3edit combat {view|edit|import} ...", file=sys.stderr)
 
 
 def main() -> None:

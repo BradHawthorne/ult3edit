@@ -8,6 +8,7 @@ Reads multiple save files from a GAME directory:
 """
 
 import argparse
+import json
 import os
 import sys
 
@@ -16,7 +17,7 @@ from .constants import (
     PRTY_FILE_SIZE, PLRS_FILE_SIZE, SOSA_FILE_SIZE, SOSM_FILE_SIZE,
     CHAR_RECORD_SIZE, tile_char,
 )
-from .fileutil import resolve_single_file
+from .fileutil import resolve_single_file, backup_file
 from .roster import Character
 from .json_export import export_json
 
@@ -159,6 +160,8 @@ def cmd_view(args) -> None:
 
 def cmd_edit(args) -> None:
     game_dir = args.game_dir
+    dry_run = getattr(args, 'dry_run', False)
+    do_backup = getattr(args, 'backup', False)
 
     prty_path = resolve_single_file(game_dir, 'PRTY')
     if not prty_path:
@@ -169,26 +172,145 @@ def cmd_edit(args) -> None:
         data = bytearray(f.read())
     party = PartyState(data)
 
-    modified = False
+    prty_modified = False
     if args.transport is not None:
-        party.transport = args.transport; modified = True
+        party.transport = args.transport; prty_modified = True
     if args.x is not None:
-        party.x = args.x; modified = True
+        party.x = args.x; prty_modified = True
     if args.y is not None:
-        party.y = args.y; modified = True
+        party.y = args.y; prty_modified = True
     if args.party_size is not None:
-        party.party_size = args.party_size; modified = True
+        party.party_size = args.party_size; prty_modified = True
     if args.slot_ids is not None:
-        party.slot_ids = args.slot_ids; modified = True
+        party.slot_ids = args.slot_ids; prty_modified = True
 
-    if modified:
+    # PLRS character editing
+    plrs_modified = False
+    plrs_slot = getattr(args, 'plrs_slot', None)
+    if plrs_slot is not None:
+        plrs_path = resolve_single_file(game_dir, 'PLRS')
+        if not plrs_path:
+            print(f"Error: PLRS file not found in {game_dir}", file=sys.stderr)
+            sys.exit(1)
+        with open(plrs_path, 'rb') as f:
+            plrs_data = bytearray(f.read())
+
+        if plrs_slot < 0 or plrs_slot >= min(4, len(plrs_data) // CHAR_RECORD_SIZE):
+            print(f"Error: PLRS slot {plrs_slot} out of range", file=sys.stderr)
+            sys.exit(1)
+
+        offset = plrs_slot * CHAR_RECORD_SIZE
+        char = Character(plrs_data[offset:offset + CHAR_RECORD_SIZE])
+
+        if getattr(args, 'name', None) is not None:
+            char.name = args.name; plrs_modified = True
+        if getattr(args, 'str', None) is not None:
+            char.strength = args.str; plrs_modified = True
+        if getattr(args, 'dex', None) is not None:
+            char.dexterity = args.dex; plrs_modified = True
+        if getattr(args, 'int_', None) is not None:
+            char.intelligence = args.int_; plrs_modified = True
+        if getattr(args, 'wis', None) is not None:
+            char.wisdom = args.wis; plrs_modified = True
+        if getattr(args, 'hp', None) is not None:
+            char.hp = args.hp
+            char.max_hp = max(char.max_hp, args.hp)
+            plrs_modified = True
+        if getattr(args, 'max_hp', None) is not None:
+            char.max_hp = args.max_hp; plrs_modified = True
+        if getattr(args, 'mp', None) is not None:
+            char.mp = args.mp; plrs_modified = True
+        if getattr(args, 'gold', None) is not None:
+            char.gold = args.gold; plrs_modified = True
+        if getattr(args, 'exp', None) is not None:
+            char.exp = args.exp; plrs_modified = True
+        if getattr(args, 'food', None) is not None:
+            char.food = args.food; plrs_modified = True
+
+        if plrs_modified:
+            plrs_data[offset:offset + CHAR_RECORD_SIZE] = char.raw
+            print(f"Modified PLRS slot {plrs_slot}:")
+            char.display(plrs_slot)
+
+            if not dry_run:
+                plrs_output = args.output if args.output else plrs_path
+                if do_backup and (not args.output or args.output == plrs_path):
+                    backup_file(plrs_path)
+                with open(plrs_output, 'wb') as f:
+                    f.write(plrs_data)
+                print(f"Saved PLRS to {plrs_output}")
+
+    if not prty_modified and not plrs_modified:
+        print("No modifications specified.")
+        return
+
+    if prty_modified:
+        if dry_run:
+            print("Dry run - no changes written.")
+            party.display()
+            return
         output = args.output if args.output else prty_path
+        if do_backup and (not args.output or args.output == prty_path):
+            backup_file(prty_path)
         with open(output, 'wb') as f:
             f.write(bytes(party.raw) + data[PRTY_FILE_SIZE:])
         print(f"Saved party state to {output}")
         party.display()
-    else:
-        print("No modifications specified.")
+    elif dry_run:
+        print("Dry run - no changes written.")
+
+
+def cmd_import(args) -> None:
+    """Import save state from JSON."""
+    game_dir = args.game_dir
+    do_backup = getattr(args, 'backup', False)
+
+    with open(args.json_file, 'r', encoding='utf-8') as f:
+        jdata = json.load(f)
+
+    party_data = jdata.get('party', {})
+    if party_data:
+        prty_path = resolve_single_file(game_dir, 'PRTY')
+        if not prty_path:
+            print(f"Error: PRTY file not found in {game_dir}", file=sys.stderr)
+            sys.exit(1)
+        with open(prty_path, 'rb') as f:
+            data = bytearray(f.read())
+        party = PartyState(data)
+
+        if 'transport' in party_data:
+            party.transport = party_data['transport']
+        if 'x' in party_data:
+            party.x = party_data['x']
+        if 'y' in party_data:
+            party.y = party_data['y']
+        if 'party_size' in party_data:
+            party.party_size = party_data['party_size']
+        if 'slot_ids' in party_data:
+            party.slot_ids = party_data['slot_ids']
+
+        output = args.output if args.output else prty_path
+        if do_backup and (not args.output or args.output == prty_path):
+            backup_file(prty_path)
+        with open(output, 'wb') as f:
+            f.write(bytes(party.raw) + data[PRTY_FILE_SIZE:])
+        print(f"Imported party state to {output}")
+
+
+def _add_plrs_edit_args(p) -> None:
+    """Add PLRS character editing arguments."""
+    p.add_argument('--plrs-slot', type=int, help='Active character slot (0-3)')
+    p.add_argument('--name', help='Character name')
+    p.add_argument('--str', type=int, help='Strength (0-99)')
+    p.add_argument('--dex', type=int, help='Dexterity (0-99)')
+    p.add_argument('--int', type=int, dest='int_', help='Intelligence (0-99)')
+    p.add_argument('--wis', type=int, help='Wisdom (0-99)')
+    p.add_argument('--hp', type=int, help='Hit points (0-9999)')
+    p.add_argument('--max-hp', type=int, help='Max HP (0-9999)')
+    p.add_argument('--mp', type=int, help='Magic points (0-99)')
+    p.add_argument('--gold', type=int, help='Gold (0-9999)')
+    p.add_argument('--exp', type=int, help='Experience (0-9999)')
+    p.add_argument('--food', type=int, help='Food (0-9999)')
 
 
 def register_parser(subparsers) -> None:
@@ -208,16 +330,28 @@ def register_parser(subparsers) -> None:
     p_edit.add_argument('--y', type=int, help='Y coordinate (0-63)')
     p_edit.add_argument('--party-size', type=int, help='Party size (0-4)')
     p_edit.add_argument('--slot-ids', type=int, nargs='+', help='Roster slot IDs (e.g., 0 1 2 3)')
-    p_edit.add_argument('--output', '-o', help='Output file (default: overwrite PRTY)')
+    p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_edit.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_edit.add_argument('--dry-run', action='store_true', help='Show changes without writing')
+    _add_plrs_edit_args(p_edit)
+
+    p_import = sub.add_parser('import', help='Import save state from JSON')
+    p_import.add_argument('game_dir', help='GAME directory')
+    p_import.add_argument('json_file', help='JSON file to import')
+    p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
 
 
 def dispatch(args) -> None:
-    if args.save_command == 'view':
+    cmd = args.save_command
+    if cmd == 'view':
         cmd_view(args)
-    elif args.save_command == 'edit':
+    elif cmd == 'edit':
         cmd_edit(args)
+    elif cmd == 'import':
+        cmd_import(args)
     else:
-        print("Usage: u3edit save {view|edit} ...", file=sys.stderr)
+        print("Usage: u3edit save {view|edit|import} ...", file=sys.stderr)
 
 
 def main() -> None:
@@ -239,6 +373,15 @@ def main() -> None:
     p_edit.add_argument('--party-size', type=int)
     p_edit.add_argument('--slot-ids', type=int, nargs='+')
     p_edit.add_argument('--output', '-o')
+    p_edit.add_argument('--backup', action='store_true')
+    p_edit.add_argument('--dry-run', action='store_true')
+    _add_plrs_edit_args(p_edit)
+
+    p_import = sub.add_parser('import', help='Import save state from JSON')
+    p_import.add_argument('game_dir', help='GAME directory')
+    p_import.add_argument('json_file', help='JSON file to import')
+    p_import.add_argument('--output', '-o')
+    p_import.add_argument('--backup', action='store_true')
 
     args = parser.parse_args()
     dispatch(args)

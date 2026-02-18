@@ -6,12 +6,13 @@ Format: 0xFF = line break within record, 0x00 = record terminator.
 """
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
 
 from .constants import TLK_LETTERS, TLK_NAMES, TLK_LINE_BREAK, TLK_RECORD_END
-from .fileutil import resolve_game_file, decode_high_ascii
+from .fileutil import resolve_game_file, decode_high_ascii, backup_file
 from .json_export import export_json
 
 
@@ -195,6 +196,8 @@ def cmd_edit(args) -> None:
     """Edit a specific record in-place, preserving binary records."""
     with open(args.file, 'rb') as f:
         raw = f.read()
+    dry_run = getattr(args, 'dry_run', False)
+    do_backup = getattr(args, 'backup', False)
 
     # Split into raw parts, track which are text
     raw_parts = raw.split(bytes([TLK_RECORD_END]))
@@ -224,10 +227,91 @@ def cmd_edit(args) -> None:
     # Rebuild: rejoin with TLK_RECORD_END separator
     out = bytes([TLK_RECORD_END]).join(raw_parts)
 
+    if dry_run:
+        print(f"Would update record {args.record}")
+        print("Dry run - no changes written.")
+        return
+
     output = args.output if args.output else args.file
+    if do_backup and (not args.output or args.output == args.file):
+        backup_file(args.file)
     with open(output, 'wb') as f:
         f.write(out)
     print(f"Updated record {args.record} in {output}")
+
+
+def cmd_search(args) -> None:
+    """Search dialog text across TLK files."""
+    pattern = args.pattern.lower()
+    path_or_dir = args.path
+
+    results = []
+
+    if os.path.isdir(path_or_dir):
+        for letter in TLK_LETTERS:
+            path = resolve_game_file(path_or_dir, 'TLK', letter)
+            if not path:
+                continue
+            records = load_tlk_records(path)
+            location = TLK_NAMES.get(letter, 'Unknown')
+            for i, rec in enumerate(records):
+                for line in rec:
+                    if pattern in line.lower():
+                        results.append({
+                            'file': f'TLK{letter}',
+                            'location': location,
+                            'record': i,
+                            'line': line,
+                        })
+    else:
+        records = load_tlk_records(path_or_dir)
+        filename = os.path.basename(path_or_dir)
+        for i, rec in enumerate(records):
+            for line in rec:
+                if pattern in line.lower():
+                    results.append({
+                        'file': filename,
+                        'record': i,
+                        'line': line,
+                    })
+
+    if getattr(args, 'json', False):
+        export_json(results, getattr(args, 'output', None))
+        return
+
+    if not results:
+        print(f"No matches for '{args.pattern}'")
+        return
+
+    print(f"\n=== Search: '{args.pattern}' ({len(results)} matches) ===\n")
+    for r in results:
+        loc = f" ({r['location']})" if 'location' in r else ''
+        print(f"  {r['file']}{loc} record {r['record']}: {r['line']}")
+    print()
+
+
+def cmd_import(args) -> None:
+    """Import dialog records from JSON."""
+    do_backup = getattr(args, 'backup', False)
+
+    with open(args.json_file, 'r', encoding='utf-8') as f:
+        jdata = json.load(f)
+
+    # Accept either a list of records or a dict with 'records' key
+    records = jdata if isinstance(jdata, list) else jdata.get('records', [])
+
+    out = bytearray()
+    for entry in records:
+        lines = entry.get('lines', []) if isinstance(entry, dict) else entry
+        out.extend(encode_record(lines))
+
+    if do_backup and os.path.exists(args.file) and (not args.output or args.output == args.file):
+        backup_file(args.file)
+
+    output = args.output if args.output else args.file
+    with open(output, 'wb') as f:
+        f.write(bytes(out))
+    print(f"Imported {len(records)} records to {output}")
 
 
 def register_parser(subparsers) -> None:
@@ -253,20 +337,39 @@ def register_parser(subparsers) -> None:
     p_edit.add_argument('--record', type=int, required=True, help='Record index')
     p_edit.add_argument('--text', required=True, help='New text (use \\n for line breaks)')
     p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_edit.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_edit.add_argument('--dry-run', action='store_true', help='Show changes without writing')
+
+    p_search = sub.add_parser('search', help='Search dialog text')
+    p_search.add_argument('path', help='TLK file or GAME directory')
+    p_search.add_argument('pattern', help='Text to search for (case-insensitive)')
+    p_search.add_argument('--json', action='store_true', help='Output as JSON')
+    p_search.add_argument('--output', '-o', help='Output file (for --json)')
+
+    p_import = sub.add_parser('import', help='Import dialog from JSON')
+    p_import.add_argument('file', help='TLK file path (output target)')
+    p_import.add_argument('json_file', help='JSON file to import')
+    p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
 
 
 def dispatch(args) -> None:
     """Dispatch tlk subcommand."""
-    if args.tlk_command == 'view':
+    cmd = args.tlk_command
+    if cmd == 'view':
         cmd_view(args)
-    elif args.tlk_command == 'extract':
+    elif cmd == 'extract':
         cmd_extract(args)
-    elif args.tlk_command == 'build':
+    elif cmd == 'build':
         cmd_build(args)
-    elif args.tlk_command == 'edit':
+    elif cmd == 'edit':
         cmd_edit(args)
+    elif cmd == 'search':
+        cmd_search(args)
+    elif cmd == 'import':
+        cmd_import(args)
     else:
-        print("Usage: u3edit tlk {view|extract|build|edit} ...", file=sys.stderr)
+        print("Usage: u3edit tlk {view|extract|build|edit|search|import} ...", file=sys.stderr)
 
 
 def main() -> None:
@@ -293,6 +396,20 @@ def main() -> None:
     p_edit.add_argument('--record', type=int, required=True)
     p_edit.add_argument('--text', required=True)
     p_edit.add_argument('--output', '-o')
+    p_edit.add_argument('--backup', action='store_true')
+    p_edit.add_argument('--dry-run', action='store_true')
+
+    p_search = sub.add_parser('search', help='Search dialog text')
+    p_search.add_argument('path', help='TLK file or GAME directory')
+    p_search.add_argument('pattern', help='Text to search for')
+    p_search.add_argument('--json', action='store_true')
+    p_search.add_argument('--output', '-o')
+
+    p_import = sub.add_parser('import', help='Import dialog from JSON')
+    p_import.add_argument('file', help='TLK file path')
+    p_import.add_argument('json_file', help='JSON file to import')
+    p_import.add_argument('--output', '-o')
+    p_import.add_argument('--backup', action='store_true')
 
     args = parser.parse_args()
     dispatch(args)
