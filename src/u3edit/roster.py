@@ -111,6 +111,7 @@ class Character:
             if v[0].upper() == code or v.upper() == code:
                 self.raw[CHAR_STATUS] = k
                 return
+        raise ValueError(f'Unknown status: {code}')
 
     @property
     def strength(self) -> int:
@@ -158,6 +159,7 @@ class Character:
             if v.upper() == code:
                 self.raw[CHAR_RACE] = k
                 return
+        raise ValueError(f'Unknown race: {code}')
 
     @property
     def char_class(self) -> str:
@@ -173,6 +175,7 @@ class Character:
             if v.upper() == code:
                 self.raw[CHAR_CLASS] = k
                 return
+        raise ValueError(f'Unknown class: {code}')
 
     @property
     def gender(self) -> str:
@@ -185,6 +188,7 @@ class Character:
             if v[0].upper() == code or v.upper() == code:
                 self.raw[CHAR_GENDER] = k
                 return
+        raise ValueError(f'Unknown gender: {code}')
 
     @property
     def mp(self) -> int:

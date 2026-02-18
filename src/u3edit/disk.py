@@ -168,8 +168,10 @@ class DiskContext:
                     disk_write(self.image_path, name, data,
                                file_type=ft, aux_type=at,
                                diskiigs_path=self.diskiigs_path)
-                except Exception:
-                    pass  # Best-effort write-back; don't mask original exception
+                except Exception as e:
+                    import sys
+                    print(f'Warning: failed to write {name}: {e}',
+                          file=sys.stderr)
         if self._tmpdir:
             shutil.rmtree(self._tmpdir, ignore_errors=True)
         return False

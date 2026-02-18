@@ -49,7 +49,7 @@ class CombatEditor(BaseTileEditor):
         # Check for monster positions
         for i in range(CON_MONSTER_COUNT):
             if self.monster_x[i] == x and self.monster_y[i] == y:
-                if self.monster_x[i] or self.monster_y[i]:  # skip (0,0) unless both are 0
+                if self.monster_x[i] or self.monster_y[i]:  # skip if both 0 (no monster)
                     return 'class:overlay-monster', str(i)
 
         # Check for PC positions

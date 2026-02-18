@@ -19,7 +19,7 @@ from .json_export import export_json
 
 def render_special_map(data: bytes) -> str:
     """Render 11x11 special location map as text art."""
-    lines = ['     ' + ''.join(f'{x}' for x in range(SPECIAL_MAP_WIDTH))]
+    lines = ['     ' + ''.join(f'{x % 10}' for x in range(SPECIAL_MAP_WIDTH))]
     for y in range(SPECIAL_MAP_HEIGHT):
         row = []
         for x in range(SPECIAL_MAP_WIDTH):

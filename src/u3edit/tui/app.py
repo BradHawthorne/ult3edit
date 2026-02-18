@@ -216,9 +216,14 @@ class UnifiedApp:
 
         @global_kb.add('c-q')
         def _quit(event):
+            import sys
             for tab in app_ref.tabs:
                 if tab.is_dirty:
-                    tab.save()
+                    try:
+                        tab.save()
+                    except Exception as e:
+                        print(f'Warning: failed to save {tab.name}: {e}',
+                              file=sys.stderr)
             event.app.exit(result=True)
 
         # Per-tab keybindings (conditional)

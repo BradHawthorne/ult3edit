@@ -20,6 +20,12 @@ class TestBcdToInt:
         assert bcd_to_int(0x07) == 7
 
 
+    def test_invalid_nibble_produces_value(self):
+        """Invalid BCD bytes (nibble > 9) still decode without crashing."""
+        assert bcd_to_int(0xAB) == 111  # (10*10 + 11)
+        assert bcd_to_int(0xFF) == 165  # (15*10 + 15)
+
+
 class TestBcd16ToInt:
     def test_zero(self):
         assert bcd16_to_int(0x00, 0x00) == 0

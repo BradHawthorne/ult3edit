@@ -193,6 +193,48 @@ class TestCmdEdit:
         assert chars[0].name == 'HERO'
 
 
+class TestSetterValidation:
+    """Test that setters raise ValueError on invalid codes."""
+
+    def test_invalid_status(self, sample_character_bytes):
+        char = Character(bytearray(sample_character_bytes))
+        original = char.raw[0x11]  # CHAR_STATUS offset
+        with pytest.raises(ValueError):
+            char.status = 'INVALID'
+        assert char.raw[0x11] == original  # Unchanged
+
+    def test_invalid_race(self, sample_character_bytes):
+        char = Character(bytearray(sample_character_bytes))
+        original = char.raw[0x16]  # CHAR_RACE offset
+        with pytest.raises(ValueError):
+            char.race = 'X'
+        assert char.raw[0x16] == original
+
+    def test_invalid_class(self, sample_character_bytes):
+        char = Character(bytearray(sample_character_bytes))
+        original = char.raw[0x17]  # CHAR_CLASS offset
+        with pytest.raises(ValueError):
+            char.char_class = 'Z'
+        assert char.raw[0x17] == original
+
+    def test_invalid_gender(self, sample_character_bytes):
+        char = Character(bytearray(sample_character_bytes))
+        original = char.raw[0x18]  # CHAR_GENDER offset
+        with pytest.raises(ValueError):
+            char.gender = 'X'
+        assert char.raw[0x18] == original
+
+    def test_valid_full_name_race(self, sample_character_bytes):
+        char = Character(bytearray(sample_character_bytes))
+        char.race = 'Elf'
+        assert char.race == 'Elf'
+
+    def test_valid_full_name_class(self, sample_character_bytes):
+        char = Character(bytearray(sample_character_bytes))
+        char.char_class = 'Wizard'
+        assert char.char_class == 'Wizard'
+
+
 class TestCmdCreate:
     def test_create_character(self, sample_roster_file, tmp_dir):
         out = os.path.join(tmp_dir, 'ROST_OUT')

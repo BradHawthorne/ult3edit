@@ -24,8 +24,7 @@ def load_text_records(path: str) -> list[str]:
         if not part:
             continue
         text = decode_high_ascii(part)
-        if text.strip():
-            records.append(text)
+        records.append(text)
     return records
 
 
