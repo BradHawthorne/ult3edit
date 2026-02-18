@@ -5,7 +5,7 @@ def require_prompt_toolkit():
     """Check that prompt_toolkit is available. Exit with helpful message if not."""
     try:
         import prompt_toolkit  # noqa: F401
-        return True
+        return
     except ImportError:
         import sys
         print(

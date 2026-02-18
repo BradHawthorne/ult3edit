@@ -63,7 +63,7 @@ class CombatMap:
             if 0 <= px < CON_MAP_WIDTH and 0 <= py < CON_MAP_HEIGHT:
                 grid[py][px] = '@'
 
-        lines = ['     ' + ''.join(f'{x}' for x in range(CON_MAP_WIDTH))]
+        lines = ['     ' + ''.join(f'{x % 10}' for x in range(CON_MAP_WIDTH))]
         for y, row in enumerate(grid):
             lines.append(f'  {y:2d}  {"".join(row)}')
         return '\n'.join(lines)

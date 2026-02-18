@@ -139,8 +139,10 @@ class UnifiedApp:
                 tab_containers.append(container)
                 tab_keybindings.append(kb)
                 valid_tabs.append(tab)
-            except Exception:
-                pass  # Skip tabs that fail to build
+            except Exception as e:
+                import sys
+                print(f"Warning: tab '{tab.name}' failed to build: {e}",
+                      file=sys.stderr)
         self.tabs = valid_tabs
         if not self.tabs:
             print("No game data files found on disk image.")
