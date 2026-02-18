@@ -108,16 +108,21 @@ class BaseTileEditor:
     _render_cell() for custom overlays.
     """
 
-    def __init__(self, state: EditorState, file_path: str, title: str = 'Tile Editor'):
+    def __init__(self, state: EditorState, file_path: str, title: str = 'Tile Editor',
+                 save_callback=None):
         self.state = state
         self.file_path = file_path
         self.title = title
         self.show_help = False
+        self.save_callback = save_callback
 
     def _save(self) -> None:
         """Write data to file. Override in subclasses."""
-        with open(self.file_path, 'wb') as f:
-            f.write(bytes(self.state.data))
+        if self.save_callback:
+            self.save_callback(bytes(self.state.data))
+        else:
+            with open(self.file_path, 'wb') as f:
+                f.write(bytes(self.state.data))
         self.state.dirty = False
 
     def _extra_status(self) -> str:
@@ -135,15 +140,18 @@ class BaseTileEditor:
         """Add subclass-specific keybindings. Override as needed."""
         pass
 
-    def run(self) -> bool:
-        """Run the full-screen editor. Returns True if saved."""
-        from prompt_toolkit import Application
-        from prompt_toolkit.layout import Layout, HSplit, VSplit, Window, FormattedTextControl
+    def _build_ui(self, embedded: bool = False):
+        """Build the UI container and keybindings.
+
+        Args:
+            embedded: If True, skip Escape/Ctrl+Q/Ctrl+S bindings (handled by host app).
+
+        Returns:
+            (container, key_bindings) tuple for embedding in a larger app.
+        """
+        from prompt_toolkit.layout import HSplit, VSplit, Window, FormattedTextControl
         from prompt_toolkit.layout.controls import UIControl, UIContent
         from prompt_toolkit.key_binding import KeyBindings
-        from prompt_toolkit.widgets import Dialog, Label, Button
-
-        from .theme import U3_STYLE, tile_style
 
         editor = self
         state = self.state
@@ -151,7 +159,6 @@ class BaseTileEditor:
         # --- Grid Control ---
         class GridControl(UIControl):
             def create_content(self, width: int, height: int):
-                # Adjust viewport to available space (leave room for row labels)
                 usable_w = max(1, width - 5)
                 usable_h = max(1, height)
                 state.viewport_w = min(usable_w, state.width)
@@ -274,31 +281,36 @@ class BaseTileEditor:
         def _prev_tile(event):
             state.select_prev_tile()
 
-        @kb.add('c-s')
-        def _save_cmd(event):
-            editor._save()
-
-        @kb.add('c-q')
-        def _quit(event):
-            if state.dirty:
-                # Simple approach: save and quit
-                editor._save()
-            event.app.exit(result=True)
-
-        @kb.add('escape')
-        def _escape(event):
-            if state.dirty:
-                # Discard changes on Escape
-                pass
-            event.app.exit(result=False)
-
         @kb.add('?')
         def _toggle_help(event):
             editor.show_help = not editor.show_help
 
+        if not embedded:
+            @kb.add('c-s')
+            def _save_cmd(event):
+                editor._save()
+
+            @kb.add('c-q')
+            def _quit(event):
+                if state.dirty:
+                    editor._save()
+                event.app.exit(result=True)
+
+            @kb.add('escape')
+            def _escape(event):
+                event.app.exit(result=False)
+
         self._extra_keybindings(kb)
 
-        # --- Run ---
+        return root, kb
+
+    def run(self) -> bool:
+        """Run the full-screen editor. Returns True if saved."""
+        from prompt_toolkit import Application
+        from prompt_toolkit.layout import Layout
+        from .theme import U3_STYLE
+
+        root, kb = self._build_ui(embedded=False)
         app = Application(
             layout=Layout(root),
             key_bindings=kb,

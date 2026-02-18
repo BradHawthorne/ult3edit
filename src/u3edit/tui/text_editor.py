@@ -58,22 +58,27 @@ class TextEditor:
     +--------------------------------------+
     """
 
-    def __init__(self, file_path: str, data: bytes):
+    def __init__(self, file_path: str, data: bytes, save_callback=None):
         self.file_path = file_path
         self.original_size = len(data)
         self.records = parse_text_records(data)
         self.selected_index = 0
         self.dirty = False
+        self.save_callback = save_callback
 
-    def run(self) -> bool:
-        """Run the full-screen text editor."""
-        from prompt_toolkit import Application
-        from prompt_toolkit.layout import Layout, HSplit, Window, FormattedTextControl
+    def _build_ui(self, embedded: bool = False):
+        """Build the UI container and keybindings.
+
+        Args:
+            embedded: If True, skip Escape/Ctrl+Q/Ctrl+S bindings.
+
+        Returns:
+            (container, key_bindings) tuple for embedding in a larger app.
+        """
+        from prompt_toolkit.layout import HSplit, Window, FormattedTextControl
         from prompt_toolkit.layout.controls import UIControl, UIContent
         from prompt_toolkit.key_binding import KeyBindings
         from prompt_toolkit.shortcuts import input_dialog
-
-        from .theme import U3_STYLE
 
         editor = self
 
@@ -139,7 +144,6 @@ class TextEditor:
             if not editor.records:
                 return
             rec = editor.records[editor.selected_index]
-            # Use input_dialog for inline editing
             result = input_dialog(
                 title=f'Edit Record {editor.selected_index}',
                 text=f'Max {rec.max_len} characters (auto-uppercased):',
@@ -149,20 +153,30 @@ class TextEditor:
                 rec.text = result[:rec.max_len].upper()
                 editor.dirty = True
 
-        @kb.add('c-s')
-        def _save(event):
-            editor._save()
-
-        @kb.add('c-q')
-        def _quit(event):
-            if editor.dirty:
+        if not embedded:
+            @kb.add('c-s')
+            def _save(event):
                 editor._save()
-            event.app.exit(result=True)
 
-        @kb.add('escape')
-        def _escape(event):
-            event.app.exit(result=False)
+            @kb.add('c-q')
+            def _quit(event):
+                if editor.dirty:
+                    editor._save()
+                event.app.exit(result=True)
 
+            @kb.add('escape')
+            def _escape(event):
+                event.app.exit(result=False)
+
+        return root, kb
+
+    def run(self) -> bool:
+        """Run the full-screen text editor."""
+        from prompt_toolkit import Application
+        from prompt_toolkit.layout import Layout
+        from .theme import U3_STYLE
+
+        root, kb = self._build_ui(embedded=False)
         app = Application(
             layout=Layout(root),
             key_bindings=kb,
@@ -174,6 +188,9 @@ class TextEditor:
 
     def _save(self) -> None:
         out = rebuild_text_data(self.records, self.original_size)
-        with open(self.file_path, 'wb') as f:
-            f.write(bytes(out))
+        if self.save_callback:
+            self.save_callback(bytes(out))
+        else:
+            with open(self.file_path, 'wb') as f:
+                f.write(bytes(out))
         self.dirty = False

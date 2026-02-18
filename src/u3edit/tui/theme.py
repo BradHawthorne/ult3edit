@@ -45,6 +45,12 @@ U3_STYLE = Style.from_dict({
     # Help
     'help-key':         'ansigreen bold',
     'help-text':        '',
+
+    # Tab bar
+    'tab-active':       'bg:ansiblue ansiwhite bold',
+    'tab-inactive':     'bg:#333333 ansigray',
+    'tab-dirty':        'ansired bold',
+    'tab-bar':          'bg:#222222',
 })
 
 # Map canonical tile IDs to style classes

@@ -18,7 +18,7 @@ class CombatEditor(BaseTileEditor):
       'pc'      - place PC start positions (4 slots)
     """
 
-    def __init__(self, file_path: str, data: bytes):
+    def __init__(self, file_path: str, data: bytes, save_callback=None):
         self.full_data = bytearray(data) if len(data) >= CON_FILE_SIZE else bytearray(CON_FILE_SIZE)
         if len(data) < CON_FILE_SIZE:
             self.full_data[:len(data)] = data
@@ -41,7 +41,8 @@ class CombatEditor(BaseTileEditor):
                      for i in range(CON_PC_COUNT)]
         self.placement_slot = 0
 
-        super().__init__(state, file_path, title='Combat Map Editor')
+        super().__init__(state, file_path, title='Combat Map Editor',
+                         save_callback=save_callback)
 
     def _render_cell(self, x: int, y: int, tile_byte: int) -> tuple[str, str]:
         """Overlay monster/PC markers on top of tiles."""
@@ -138,6 +139,9 @@ class CombatEditor(BaseTileEditor):
         for i in range(CON_PC_COUNT):
             out[CON_PC_X_OFFSET + i] = self.pc_x[i]
             out[CON_PC_Y_OFFSET + i] = self.pc_y[i]
-        with open(self.file_path, 'wb') as f:
-            f.write(bytes(out))
+        if self.save_callback:
+            self.save_callback(bytes(out))
+        else:
+            with open(self.file_path, 'wb') as f:
+                f.write(bytes(out))
         self.state.dirty = False

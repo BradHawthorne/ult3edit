@@ -11,7 +11,8 @@ class MapEditor(BaseTileEditor):
     Dungeon: 8 levels of 16x16, keys 1-8 switch levels.
     """
 
-    def __init__(self, file_path: str, data: bytes, is_dungeon: bool = False):
+    def __init__(self, file_path: str, data: bytes, is_dungeon: bool = False,
+                 save_callback=None):
         self.full_data = bytearray(data)
         self.is_dungeon = is_dungeon
         self.current_level = 0
@@ -29,7 +30,8 @@ class MapEditor(BaseTileEditor):
                 data=bytearray(data), width=width, height=height,
             )
 
-        super().__init__(state, file_path, title='Map Editor')
+        super().__init__(state, file_path, title='Map Editor',
+                         save_callback=save_callback)
 
     def switch_level(self, level: int) -> None:
         """Switch dungeon level (0-based). Saves current level to full_data first."""
@@ -61,12 +63,14 @@ class MapEditor(BaseTileEditor):
 
     def _save(self) -> None:
         if self.is_dungeon:
-            # Patch current level back
             offset = self.current_level * 256
             self.full_data[offset:offset + 256] = self.state.data
-            with open(self.file_path, 'wb') as f:
-                f.write(bytes(self.full_data))
+            out = bytes(self.full_data)
+        else:
+            out = bytes(self.state.data)
+        if self.save_callback:
+            self.save_callback(out)
         else:
             with open(self.file_path, 'wb') as f:
-                f.write(bytes(self.state.data))
+                f.write(out)
         self.state.dirty = False

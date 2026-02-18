@@ -1,0 +1,98 @@
+"""Tests for EditorTab, DrillDownTab state management."""
+
+import pytest
+
+from u3edit.tui.editor_tab import TileEditorTab, DrillDownTab
+from u3edit.tui.base import EditorState, BaseTileEditor
+
+
+class TestTileEditorTab:
+    def test_name(self):
+        state = EditorState(data=bytearray(256), width=16, height=16)
+        editor = BaseTileEditor(state, '/tmp/test', title='Test Editor')
+        tab = TileEditorTab(editor)
+        assert tab.name == 'Test Editor'
+
+    def test_dirty_tracking(self):
+        state = EditorState(data=bytearray(256), width=16, height=16)
+        editor = BaseTileEditor(state, '/tmp/test')
+        tab = TileEditorTab(editor)
+        assert not tab.is_dirty
+        state.dirty = True
+        assert tab.is_dirty
+
+
+class TestDrillDownTab:
+    def _make_tab(self, file_list=None):
+        if file_list is None:
+            file_list = [('MAPA', 'Sosaria'), ('MAPB', 'LB Castle')]
+
+        class MockSession:
+            def read(self, name):
+                return bytes(256)
+
+            def make_save_callback(self, name):
+                def cb(data):
+                    pass
+                return cb
+
+        class MockEditor:
+            def __init__(self):
+                self._dirty = False
+
+            @property
+            def is_dirty(self):
+                return self._dirty
+
+            def build_ui(self):
+                # Return minimal stubs
+                from prompt_toolkit.layout import Window
+                return Window(), None
+
+            def save(self):
+                self._dirty = False
+
+        def factory(fname, data, save_cb):
+            return MockEditor()
+
+        return DrillDownTab('Maps', file_list, factory, MockSession())
+
+    def test_initial_state(self):
+        tab = self._make_tab()
+        assert tab.name == 'Maps'
+        assert tab.active_editor is None
+        assert tab.selected_index == 0
+        assert not tab.is_dirty
+
+    def test_selector_navigation(self):
+        tab = self._make_tab()
+        tab.selected_index = 0
+        tab.selected_index = min(len(tab.file_list) - 1, tab.selected_index + 1)
+        assert tab.selected_index == 1
+
+    def test_open_editor(self):
+        tab = self._make_tab()
+        tab._open_editor()
+        assert tab.active_editor is not None
+
+    def test_close_editor(self):
+        tab = self._make_tab()
+        tab._open_editor()
+        assert tab.active_editor is not None
+        # Simulate Escape
+        tab.active_editor = None
+        tab._editor_container = None
+        assert tab.active_editor is None
+
+    def test_dirty_from_editor(self):
+        tab = self._make_tab()
+        tab._open_editor()
+        assert not tab.is_dirty
+        tab.active_editor._dirty = True
+        assert tab.is_dirty
+
+    def test_empty_file_list(self):
+        tab = self._make_tab(file_list=[])
+        assert not tab.is_dirty
+        tab._open_editor()  # Should be a no-op
+        assert tab.active_editor is None

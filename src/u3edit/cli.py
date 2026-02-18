@@ -1,6 +1,7 @@
 """Unified CLI for u3edit: Ultima III data toolkit.
 
 Dispatches to all tool modules via a single entry point:
+    u3edit edit <disk_image>
     u3edit roster view <file>
     u3edit bestiary view <dir>
     u3edit map view <file>
@@ -30,6 +31,18 @@ from . import equip
 from . import disk
 
 
+def _cmd_unified_edit(args) -> None:
+    """Launch the unified tabbed TUI editor for a disk image."""
+    from .tui import require_prompt_toolkit
+    require_prompt_toolkit()
+    from .tui.game_session import GameSession
+    from .tui.app import UnifiedApp
+
+    with GameSession(args.image) as session:
+        app = UnifiedApp(session)
+        app.run()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog='u3edit',
@@ -39,6 +52,11 @@ def main() -> None:
     parser.add_argument('--version', action='version', version=f'u3edit {__version__}')
 
     subparsers = parser.add_subparsers(dest='tool', help='Tool to run')
+
+    # Top-level unified editor
+    edit_parser = subparsers.add_parser(
+        'edit', help='Open unified tabbed TUI editor for a disk image')
+    edit_parser.add_argument('image', help='Path to ProDOS disk image (.po, .2mg)')
 
     # Register all tool modules
     roster.register_parser(subparsers)
@@ -73,6 +91,10 @@ def main() -> None:
         'equip': equip.dispatch,
         'disk': disk.dispatch,
     }
+
+    if args.tool == 'edit':
+        _cmd_unified_edit(args)
+        return
 
     handler = dispatchers.get(args.tool)
     if handler:

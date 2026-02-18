@@ -7,7 +7,7 @@ from .base import EditorState, BaseTileEditor
 class SpecialEditor(BaseTileEditor):
     """11x11 special location tile editor. Preserves 7 metadata bytes."""
 
-    def __init__(self, file_path: str, data: bytes):
+    def __init__(self, file_path: str, data: bytes, save_callback=None):
         self.full_data = bytearray(data)
         tile_data = bytearray(data[:SPECIAL_MAP_TILES])
         state = EditorState(
@@ -15,11 +15,15 @@ class SpecialEditor(BaseTileEditor):
             width=SPECIAL_MAP_WIDTH,
             height=SPECIAL_MAP_HEIGHT,
         )
-        super().__init__(state, file_path, title='Special Location Editor')
+        super().__init__(state, file_path, title='Special Location Editor',
+                         save_callback=save_callback)
 
     def _save(self) -> None:
         out = bytearray(self.full_data)
         out[:SPECIAL_MAP_TILES] = self.state.data
-        with open(self.file_path, 'wb') as f:
-            f.write(bytes(out))
+        if self.save_callback:
+            self.save_callback(bytes(out))
+        else:
+            with open(self.file_path, 'wb') as f:
+                f.write(bytes(out))
         self.state.dirty = False
