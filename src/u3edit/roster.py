@@ -729,6 +729,114 @@ def cmd_import(args) -> None:
     print(f"Imported {count} character(s)")
 
 
+def check_progress(chars: list[Character]) -> dict:
+    """Analyze a roster for endgame readiness.
+
+    Returns a dict with completion status for victory conditions:
+    - All 4 marks (Kings, Snake, Fire, Force)
+    - All 4 cards (Death, Sol, Love, Moons)
+    - Exotic weapon equipped on at least one character
+    - Exotic armor equipped on at least one character
+    - Party of 4 non-dead characters
+    """
+    all_marks = {'Kings', 'Snake', 'Fire', 'Force'}
+    all_cards = {'Death', 'Sol', 'Love', 'Moons'}
+
+    active = [c for c in chars if not c.is_empty and c.status != 'Dead' and c.status != 'Ashes']
+
+    # Collect marks and cards across all characters
+    marks_found = set()
+    cards_found = set()
+    has_exotic_weapon = False
+    has_exotic_armor = False
+
+    for char in chars:
+        if char.is_empty:
+            continue
+        marks_found.update(char.marks)
+        cards_found.update(char.cards)
+        if char.raw[CHAR_READIED_WEAPON] == 15:  # Exotic weapon index
+            has_exotic_weapon = True
+        if char.raw[CHAR_WORN_ARMOR] == 7:  # Exotic armor index
+            has_exotic_armor = True
+
+    marks_missing = all_marks - marks_found
+    cards_missing = all_cards - cards_found
+
+    return {
+        'party_alive': len(active),
+        'party_ready': len(active) >= 4,
+        'marks_found': sorted(marks_found),
+        'marks_missing': sorted(marks_missing),
+        'marks_complete': len(marks_missing) == 0,
+        'cards_found': sorted(cards_found),
+        'cards_missing': sorted(cards_missing),
+        'cards_complete': len(cards_missing) == 0,
+        'has_exotic_weapon': has_exotic_weapon,
+        'has_exotic_armor': has_exotic_armor,
+        'exodus_ready': (
+            len(marks_missing) == 0
+            and len(cards_missing) == 0
+            and has_exotic_weapon
+            and has_exotic_armor
+            and len(active) >= 4
+        ),
+    }
+
+
+def cmd_check_progress(args) -> None:
+    """Check roster for endgame readiness."""
+    chars, _ = load_roster(args.file)
+
+    progress = check_progress(chars)
+
+    if getattr(args, 'json', False):
+        export_json(progress, getattr(args, 'output', None))
+        return
+
+    print(f"\n=== Exodus Endgame Readiness ===\n")
+
+    # Party status
+    status = "READY" if progress['party_ready'] else "NOT READY"
+    print(f"  Party:          {progress['party_alive']}/4 alive ({status})")
+
+    # Marks
+    status = "COMPLETE" if progress['marks_complete'] else "INCOMPLETE"
+    print(f"  Marks:          {', '.join(progress['marks_found']) or 'None'} ({status})")
+    if progress['marks_missing']:
+        print(f"    Missing:      {', '.join(progress['marks_missing'])}")
+
+    # Cards
+    status = "COMPLETE" if progress['cards_complete'] else "INCOMPLETE"
+    print(f"  Cards:          {', '.join(progress['cards_found']) or 'None'} ({status})")
+    if progress['cards_missing']:
+        print(f"    Missing:      {', '.join(progress['cards_missing'])}")
+
+    # Exotic gear
+    w = "Yes" if progress['has_exotic_weapon'] else "No"
+    a = "Yes" if progress['has_exotic_armor'] else "No"
+    print(f"  Exotic Weapon:  {w}")
+    print(f"  Exotic Armor:   {a}")
+
+    # Verdict
+    print()
+    if progress['exodus_ready']:
+        print("  >>> READY TO FACE EXODUS <<<")
+    else:
+        print("  Not yet ready for Exodus. Requirements:")
+        if not progress['party_ready']:
+            print(f"    - Need 4 alive characters (have {progress['party_alive']})")
+        if progress['marks_missing']:
+            print(f"    - Missing marks: {', '.join(progress['marks_missing'])}")
+        if progress['cards_missing']:
+            print(f"    - Missing cards: {', '.join(progress['cards_missing'])}")
+        if not progress['has_exotic_weapon']:
+            print("    - Need Exotic weapon equipped")
+        if not progress['has_exotic_armor']:
+            print("    - Need Exotic armor equipped")
+    print()
+
+
 def _add_edit_args(p) -> None:
     """Add common character edit arguments to a parser."""
     p.add_argument('--name', help='Character name (max 9 chars)')
@@ -809,6 +917,12 @@ def register_parser(subparsers) -> None:
     p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
 
+    # Check progress
+    p_progress = sub.add_parser('check-progress', help='Check endgame readiness')
+    p_progress.add_argument('file', help='ROST file path')
+    p_progress.add_argument('--json', action='store_true', help='Output as JSON')
+    p_progress.add_argument('--output', '-o', help='Output file (for --json)')
+
 
 def dispatch(args) -> None:
     """Dispatch roster subcommand."""
@@ -820,8 +934,10 @@ def dispatch(args) -> None:
         cmd_create(args)
     elif args.roster_command == 'import':
         cmd_import(args)
+    elif args.roster_command == 'check-progress':
+        cmd_check_progress(args)
     else:
-        print("Usage: u3edit roster {view|edit|create|import} ...", file=sys.stderr)
+        print("Usage: u3edit roster {view|edit|create|import|check-progress} ...", file=sys.stderr)
 
 
 def main() -> None:
@@ -869,6 +985,11 @@ def main() -> None:
     p_import.add_argument('json_file', help='JSON file to import')
     p_import.add_argument('--output', '-o')
     p_import.add_argument('--backup', action='store_true')
+
+    p_progress = sub.add_parser('check-progress', help='Check endgame readiness')
+    p_progress.add_argument('file', help='ROST file path')
+    p_progress.add_argument('--json', action='store_true')
+    p_progress.add_argument('--output', '-o')
 
     args = parser.parse_args()
     dispatch(args)

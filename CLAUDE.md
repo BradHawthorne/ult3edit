@@ -11,7 +11,7 @@ u3edit is a data toolkit for Ultima III: Exodus (Apple II, 1983). It provides CL
 ```bash
 pip install -e ".[dev]"              # Install with pytest
 pip install -e ".[tui]"              # Install with prompt_toolkit for TUI editors
-pytest -v                            # Run all 335 tests
+pytest -v                            # Run all 348 tests
 pytest tests/test_roster.py          # Run one test module
 pytest -v tests/test_bcd.py::TestBcdToInt::test_zero  # Run single test
 u3edit roster view path/to/ROST      # CLI usage pattern
@@ -78,7 +78,8 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 - **`--all`**: Bulk roster editing — applies edits to all non-empty slots (mutually exclusive with `--slot`).
 - **`import`**: Every editable module supports `import <binary_file> <json_file>` to apply JSON data.
 - **`map set/fill/replace/find`**: Map CLI editing — set tiles, fill regions, replace tile types, search.
-- **`tlk search`**: Case-insensitive text search across TLK dialog files.
+- **`tlk search`**: Text search across TLK dialog files. Case-insensitive by default, `--regex` for regex patterns.
+- **`roster check-progress`**: Endgame readiness checker — marks, cards, exotic gear, party status.
 - **`save edit --plrs-slot`**: Edit active characters in PLRS file via save subcommand.
 - **`TILE_CHARS_REVERSE` / `DUNGEON_TILE_CHARS_REVERSE`**: Reverse lookups in `constants.py` for char→tile-byte conversion (used by import commands).
 

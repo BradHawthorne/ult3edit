@@ -8,6 +8,7 @@ Format: 0xFF = line break within record, 0x00 = record terminator.
 import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -240,10 +241,24 @@ def cmd_edit(args) -> None:
     print(f"Updated record {args.record} in {output}")
 
 
+def _match_line(line: str, pattern: str, use_regex: bool) -> bool:
+    """Check if a line matches a search pattern."""
+    if use_regex:
+        return bool(re.search(pattern, line, re.IGNORECASE))
+    return pattern.lower() in line.lower()
+
+
 def cmd_search(args) -> None:
     """Search dialog text across TLK files."""
-    pattern = args.pattern.lower()
+    use_regex = getattr(args, 'regex', False)
     path_or_dir = args.path
+
+    if use_regex:
+        try:
+            re.compile(args.pattern)
+        except re.error as e:
+            print(f"Error: Invalid regex: {e}", file=sys.stderr)
+            sys.exit(1)
 
     results = []
 
@@ -256,7 +271,7 @@ def cmd_search(args) -> None:
             location = TLK_NAMES.get(letter, 'Unknown')
             for i, rec in enumerate(records):
                 for line in rec:
-                    if pattern in line.lower():
+                    if _match_line(line, args.pattern, use_regex):
                         results.append({
                             'file': f'TLK{letter}',
                             'location': location,
@@ -268,7 +283,7 @@ def cmd_search(args) -> None:
         filename = os.path.basename(path_or_dir)
         for i, rec in enumerate(records):
             for line in rec:
-                if pattern in line.lower():
+                if _match_line(line, args.pattern, use_regex):
                     results.append({
                         'file': filename,
                         'record': i,
@@ -343,6 +358,7 @@ def register_parser(subparsers) -> None:
     p_search = sub.add_parser('search', help='Search dialog text')
     p_search.add_argument('path', help='TLK file or GAME directory')
     p_search.add_argument('pattern', help='Text to search for (case-insensitive)')
+    p_search.add_argument('--regex', action='store_true', help='Treat pattern as a regular expression')
     p_search.add_argument('--json', action='store_true', help='Output as JSON')
     p_search.add_argument('--output', '-o', help='Output file (for --json)')
 
@@ -402,6 +418,7 @@ def main() -> None:
     p_search = sub.add_parser('search', help='Search dialog text')
     p_search.add_argument('path', help='TLK file or GAME directory')
     p_search.add_argument('pattern', help='Text to search for')
+    p_search.add_argument('--regex', action='store_true')
     p_search.add_argument('--json', action='store_true')
     p_search.add_argument('--output', '-o')
 

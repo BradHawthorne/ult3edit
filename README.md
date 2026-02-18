@@ -11,6 +11,9 @@ pip install -e .
 
 # With development dependencies (pytest)
 pip install -e ".[dev]"
+
+# With TUI support (prompt_toolkit)
+pip install -e ".[tui]"
 ```
 
 Requires Python 3.10+. No runtime dependencies.
@@ -18,6 +21,9 @@ Requires Python 3.10+. No runtime dependencies.
 ## Quick Start
 
 ```bash
+# Interactive TUI editor (requires prompt_toolkit)
+u3edit edit game.po
+
 # View characters
 u3edit roster view path/to/GAME/ROST#069500
 
@@ -49,6 +55,22 @@ u3edit equip view
 u3edit roster view path/to/ROST#069500 --json -o roster.json
 ```
 
+## Unified TUI Editor
+
+The interactive text-based editor provides a tabbed interface for editing all game data in one session. Requires `prompt_toolkit`:
+
+```bash
+pip install -e ".[tui]"
+
+# Edit a ProDOS disk image directly
+u3edit edit game.po
+
+# Edit extracted files in a directory
+u3edit edit path/to/GAME/
+```
+
+The TUI supports tile painting for maps, form editing for character stats and monster attributes, and in-place dialog editing. Changes are written back to the disk image or directory on save.
+
 ## Disk Image Support
 
 If you have [diskiigs](https://github.com/BradHawthorne/rosetta) on your PATH (or set `DISKIIGS_PATH`), u3edit can work directly with ProDOS disk images:
@@ -62,14 +84,14 @@ u3edit disk list game.po
 
 | Tool | Description | Commands |
 |------|-------------|----------|
-| `roster` | Character roster viewer/editor | `view`, `edit`, `create` |
-| `bestiary` | Monster bestiary viewer/editor | `view`, `dump`, `edit` |
-| `map` | Overworld, town, and dungeon map viewer | `view`, `overview`, `legend` |
-| `tlk` | NPC dialog viewer/editor | `view`, `extract`, `build`, `edit` |
-| `combat` | Combat battlefield viewer | `view` |
-| `save` | Save state viewer/editor | `view`, `edit` |
-| `special` | Special location viewer (shrines, fountains) | `view` |
-| `text` | Game text string viewer | `view` |
+| `roster` | Character roster viewer/editor | `view`, `edit`, `create`, `import`, `check-progress` |
+| `bestiary` | Monster bestiary viewer/editor | `view`, `dump`, `edit`, `import` |
+| `map` | Overworld, town, and dungeon map viewer/editor | `view`, `overview`, `legend`, `set`, `fill`, `replace`, `find`, `import` |
+| `tlk` | NPC dialog viewer/editor | `view`, `extract`, `build`, `edit`, `search`, `import` |
+| `combat` | Combat battlefield viewer | `view`, `edit`, `import` |
+| `save` | Save state viewer/editor | `view`, `edit`, `import` |
+| `special` | Special location viewer (shrines, fountains) | `view`, `edit`, `import` |
+| `text` | Game text string viewer | `view`, `edit`, `import` |
 | `spell` | Spell reference (wizard + cleric) | `view` |
 | `equip` | Equipment stats and class restrictions | `view` |
 
@@ -84,8 +106,17 @@ u3edit roster edit ROST#069500 --slot 0 --str 99 --hp 9999 --gold 9999
 # Give all marks and cards
 u3edit roster edit ROST#069500 --slot 0 --marks "Kings,Snake,Fire,Force" --cards "Death,Sol,Love,Moons"
 
+# Bulk edit all characters at once
+u3edit roster edit ROST#069500 --all --gold 9999 --food 9999
+
 # Create a new character
 u3edit roster create ROST#069500 --slot 5 --name "WIZARD" --race E --class W --gender F
+
+# Validate roster for game-rule violations
+u3edit roster view ROST#069500 --validate
+
+# Check endgame readiness
+u3edit roster check-progress ROST#069500
 ```
 
 ## Editing Monsters
@@ -95,12 +126,78 @@ u3edit roster create ROST#069500 --slot 5 --name "WIZARD" --race E --class W --g
 u3edit bestiary edit MONA#069900 --monster 0 --hp 200 --attack 80
 ```
 
+## Editing Maps
+
+```bash
+# Set a single tile
+u3edit map set MAPA#061000 --x 10 --y 20 --tile 0x04
+
+# Fill a rectangular region with grass
+u3edit map fill MAPA#061000 --x1 0 --y1 0 --x2 5 --y2 5 --tile 0x04
+
+# Replace all water tiles with grass
+u3edit map replace MAPA#061000 --from 0x00 --to 0x04
+
+# Find all town tiles
+u3edit map find MAPA#061000 --tile 0x18
+
+# Dungeon editing (specify level 0-7)
+u3edit map set MAPM#061000 --x 5 --y 5 --tile 0x02 --level 3
+```
+
+## Searching Dialog
+
+```bash
+# Search all TLK files for a keyword
+u3edit tlk search path/to/GAME/ "exodus"
+
+# Regex search
+u3edit tlk search path/to/GAME/ "exo.*us" --regex
+
+# Export search results as JSON
+u3edit tlk search path/to/GAME/ "mark" --json -o results.json
+```
+
 ## Editing Save State
 
 ```bash
 # Teleport the party
 u3edit save edit path/to/GAME/ --x 32 --y 32 --transport horse
+
+# Edit active party characters
+u3edit save edit path/to/GAME/ --plrs-slot 0 --hp 9999 --gold 9999
 ```
+
+## JSON Import/Export
+
+All editable data types support round-trip JSON:
+
+```bash
+# Export to JSON
+u3edit roster view ROST#069500 --json -o roster.json
+
+# Edit the JSON externally, then import back
+u3edit roster import ROST#069500 roster.json --backup
+
+# Same pattern for all modules
+u3edit bestiary view MONA#069900 --json -o monsters.json
+u3edit bestiary import MONA#069900 monsters.json --backup
+```
+
+## Safety Features
+
+```bash
+# Preview changes without writing (dry run)
+u3edit roster edit ROST#069500 --slot 0 --hp 9999 --dry-run
+
+# Create a .bak backup before overwriting
+u3edit roster edit ROST#069500 --slot 0 --hp 9999 --backup
+
+# Validate character data integrity
+u3edit roster view ROST#069500 --validate
+```
+
+`--backup` and `--dry-run` are available on all edit and import commands.
 
 ## File Formats
 
@@ -168,7 +265,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-163 tests covering all modules with synthesized game data (no real game files needed).
+348 tests covering all modules with synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 

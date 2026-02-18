@@ -19,10 +19,13 @@ from u3edit.constants import (
     TILE_CHARS_REVERSE, DUNGEON_TILE_CHARS_REVERSE,
 )
 from u3edit.fileutil import backup_file
-from u3edit.roster import Character, load_roster, save_roster, validate_character, cmd_import
+from u3edit.roster import (
+    Character, load_roster, save_roster, validate_character, cmd_import,
+    check_progress,
+)
 from u3edit.bestiary import load_mon_file, save_mon_file
 from u3edit.map import cmd_find, cmd_set
-from u3edit.tlk import load_tlk_records, encode_record, cmd_search
+from u3edit.tlk import load_tlk_records, encode_record, cmd_search, _match_line
 from u3edit.save import PartyState
 from u3edit.text import load_text_records
 
@@ -521,3 +524,142 @@ class TestDryRun:
         with open(path, 'rb') as f:
             after = f.read()
         assert before == after
+
+
+# =============================================================================
+# TLK regex search
+# =============================================================================
+
+class TestTlkRegexSearch:
+    def test_regex_match(self):
+        assert _match_line("HELLO WORLD", r"HEL+O", True)
+
+    def test_regex_no_match(self):
+        assert not _match_line("HELLO WORLD", r"^WORLD", True)
+
+    def test_regex_case_insensitive(self):
+        assert _match_line("Hello World", r"hello", True)
+
+    def test_plain_match_still_works(self):
+        assert _match_line("HELLO WORLD", "hello", False)
+
+    def test_plain_no_match(self):
+        assert not _match_line("HELLO WORLD", "zzz", False)
+
+    def test_regex_pattern_groups(self):
+        assert _match_line("LOOK FOR THE MARK OF FIRE", r"MARK.*FIRE", True)
+
+    def test_regex_alternation(self):
+        assert _match_line("THE CASTLE", r"castle|town", True)
+        assert _match_line("THE TOWN", r"castle|town", True)
+        assert not _match_line("THE DUNGEON", r"castle|town", True)
+
+
+# =============================================================================
+# Progression checker
+# =============================================================================
+
+class TestCheckProgress:
+    def _make_char(self, marks=None, cards=None, weapon=0, armor=0, status='G'):
+        data = bytearray(CHAR_RECORD_SIZE)
+        data[CHAR_NAME_OFFSET:CHAR_NAME_OFFSET + 4] = b'\xC8\xC5\xD2\xCF'  # "HERO"
+        data[CHAR_RACE] = ord('H')
+        data[CHAR_CLASS] = ord('F')
+        data[CHAR_GENDER] = ord('M')
+        data[CHAR_STATUS] = ord(status)
+        data[CHAR_STR] = int_to_bcd(50)
+        data[CHAR_HP_HI], data[CHAR_HP_LO] = int_to_bcd16(100)
+        data[CHAR_READIED_WEAPON] = weapon
+        data[CHAR_WORN_ARMOR] = armor
+        char = Character(data)
+        if marks:
+            char.marks = marks
+        if cards:
+            char.cards = cards
+        return char
+
+    def test_empty_roster(self):
+        chars = [Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(20)]
+        progress = check_progress(chars)
+        assert not progress['exodus_ready']
+        assert progress['party_alive'] == 0
+        assert not progress['marks_complete']
+        assert not progress['cards_complete']
+
+    def test_fully_ready(self):
+        all_marks = ['Kings', 'Snake', 'Fire', 'Force']
+        all_cards = ['Death', 'Sol', 'Love', 'Moons']
+        chars = [
+            self._make_char(marks=all_marks, cards=all_cards, weapon=15, armor=7),
+            self._make_char(),
+            self._make_char(),
+            self._make_char(),
+        ]
+        # Pad to 20 slots
+        chars.extend([Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(16)])
+        progress = check_progress(chars)
+        assert progress['exodus_ready']
+        assert progress['marks_complete']
+        assert progress['cards_complete']
+        assert progress['has_exotic_weapon']
+        assert progress['has_exotic_armor']
+        assert progress['party_alive'] == 4
+
+    def test_missing_marks(self):
+        chars = [
+            self._make_char(marks=['Kings', 'Snake'], weapon=15, armor=7),
+            self._make_char(),
+            self._make_char(),
+            self._make_char(),
+        ]
+        chars.extend([Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(16)])
+        progress = check_progress(chars)
+        assert not progress['exodus_ready']
+        assert not progress['marks_complete']
+        assert set(progress['marks_missing']) == {'Fire', 'Force'}
+
+    def test_dead_chars_not_counted(self):
+        chars = [
+            self._make_char(marks=['Kings', 'Snake', 'Fire', 'Force'],
+                          cards=['Death', 'Sol', 'Love', 'Moons'],
+                          weapon=15, armor=7),
+            self._make_char(status='D'),  # Dead
+            self._make_char(status='A'),  # Ashes
+            self._make_char(),
+        ]
+        chars.extend([Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(16)])
+        progress = check_progress(chars)
+        assert not progress['exodus_ready']
+        assert progress['party_alive'] == 2
+        assert not progress['party_ready']
+
+    def test_marks_spread_across_party(self):
+        """Marks/cards on different characters still count."""
+        chars = [
+            self._make_char(marks=['Kings', 'Snake']),
+            self._make_char(marks=['Fire', 'Force'], cards=['Death', 'Sol']),
+            self._make_char(cards=['Love', 'Moons'], weapon=15),
+            self._make_char(armor=7),
+        ]
+        chars.extend([Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(16)])
+        progress = check_progress(chars)
+        assert progress['marks_complete']
+        assert progress['cards_complete']
+        assert progress['has_exotic_weapon']
+        assert progress['has_exotic_armor']
+        assert progress['exodus_ready']
+
+    def test_no_exotic_gear(self):
+        all_marks = ['Kings', 'Snake', 'Fire', 'Force']
+        all_cards = ['Death', 'Sol', 'Love', 'Moons']
+        chars = [
+            self._make_char(marks=all_marks, cards=all_cards, weapon=6, armor=4),
+            self._make_char(),
+            self._make_char(),
+            self._make_char(),
+        ]
+        chars.extend([Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(16)])
+        progress = check_progress(chars)
+        assert not progress['exodus_ready']
+        assert not progress['has_exotic_weapon']
+        assert not progress['has_exotic_armor']
