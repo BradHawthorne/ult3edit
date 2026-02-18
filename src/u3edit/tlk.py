@@ -192,24 +192,41 @@ def cmd_build(args) -> None:
 
 
 def cmd_edit(args) -> None:
-    """Edit a specific record in-place."""
-    records = load_tlk_records(args.file)
+    """Edit a specific record in-place, preserving binary records."""
+    with open(args.file, 'rb') as f:
+        raw = f.read()
 
-    if args.record < 0 or args.record >= len(records):
-        print(f"Error: Record {args.record} out of range (0-{len(records)-1})",
+    # Split into raw parts, track which are text
+    raw_parts = raw.split(bytes([TLK_RECORD_END]))
+    text_index = 0
+    target_part = None
+    for i, part in enumerate(raw_parts):
+        if not part:
+            continue
+        if is_text_record(part):
+            if text_index == args.record:
+                target_part = i
+                break
+            text_index += 1
+
+    text_count = sum(1 for p in raw_parts if p and is_text_record(p))
+    if target_part is None:
+        print(f"Error: Record {args.record} out of range (0-{text_count-1})",
               file=sys.stderr)
         sys.exit(1)
 
-    records[args.record] = args.text.split('\\n')
+    # Replace only the target text record, preserve everything else
+    new_lines = args.text.split('\\n')
+    new_encoded = encode_record(new_lines)
+    # encode_record appends TLK_RECORD_END; strip it since split removed them
+    raw_parts[target_part] = new_encoded[:-1]
 
-    # Rebuild binary
-    out = bytearray()
-    for rec in records:
-        out.extend(encode_record(rec))
+    # Rebuild: rejoin with TLK_RECORD_END separator
+    out = bytes([TLK_RECORD_END]).join(raw_parts)
 
     output = args.output if args.output else args.file
     with open(output, 'wb') as f:
-        f.write(bytes(out))
+        f.write(out)
     print(f"Updated record {args.record} in {output}")
 
 

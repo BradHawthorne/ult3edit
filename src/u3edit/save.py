@@ -236,6 +236,8 @@ def main() -> None:
     p_edit.add_argument('--transport')
     p_edit.add_argument('--x', type=int)
     p_edit.add_argument('--y', type=int)
+    p_edit.add_argument('--party-size', type=int)
+    p_edit.add_argument('--slot-ids', type=int, nargs='+')
     p_edit.add_argument('--output', '-o')
 
     args = parser.parse_args()

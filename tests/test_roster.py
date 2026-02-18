@@ -1,9 +1,10 @@
 """Tests for roster tool."""
 
+import argparse
 import os
 import pytest
 
-from u3edit.roster import Character, load_roster, save_roster
+from u3edit.roster import Character, load_roster, save_roster, cmd_edit, cmd_create
 from u3edit.constants import CHAR_RECORD_SIZE, CHAR_MARKS_CARDS
 
 
@@ -155,3 +156,54 @@ class TestLoadSave:
         chars2, _ = load_roster(output)
         assert chars2[0].strength == 50
         assert chars2[0].name == 'HERO'  # Other fields preserved
+
+
+def _edit_args(**kwargs):
+    """Build an argparse.Namespace with all roster edit args defaulting to None."""
+    defaults = dict(
+        file=None, slot=0, output=None, name=None,
+        str=None, dex=None, int_=None, wis=None,
+        hp=None, max_hp=None, mp=None,
+        gold=None, exp=None, food=None,
+        gems=None, keys=None, powders=None, torches=None,
+        race=None, class_=None, status=None, gender=None,
+        weapon=None, armor=None,
+        give_weapon=None, give_armor=None,
+        marks=None, cards=None,
+    )
+    defaults.update(kwargs)
+    return argparse.Namespace(**defaults)
+
+
+class TestCmdEdit:
+    def test_edit_name(self, sample_roster_file, tmp_dir):
+        out = os.path.join(tmp_dir, 'ROST_OUT')
+        args = _edit_args(file=sample_roster_file, slot=0, output=out, name='KNIGHT')
+        cmd_edit(args)
+        chars, _ = load_roster(out)
+        assert chars[0].name == 'KNIGHT'
+        assert chars[0].strength == 25  # Other stats preserved
+
+    def test_edit_strength(self, sample_roster_file, tmp_dir):
+        out = os.path.join(tmp_dir, 'ROST_OUT')
+        args = _edit_args(file=sample_roster_file, slot=0, output=out, **{'str': 99})
+        cmd_edit(args)
+        chars, _ = load_roster(out)
+        assert chars[0].strength == 99
+        assert chars[0].name == 'HERO'
+
+
+class TestCmdCreate:
+    def test_create_character(self, sample_roster_file, tmp_dir):
+        out = os.path.join(tmp_dir, 'ROST_OUT')
+        args = argparse.Namespace(
+            file=sample_roster_file, slot=1, output=out,
+            name='WIZARD', race='E', class_='W', gender='F',
+            str=10, dex=20, int_=25, wis=15, force=False,
+        )
+        cmd_create(args)
+        chars, _ = load_roster(out)
+        assert chars[1].name == 'WIZARD'
+        assert chars[1].race == 'Elf'
+        assert chars[1].char_class == 'Wizard'
+        assert chars[0].name == 'HERO'  # Slot 0 preserved

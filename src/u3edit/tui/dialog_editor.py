@@ -16,14 +16,16 @@ class DialogEditor:
         self.save_callback = save_callback
         self.dirty = False
 
-        # Parse records from raw data
+        # Parse records from raw data, preserving binary parts
+        self._raw_parts = data.split(bytes([TLK_RECORD_END]))
+        self._text_part_indices = []  # maps text record index → raw part index
         self.records = []  # list of list[str] (lines per record)
-        parts = data.split(bytes([TLK_RECORD_END]))
-        for part in parts:
+        for i, part in enumerate(self._raw_parts):
             if not part:
                 continue
             if not is_text_record(part):
                 continue
+            self._text_part_indices.append(i)
             self.records.append(decode_record(part + bytes([TLK_RECORD_END])))
 
         self.selected_index = 0
@@ -36,10 +38,13 @@ class DialogEditor:
         self._save()
 
     def _save(self):
-        out = bytearray()
-        for rec in self.records:
-            out.extend(encode_record(rec))
-        data = bytes(out)
+        # Write modified text records back into raw parts, preserving binary parts
+        parts = list(self._raw_parts)
+        for text_idx, rec in enumerate(self.records):
+            raw_idx = self._text_part_indices[text_idx]
+            encoded = encode_record(rec)
+            parts[raw_idx] = encoded[:-1]  # strip trailing TLK_RECORD_END
+        data = bytes([TLK_RECORD_END]).join(parts)
         if self.save_callback:
             self.save_callback(data)
         else:

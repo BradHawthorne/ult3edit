@@ -71,7 +71,7 @@ class TestEncodeHighAscii:
         result = encode_high_ascii('HERO', 10)
         assert len(result) == 10
         assert result[0] == ord('H') | 0x80
-        assert result[4] == 0  # Padding
+        assert result[4] == 0xA0  # Padding (high-ASCII space)
 
     def test_truncation(self):
         result = encode_high_ascii('VERY LONG NAME HERE', 10)

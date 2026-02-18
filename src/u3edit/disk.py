@@ -159,10 +159,14 @@ class DiskContext:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if exc_type is None:
-            # Write back modified files
+        # Always write back modified files, even on exception, to avoid data loss
+        if self._modified:
             for name, data in self._modified.items():
-                disk_write(self.image_path, name, data, diskiigs_path=self.diskiigs_path)
+                try:
+                    disk_write(self.image_path, name, data,
+                               diskiigs_path=self.diskiigs_path)
+                except Exception:
+                    pass  # Best-effort write-back; don't mask original exception
         if self._tmpdir:
             shutil.rmtree(self._tmpdir, ignore_errors=True)
         return False

@@ -1,9 +1,10 @@
 """Tests for bestiary tool."""
 
+import argparse
 import os
 import pytest
 
-from u3edit.bestiary import Monster, load_mon_file, save_mon_file
+from u3edit.bestiary import Monster, load_mon_file, save_mon_file, cmd_edit
 from u3edit.constants import MON_FILE_SIZE, MON_MONSTERS_PER_FILE
 
 
@@ -64,6 +65,33 @@ class TestLoadSave:
         monsters2 = load_mon_file(output)
         assert monsters2[0].hp == 99
         assert monsters2[1].name == 'Dragon'  # Other monsters preserved
+
+
+class TestCmdEdit:
+    def test_edit_hp(self, sample_mon_file, tmp_dir):
+        out = os.path.join(tmp_dir, 'MONA_OUT')
+        args = argparse.Namespace(
+            file=sample_mon_file, monster=0, output=out,
+            hp=99, attack=None, defense=None, speed=None,
+            tile1=None, tile2=None, flags1=None, flags2=None,
+            ability1=None, ability2=None,
+        )
+        cmd_edit(args)
+        monsters = load_mon_file(out)
+        assert monsters[0].hp == 99
+        assert monsters[1].hp == 200  # Other monsters preserved
+
+    def test_edit_clamps(self, sample_mon_file, tmp_dir):
+        out = os.path.join(tmp_dir, 'MONA_OUT')
+        args = argparse.Namespace(
+            file=sample_mon_file, monster=0, output=out,
+            hp=999, attack=None, defense=None, speed=None,
+            tile1=None, tile2=None, flags1=None, flags2=None,
+            ability1=None, ability2=None,
+        )
+        cmd_edit(args)
+        monsters = load_mon_file(out)
+        assert monsters[0].hp == 255  # Clamped to byte range
 
 
 def load_mon_file_from_bytes(data: bytes):

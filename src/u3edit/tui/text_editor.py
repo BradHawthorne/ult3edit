@@ -23,7 +23,7 @@ def parse_text_records(data: bytes) -> list[TextRecord]:
             end += 1
         text = decode_high_ascii(data[offset:end])
         max_len = end - offset
-        if text.strip():
+        if max_len > 0:
             records.append(TextRecord(text, offset, max_len))
         offset = end + 1
     return records

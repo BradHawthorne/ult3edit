@@ -238,7 +238,7 @@ def sample_text_bytes():
 def sample_prty_bytes():
     """Build a 16-byte PRTY file."""
     data = bytearray(PRTY_FILE_SIZE)
-    data[0] = 0x3F  # On Foot
+    data[0] = 0x01  # On Foot
     data[1] = 0x00  # Sosaria
     data[2] = 32    # X
     data[3] = 32    # Y

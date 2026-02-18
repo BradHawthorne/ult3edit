@@ -617,26 +617,20 @@ def main() -> None:
     p_edit.add_argument('file', help='ROST file path')
     p_edit.add_argument('--slot', type=int, required=True)
     p_edit.add_argument('--output', '-o')
-    for flag in ['--name', '--str', '--dex', '--wis', '--hp', '--max-hp',
+    p_edit.add_argument('--name')
+    for flag in ['--str', '--dex', '--wis', '--hp', '--max-hp',
                  '--mp', '--gold', '--exp', '--food', '--gems', '--keys',
-                 '--powders', '--torches', '--status', '--gender', '--marks', '--cards']:
-        if flag in ('--str', '--dex', '--wis', '--hp', '--max-hp', '--mp',
-                     '--gold', '--exp', '--food', '--gems', '--keys',
-                     '--powders', '--torches'):
-            p_edit.add_argument(flag, type=int)
-        elif flag == '--weapon':
-            p_edit.add_argument(flag, type=int)
-        elif flag == '--armor':
-            p_edit.add_argument(flag, type=int)
-        else:
-            dest = 'int_' if flag == '--int' else None
-            if dest:
-                p_edit.add_argument(flag, dest=dest)
-            else:
-                p_edit.add_argument(flag)
+                 '--powders', '--torches']:
+        p_edit.add_argument(flag, type=int)
     p_edit.add_argument('--int', type=int, dest='int_')
+    p_edit.add_argument('--race')
+    p_edit.add_argument('--class', dest='class_')
+    p_edit.add_argument('--status')
+    p_edit.add_argument('--gender')
     p_edit.add_argument('--weapon', type=int)
     p_edit.add_argument('--armor', type=int)
+    p_edit.add_argument('--marks')
+    p_edit.add_argument('--cards')
 
     p_create = sub.add_parser('create', help='Create a new character')
     p_create.add_argument('file')

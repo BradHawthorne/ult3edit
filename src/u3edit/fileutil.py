@@ -72,12 +72,15 @@ def decode_high_ascii(data: bytes) -> str:
         ch = b & 0x7F
         if 0x20 <= ch < 0x7F:
             chars.append(chr(ch))
-    return ''.join(chars)
+    return ''.join(chars).rstrip()
 
 
 def encode_high_ascii(text: str, length: int) -> bytearray:
-    """Encode a Python string to Apple II high-bit ASCII, padded to length."""
-    result = bytearray(length)
+    """Encode a Python string to Apple II high-bit ASCII, padded to length.
+
+    Unused bytes are filled with 0xA0 (high-ASCII space) to match the game format.
+    """
+    result = bytearray([0xA0] * length)
     for i, ch in enumerate(text[:length]):
         result[i] = ord(ch.upper()) | 0x80
     return result

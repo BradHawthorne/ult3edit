@@ -131,7 +131,7 @@ CLASSES = {
     ord('P'): 'Paladin',
     ord('B'): 'Barbarian',
 }
-CLASS_CODES = {v[0].upper(): k for k, v in CLASSES.items() if k != 0}
+CLASS_CODES = {v[0].upper(): k for k, v in CLASSES.items()}
 
 GENDERS = {ord('M'): 'Male', ord('F'): 'Female', ord('O'): 'Other'}
 
@@ -472,10 +472,17 @@ PRTY_TRANSPORT = {
     0x01: 'On Foot',
     0x0A: 'Horse',
     0x0B: 'Ship',
-    0x3F: 'On Foot',
+    0x3F: 'On Foot (Default)',
 }
 
-PRTY_TRANSPORT_CODES = {v.lower(): k for k, v in PRTY_TRANSPORT.items()}
+# Reverse mapping: prefer 0x01 for 'on foot' (0x3F is the power-on default)
+PRTY_TRANSPORT_CODES = {
+    'none': 0x00,
+    'on foot': 0x01,
+    'on foot (default)': 0x3F,
+    'horse': 0x0A,
+    'ship': 0x0B,
+}
 
 PRTY_LOCATION_TYPE = {
     0x00: 'Sosaria',
