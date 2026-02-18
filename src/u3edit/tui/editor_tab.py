@@ -92,7 +92,6 @@ class DrillDownTab:
         self.session = session
         self.selected_index = 0
         self.active_editor = None  # None = selector mode
-        self._active_editor_dirty = False
 
     @property
     def name(self):
