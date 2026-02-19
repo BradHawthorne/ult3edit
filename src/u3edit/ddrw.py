@@ -19,6 +19,54 @@ from .json_export import export_json
 DDRW_FILE_SIZE = 1792
 DDRW_LOAD_ADDR = 0x1800
 
+# Structured regions within DDRW (offsets relative to file start)
+# Perspective projection vectors: 32 slots at offset $F0
+DDRW_VECTOR_OFFSET = 0x00F0
+DDRW_VECTOR_COUNT = 32
+DDRW_VECTOR_SIZE = 1  # Each slot is 1 byte
+
+# Tile rendering records: 7 bytes each at offset $400 ($1C00 in memory)
+DDRW_TILE_OFFSET = 0x0400
+DDRW_TILE_RECORD_SIZE = 7
+DDRW_TILE_RECORD_FIELDS = [
+    'col_start', 'col_end', 'step', 'flags',
+    'bright_lo', 'bright_hi', 'reserved',
+]
+
+
+# ============================================================================
+# Structured parsing
+# ============================================================================
+
+def parse_vectors(data: bytes) -> list[int]:
+    """Parse perspective projection vector slots."""
+    result = []
+    for i in range(DDRW_VECTOR_COUNT):
+        off = DDRW_VECTOR_OFFSET + i
+        if off < len(data):
+            result.append(data[off])
+        else:
+            result.append(0)
+    return result
+
+
+def parse_tile_records(data: bytes) -> list[dict]:
+    """Parse tile rendering records at offset $400.
+
+    Each record is 7 bytes:
+      col_start, col_end, step, flags, bright_lo, bright_hi, reserved
+    """
+    records = []
+    i = DDRW_TILE_OFFSET
+    while i + DDRW_TILE_RECORD_SIZE <= len(data):
+        rec = {}
+        for j, field in enumerate(DDRW_TILE_RECORD_FIELDS):
+            rec[field] = data[i + j]
+        rec['offset'] = i
+        records.append(rec)
+        i += DDRW_TILE_RECORD_SIZE
+    return records
+
 
 # ============================================================================
 # CLI Commands
@@ -47,6 +95,8 @@ def cmd_view(args) -> None:
             'file': filename,
             'size': len(data),
             'load_addr': f'${DDRW_LOAD_ADDR:04X}',
+            'vectors': parse_vectors(data),
+            'tile_records': parse_tile_records(data),
             'raw': list(data),
         }
         export_json(result, args.output)
@@ -54,6 +104,39 @@ def cmd_view(args) -> None:
 
     print(f"\n=== {filename}: Dungeon Drawing Data "
           f"({len(data)} bytes, ${DDRW_LOAD_ADDR:04X}) ===\n")
+
+    # Perspective vectors
+    vectors = parse_vectors(data)
+    non_zero = sum(1 for v in vectors if v)
+    if non_zero:
+        print(f"  Perspective vectors (offset $F0, {DDRW_VECTOR_COUNT} slots, "
+              f"{non_zero} active):")
+        for i in range(0, DDRW_VECTOR_COUNT, 8):
+            vals = vectors[i:i + 8]
+            hex_vals = ' '.join(f'{v:02X}' for v in vals)
+            print(f"    [{i:2d}-{i+len(vals)-1:2d}] {hex_vals}")
+        print()
+
+    # Tile records
+    if DDRW_TILE_OFFSET < len(data):
+        records = parse_tile_records(data)
+        if records:
+            print(f"  Tile records (offset $400, {len(records)} records "
+                  f"x {DDRW_TILE_RECORD_SIZE} bytes):")
+            print(f"    {'#':>3s}  {'Start':>5s} {'End':>5s} {'Step':>4s} "
+                  f"{'Flags':>5s} {'BrLo':>4s} {'BrHi':>4s} {'Rsv':>3s}")
+            for idx, rec in enumerate(records):
+                if not any(rec[f] for f in DDRW_TILE_RECORD_FIELDS):
+                    continue  # Skip all-zero records
+                print(f"    {idx:3d}  "
+                      f"${rec['col_start']:02X}  "
+                      f"${rec['col_end']:02X}  "
+                      f"${rec['step']:02X}   "
+                      f"${rec['flags']:02X}  "
+                      f"${rec['bright_lo']:02X}  "
+                      f"${rec['bright_hi']:02X}  "
+                      f"${rec['reserved']:02X}")
+            print()
 
     # Hex dump
     for i in range(0, len(data), 16):

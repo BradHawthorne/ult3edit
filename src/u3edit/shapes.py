@@ -35,6 +35,26 @@ FRAMES_PER_TILE = 4    # 4 animation frames per tile
 # SHP overlay files are code+text, not tile shapes
 SHP_OVERLAY_LETTERS = '01234567'
 
+# SHPS has an embedded code routine at offset $9F9 ($0800 + $1F9 = $09F9)
+# This 7-byte region must be preserved when editing glyphs
+SHPS_CODE_OFFSET = 0x01F9  # File offset within SHPS (glyph 63, partial)
+SHPS_CODE_SIZE = 7
+
+# SHP overlay shop type mappings (SHP0–SHP7 at $9400)
+SHP_SHOP_TYPES = {
+    '0': 'Weapons Shop',
+    '1': 'Armour Shop',
+    '2': 'Grocery',
+    '3': 'Pub/Tavern',
+    '4': 'Healer/Temple',
+    '5': 'Guild',
+    '6': 'Oracle',
+    '7': 'Horse Trader',
+}
+
+# JSR $46BA inline string pattern (Apple II)
+_JSR_46BA = bytes([0x20, 0xBA, 0x46])
+
 # Apple II NTSC artifact colors for HGR rendering
 HGR_COLORS = {
     'black':  (0, 0, 0),
@@ -248,6 +268,53 @@ def glyph_to_pixels(data: bytes, offset: int = 0,
 
 
 # ============================================================================
+# SHP overlay inline string extraction
+# ============================================================================
+
+def extract_overlay_strings(data: bytes) -> list[dict]:
+    """Extract inline text strings from SHP overlay code.
+
+    SHP0-SHP7 are code overlays that use JSR $46BA followed by inline
+    high-ASCII text terminated by $00. This finds all such strings.
+    """
+    strings = []
+    i = 0
+    while i < len(data) - 3:
+        if data[i:i + 3] == _JSR_46BA:
+            # Found JSR $46BA — extract inline text starting at i+3
+            text_start = i + 3
+            chars = []
+            j = text_start
+            while j < len(data) and data[j] != 0x00:
+                b = data[j]
+                if b == 0xFF:
+                    chars.append('\n')
+                else:
+                    ch = b & 0x7F
+                    if 0x20 <= ch < 0x7F:
+                        chars.append(chr(ch))
+                j += 1
+            if chars:
+                strings.append({
+                    'jsr_offset': i,
+                    'text_offset': text_start,
+                    'text_end': j,
+                    'text': ''.join(chars),
+                })
+            i = j + 1
+        else:
+            i += 1
+    return strings
+
+
+def check_shps_code_region(data: bytes) -> bool:
+    """Check if the SHPS embedded code region at $9F9 is non-zero."""
+    if len(data) < SHPS_CODE_OFFSET + SHPS_CODE_SIZE:
+        return False
+    return any(data[SHPS_CODE_OFFSET:SHPS_CODE_OFFSET + SHPS_CODE_SIZE])
+
+
+# ============================================================================
 # File format detection
 # ============================================================================
 
@@ -269,10 +336,22 @@ def detect_format(data: bytes, filename: str = '') -> dict:
 
     # SHP0-SHP7 are code+text overlays, not tile shapes
     if name_upper.startswith('SHP') and len(name_upper) == 4:
+        letter = name_upper[3:]
+        shop = SHP_SHOP_TYPES.get(letter, 'Unknown')
         return {
             'type': 'overlay',
             'size': size,
-            'description': f'Code+text overlay ({size} bytes)',
+            'letter': letter,
+            'shop_type': shop,
+            'description': f'Shop overlay: {shop} ({size} bytes)',
+        }
+
+    # TEXT file is raw HGR bitmap data (title screen), not editable text
+    if name_upper == 'TEXT' or (size == 1024 and name_upper != 'SHPS'):
+        return {
+            'type': 'hgr_bitmap',
+            'size': size,
+            'description': f'HGR bitmap data ({size} bytes, likely title screen)',
         }
 
     # Generic binary — try HGR tile interpretation
@@ -337,12 +416,34 @@ def cmd_view(args) -> None:
     filename = os.path.basename(path_or_dir)
 
     if fmt['type'] == 'overlay':
+        strings = extract_overlay_strings(data)
+        if args.json:
+            export_json({'file': filename, 'format': fmt,
+                         'strings': [{'offset': s['text_offset'],
+                                      'text': s['text']}
+                                     for s in strings],
+                         'raw': list(data)}, args.output)
+            return
         print(f"\n=== {filename}: {fmt['description']} ===")
-        print("  (Code+text overlay — not tile shape data)")
+        print(f"  Type: Shop overlay ({fmt.get('shop_type', 'Unknown')})")
         print(f"  Size: {fmt['size']} bytes")
+        if strings:
+            print(f"\n  Inline text strings ({len(strings)} found):")
+            for s in strings:
+                text = s['text'].replace('\n', ' / ')
+                print(f"    [0x{s['text_offset']:04X}] {text}")
+        print()
+        return
+
+    if fmt['type'] == 'hgr_bitmap':
         if args.json:
             export_json({'file': filename, 'format': fmt,
                          'raw': list(data)}, args.output)
+            return
+        print(f"\n=== {filename}: {fmt['description']} ===")
+        print("  (HGR bitmap data — not editable text)")
+        print(f"  Size: {fmt['size']} bytes")
+        print()
         return
 
     if args.json:
@@ -485,6 +586,17 @@ def cmd_edit(args) -> None:
         print(f"Error: Expected {GLYPH_SIZE} bytes, got {len(new_bytes)}",
               file=sys.stderr)
         sys.exit(1)
+
+    # Warn if editing overlaps the embedded code region in SHPS
+    code_start = SHPS_CODE_OFFSET
+    code_end = SHPS_CODE_OFFSET + SHPS_CODE_SIZE
+    if offset < code_end and offset + GLYPH_SIZE > code_start:
+        if check_shps_code_region(data):
+            print(f"Warning: Glyph {glyph_idx} overlaps embedded code "
+                  f"region at 0x{code_start:04X}-0x{code_end:04X}",
+                  file=sys.stderr)
+            print(f"  This region contains executable code that must be "
+                  f"preserved.", file=sys.stderr)
 
     old_bytes = bytes(data[offset:offset + GLYPH_SIZE])
     print(f"Glyph {glyph_idx} (offset 0x{offset:04X}):")

@@ -50,14 +50,39 @@ def identify_binary(data: bytes, filename: str = '') -> dict | None:
 
 PATCHABLE_REGIONS: dict[str, dict[str, list]] = {
     'ULT3': {
-        # "Look" text table: tile names as null-terminated strings
-        # Found at data region around file offset $1566 in the disassembly
-        # (address $6566 = $5000 + $1566)
-        'look-text': {
-            'offset': 0x1566,
-            'max_length': 400,
-            'description': 'Tile name strings (Look command)',
+        # Master name table: terrain, monster, weapon, armor, spell names
+        # CIDAR-verified at address $897A (after draw_hgr function rts)
+        # 921 bytes of null-terminated high-ASCII strings
+        'name-table': {
+            'offset': 0x397A,
+            'max_length': 921,
+            'description': 'Master name table (terrain/monster/weapon/armor/spell)',
             'data_type': 'text',
+        },
+        # Moon gate X coordinates (8 phases)
+        # CIDAR-verified at address $79A7 (arr_79A7)
+        'moongate-x': {
+            'offset': 0x29A7,
+            'max_length': 8,
+            'description': 'Moon gate X coordinates (8 phases)',
+            'data_type': 'bytes',
+        },
+        # Moon gate Y coordinates (8 phases)
+        # CIDAR-verified at address $79AF (arr_79AF)
+        'moongate-y': {
+            'offset': 0x29AF,
+            'max_length': 8,
+            'description': 'Moon gate Y coordinates (8 phases)',
+            'data_type': 'bytes',
+        },
+        # Food depletion rate counter
+        # CIDAR-verified at address $772C (word_732C)
+        # Default value $04 — decremented each step, triggers food loss at 0
+        'food-rate': {
+            'offset': 0x272C,
+            'max_length': 1,
+            'description': 'Food depletion counter (default $04, lower=faster)',
+            'data_type': 'bytes',
         },
     },
     'EXOD': {
@@ -75,7 +100,7 @@ PATCHABLE_REGIONS: dict[str, dict[str, list]] = {
             'description': 'Dungeon entrance XY coordinates',
             'data_type': 'coords',
         },
-        # Moongate coordinates
+        # Moongate coordinates (EXOD copy)
         'moongate-coords': {
             'offset': 0x384D,
             'max_length': 16,

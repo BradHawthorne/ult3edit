@@ -259,7 +259,11 @@ u3edit patch edit ULT3#065000 --region look-text --data "D7C1D4C5D200" --backup
 u3edit patch dump ULT3#065000 --offset 0x1566 --length 128
 ```
 
-Targeted binary patches at CIDAR-identified offsets in ULT3/EXOD engine binaries. Known regions include Look text (tile names), town/dungeon coordinates, and moongate positions.
+Targeted binary patches at CIDAR-identified offsets in ULT3/EXOD engine binaries.
+
+ULT3 regions: `name-table` (921 bytes — terrain, monster, weapon, armor, spell names), `moongate-x`/`moongate-y` (8 bytes each — coordinates per phase), `food-rate` (1 byte — depletion counter, default $04).
+
+EXOD regions: `town-coords`, `dungeon-coords` (entrance XY pairs), `moongate-coords` (phase positions).
 
 ## Disk Space Analysis
 
@@ -340,7 +344,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-385 tests covering all modules with synthesized game data (no real game files needed).
+415 tests covering all modules with synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 

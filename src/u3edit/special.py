@@ -2,7 +2,11 @@
 
 BRND/SHRN/FNTN/TIME files: 128 bytes each.
 First 121 bytes = 11x11 tile map, remaining 7 bytes = metadata.
+Metadata bytes may contain location identifiers, coordinates, or flags.
 """
+
+SPECIAL_META_OFFSET = 121  # Offset of 7 metadata bytes after 11x11 map
+SPECIAL_META_SIZE = 7
 
 import argparse
 import json
@@ -18,6 +22,15 @@ from .fileutil import resolve_single_file, backup_file
 from .json_export import export_json
 
 
+def get_metadata(data: bytes) -> list[int]:
+    """Extract the 7 metadata bytes after the 11x11 tile map."""
+    meta = []
+    for i in range(SPECIAL_META_SIZE):
+        off = SPECIAL_META_OFFSET + i
+        meta.append(data[off] if off < len(data) else 0)
+    return meta
+
+
 def render_special_map(data: bytes) -> str:
     """Render 11x11 special location map as text art."""
     lines = ['     ' + ''.join(f'{x % 10}' for x in range(SPECIAL_MAP_WIDTH))]
@@ -30,6 +43,13 @@ def render_special_map(data: bytes) -> str:
             else:
                 row.append(' ')
         lines.append(f'  {y:2d}  {"".join(row)}')
+
+    # Show metadata bytes if present and non-zero
+    meta = get_metadata(data)
+    if any(meta):
+        hex_str = ' '.join(f'{b:02X}' for b in meta)
+        lines.append(f'  Metadata (0x79): {hex_str}')
+
     return '\n'.join(lines)
 
 
@@ -60,6 +80,7 @@ def cmd_view(args) -> None:
                                 if y * SPECIAL_MAP_WIDTH + x < len(data)]
                                for y in range(SPECIAL_MAP_HEIGHT)
                                if y * SPECIAL_MAP_WIDTH < len(data)],
+                    'metadata': get_metadata(data),
                 }
             export_json(result, args.output)
             return
@@ -87,6 +108,7 @@ def cmd_view(args) -> None:
                             for x in range(SPECIAL_MAP_WIDTH)]
                            for y in range(SPECIAL_MAP_HEIGHT)
                            if y * SPECIAL_MAP_WIDTH < len(data)],
+                'metadata': get_metadata(data),
             }
             export_json(result, args.output)
             return
@@ -124,6 +146,13 @@ def cmd_import(args) -> None:
             offset = y * SPECIAL_MAP_WIDTH + x
             if offset < len(data):
                 data[offset] = TILE_CHARS_REVERSE.get(ch, 0x20)
+
+    # Import metadata bytes
+    meta = jdata.get('metadata', [])
+    for i, b in enumerate(meta[:SPECIAL_META_SIZE]):
+        off = SPECIAL_META_OFFSET + i
+        if off < len(data):
+            data[off] = b
 
     output = args.output if args.output else args.file
     if do_backup and (not args.output or args.output == args.file):

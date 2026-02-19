@@ -49,6 +49,30 @@ AY_REGISTERS = {
 }
 
 
+# MBS music stream opcodes (Mockingboard AY-3-8910 driver)
+# Values $00-$3F are note pitch indices
+MBS_OPCODES = {
+    0x80: ('LOOP', 'Loop start/repeat'),
+    0x81: ('JUMP', 'Jump to address'),
+    0x82: ('END', 'End of stream'),
+    0x83: ('WRITE', 'Write AY register'),
+    0x84: ('TEMPO', 'Set playback tempo'),
+    0x85: ('MIXER', 'Set mixer control'),
+}
+
+# Approximate note names for pitch indices (chromatic scale, 4 octaves)
+_NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+
+
+def mbs_note_name(pitch: int) -> str:
+    """Convert a pitch index ($00-$3F) to a note name."""
+    if pitch == 0:
+        return 'REST'
+    octave = (pitch - 1) // 12
+    note = (pitch - 1) % 12
+    return f'{_NOTE_NAMES[note]}{octave + 1}'
+
+
 # ============================================================================
 # Sound data analysis
 # ============================================================================
@@ -107,6 +131,65 @@ def analyze_mbs(data: bytes) -> list[dict]:
         })
         i += 2
 
+    return events
+
+
+def parse_mbs_stream(data: bytes, offset: int = 0) -> list[dict]:
+    """Parse MBS music data stream starting at offset.
+
+    The MBS format interleaves 6502 driver code with music data.
+    Music stream opcodes:
+      $00-$3F: Note pitch (index into frequency table)
+      $80: Loop (repeat section)
+      $81: Jump (to address — 2 byte operand)
+      $82: End of stream
+      $83: Write AY register (register + value operands)
+      $84: Tempo (1 byte operand)
+      $85: Mixer control (1 byte operand)
+    """
+    events = []
+    i = offset
+    while i < len(data):
+        b = data[i]
+        if b <= 0x3F:
+            events.append({
+                'offset': i,
+                'type': 'NOTE',
+                'value': b,
+                'name': mbs_note_name(b),
+            })
+            i += 1
+        elif b in MBS_OPCODES:
+            opname, desc = MBS_OPCODES[b]
+            ev = {'offset': i, 'type': opname, 'value': b, 'description': desc}
+            if b == 0x82:  # END
+                events.append(ev)
+                break
+            elif b == 0x81:  # JUMP — 2 byte address operand
+                if i + 2 < len(data):
+                    lo, hi = data[i + 1], data[i + 2]
+                    ev['target'] = (hi << 8) | lo
+                events.append(ev)
+                i += 3
+            elif b == 0x83:  # WRITE — register + value
+                if i + 2 < len(data):
+                    ev['register'] = data[i + 1]
+                    ev['reg_value'] = data[i + 2]
+                    reg_name = AY_REGISTERS.get(data[i + 1], f'Reg {data[i+1]}')
+                    ev['register_name'] = reg_name
+                events.append(ev)
+                i += 3
+            elif b in (0x84, 0x85):  # TEMPO, MIXER — 1 byte operand
+                if i + 1 < len(data):
+                    ev['operand'] = data[i + 1]
+                events.append(ev)
+                i += 2
+            else:
+                events.append(ev)
+                i += 1
+        else:
+            # Unknown byte — likely driver code, not music data
+            break
     return events
 
 
@@ -185,7 +268,7 @@ def cmd_view(args) -> None:
 
     print(f"\n=== {filename}: {desc} ({len(data)} bytes) ===\n")
 
-    # For MBS, try structured AY register parsing
+    # For MBS, try structured AY register parsing and music stream
     if info and info['name'] == 'MBS':
         events = analyze_mbs(data)
         if events:
@@ -197,6 +280,39 @@ def cmd_view(args) -> None:
             if len(events) > 32:
                 print(f"    ... ({len(events) - 32} more events)")
             print()
+
+        # Try music stream parsing at various offsets
+        # MBS contains driver code first, then music data
+        for try_offset in [0, 0x100, 0x200, 0x300]:
+            if try_offset >= len(data):
+                break
+            stream = parse_mbs_stream(data, try_offset)
+            if len(stream) >= 4:  # Only show if we found meaningful data
+                print(f"  Music stream at offset 0x{try_offset:04X} "
+                      f"({len(stream)} events):\n")
+                for ev in stream[:48]:
+                    if ev['type'] == 'NOTE':
+                        print(f"    [{ev['offset']:04X}] {ev['name']:>5s} "
+                              f"(pitch ${ev['value']:02X})")
+                    elif ev['type'] == 'WRITE':
+                        rn = ev.get('register_name', '?')
+                        rv = ev.get('reg_value', 0)
+                        print(f"    [{ev['offset']:04X}] WRITE "
+                              f"R{ev.get('register', 0)} ({rn}) = ${rv:02X}")
+                    elif ev['type'] in ('TEMPO', 'MIXER'):
+                        print(f"    [{ev['offset']:04X}] {ev['type']} "
+                              f"${ev.get('operand', 0):02X}")
+                    elif ev['type'] == 'JUMP':
+                        print(f"    [{ev['offset']:04X}] JUMP "
+                              f"-> ${ev.get('target', 0):04X}")
+                    elif ev['type'] == 'END':
+                        print(f"    [{ev['offset']:04X}] END")
+                    else:
+                        print(f"    [{ev['offset']:04X}] {ev['type']}")
+                if len(stream) > 48:
+                    print(f"    ... ({len(stream) - 48} more events)")
+                print()
+                break  # Found a valid stream, stop trying offsets
 
     # Hex dump
     lines = hex_dump(data, 0, len(data), base_addr)

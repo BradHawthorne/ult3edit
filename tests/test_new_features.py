@@ -893,7 +893,7 @@ class TestSound:
 
 from u3edit.patch import (
     identify_binary, get_regions, parse_text_region,
-    parse_coord_region, encode_text_region,
+    parse_coord_region, encode_text_region, PATCHABLE_REGIONS,
 )
 
 
@@ -901,11 +901,19 @@ class TestPatch:
     def _make_ult3(self):
         """Create a synthetic ULT3 binary."""
         data = bytearray(17408)
-        # Put some "Look" text at the expected offset
-        offset = 0x1566
-        text = b'\xD7\xC1\xD4\xC5\xD2\x00'  # "WATER" + null (high-ASCII)
+        # Put some name table text at the CIDAR-verified offset
+        offset = 0x397A
+        text = b'\x00\xD7\xC1\xD4\xC5\xD2\x00'  # null + "WATER" + null
         text += b'\xC7\xD2\xC1\xD3\xD3\x00'  # "GRASS" + null
         data[offset:offset + len(text)] = text
+        # Put moongate X coords at $29A7
+        for i in range(8):
+            data[0x29A7 + i] = i * 8
+        # Put moongate Y coords at $29AF
+        for i in range(8):
+            data[0x29AF + i] = i * 4
+        # Set food rate at $272C
+        data[0x272C] = 0x04
         return bytes(data)
 
     def test_identify_ult3(self):
@@ -928,8 +936,22 @@ class TestPatch:
 
     def test_get_regions_ult3(self):
         regions = get_regions('ULT3')
-        assert 'look-text' in regions
-        assert regions['look-text']['data_type'] == 'text'
+        assert 'name-table' in regions
+        assert regions['name-table']['data_type'] == 'text'
+        assert regions['name-table']['max_length'] == 921
+
+    def test_get_regions_ult3_moongate(self):
+        regions = get_regions('ULT3')
+        assert 'moongate-x' in regions
+        assert 'moongate-y' in regions
+        assert regions['moongate-x']['max_length'] == 8
+        assert regions['moongate-y']['max_length'] == 8
+
+    def test_get_regions_ult3_food_rate(self):
+        regions = get_regions('ULT3')
+        assert 'food-rate' in regions
+        assert regions['food-rate']['max_length'] == 1
+        assert regions['food-rate']['offset'] == 0x272C
 
     def test_get_regions_exod(self):
         regions = get_regions('EXOD')
@@ -938,7 +960,8 @@ class TestPatch:
 
     def test_parse_text_region(self):
         data = self._make_ult3()
-        strings = parse_text_region(data, 0x1566, 20)
+        # Skip leading null byte
+        strings = parse_text_region(data, 0x397A, 20)
         assert 'WATER' in strings
         assert 'GRASS' in strings
 
@@ -948,6 +971,19 @@ class TestPatch:
         assert len(coords) == 3
         assert coords[0] == {'x': 10, 'y': 20}
         assert coords[2] == {'x': 50, 'y': 60}
+
+    def test_parse_moongate_coords(self):
+        data = self._make_ult3()
+        # Read moongate X coordinates
+        x_vals = list(data[0x29A7:0x29A7 + 8])
+        assert x_vals == [i * 8 for i in range(8)]
+        # Read moongate Y coordinates
+        y_vals = list(data[0x29AF:0x29AF + 8])
+        assert y_vals == [i * 4 for i in range(8)]
+
+    def test_parse_food_rate(self):
+        data = self._make_ult3()
+        assert data[0x272C] == 0x04
 
     def test_encode_text_region(self):
         strings = ['WATER', 'GRASS']
@@ -973,14 +1009,31 @@ class TestPatch:
             original = f.read()
 
         # Simulate edit + dry run: data should not change
-        assert original[0x1566] == 0
+        assert original[0x397A] == 0
+
+    def test_all_regions_within_file_bounds(self):
+        """Verify all patchable region offsets fit within their binaries."""
+        from u3edit.patch import ENGINE_BINARIES
+        for binary, regions in PATCHABLE_REGIONS.items():
+            size = ENGINE_BINARIES[binary]['size']
+            for name, reg in regions.items():
+                end = reg['offset'] + reg['max_length']
+                assert end <= size, (
+                    f"{binary}.{name}: offset 0x{reg['offset']:X} + "
+                    f"length {reg['max_length']} = 0x{end:X} > "
+                    f"file size 0x{size:X}"
+                )
 
 
 # =============================================================================
 # DDRW module tests
 # =============================================================================
 
-from u3edit.ddrw import DDRW_FILE_SIZE
+from u3edit.ddrw import (
+    DDRW_FILE_SIZE, parse_vectors, parse_tile_records,
+    DDRW_VECTOR_OFFSET, DDRW_VECTOR_COUNT,
+    DDRW_TILE_OFFSET, DDRW_TILE_RECORD_SIZE, DDRW_TILE_RECORD_FIELDS,
+)
 
 
 class TestDDRW:
@@ -1027,6 +1080,258 @@ class TestDDRW:
         with open(path, 'rb') as f:
             result = f.read()
         assert result[0x10] == 0xFF
+
+    def test_parse_vectors(self):
+        data = bytearray(DDRW_FILE_SIZE)
+        for i in range(DDRW_VECTOR_COUNT):
+            data[DDRW_VECTOR_OFFSET + i] = i * 3
+        vectors = parse_vectors(data)
+        assert len(vectors) == DDRW_VECTOR_COUNT
+        assert vectors[0] == 0
+        assert vectors[1] == 3
+        assert vectors[10] == 30
+
+    def test_parse_tile_records(self):
+        data = bytearray(DDRW_FILE_SIZE)
+        # Write a tile record at offset $400
+        data[DDRW_TILE_OFFSET + 0] = 0x10  # col_start
+        data[DDRW_TILE_OFFSET + 1] = 0x20  # col_end
+        data[DDRW_TILE_OFFSET + 2] = 0x02  # step
+        data[DDRW_TILE_OFFSET + 3] = 0x01  # flags
+        data[DDRW_TILE_OFFSET + 4] = 0x80  # bright_lo
+        data[DDRW_TILE_OFFSET + 5] = 0xFF  # bright_hi
+        data[DDRW_TILE_OFFSET + 6] = 0x00  # reserved
+        records = parse_tile_records(data)
+        assert len(records) > 0
+        assert records[0]['col_start'] == 0x10
+        assert records[0]['col_end'] == 0x20
+        assert records[0]['bright_hi'] == 0xFF
+
+    def test_tile_record_field_names(self):
+        assert len(DDRW_TILE_RECORD_FIELDS) == DDRW_TILE_RECORD_SIZE
+
+
+# =============================================================================
+# Combat descriptor block tests
+# =============================================================================
+
+class TestCombatDescriptor:
+    def test_descriptor_blocks_parsed(self, sample_con_bytes):
+        from u3edit.combat import CombatMap
+        cm = CombatMap(sample_con_bytes)
+        assert len(cm.desc1) == 7
+        assert len(cm.desc2) == 16
+        assert len(cm.desc3) == 24
+
+    def test_descriptor_in_dict(self, sample_con_bytes):
+        from u3edit.combat import CombatMap
+        cm = CombatMap(sample_con_bytes)
+        d = cm.to_dict()
+        assert 'descriptor' in d
+        assert 'block1' in d['descriptor']
+        assert 'block2' in d['descriptor']
+        assert 'block3' in d['descriptor']
+
+    def test_descriptor_nonzero(self):
+        """Descriptor blocks with non-zero data should be preserved."""
+        from u3edit.combat import CombatMap, CON_DESC1_OFFSET
+        data = bytearray(192)
+        data[CON_DESC1_OFFSET] = 0x42
+        data[CON_DESC1_OFFSET + 1] = 0x55
+        cm = CombatMap(data)
+        assert cm.desc1[0] == 0x42
+        assert cm.desc1[1] == 0x55
+
+    def test_descriptor_render_shows_nonzero(self):
+        from u3edit.combat import CombatMap, CON_DESC1_OFFSET
+        data = bytearray(192)
+        data[CON_DESC1_OFFSET] = 0xAB
+        cm = CombatMap(data)
+        rendered = cm.render()
+        assert 'Desc1' in rendered
+        assert 'AB' in rendered
+
+
+# =============================================================================
+# Sound MBS music stream tests
+# =============================================================================
+
+class TestMBSStream:
+    def test_parse_note(self):
+        from u3edit.sound import parse_mbs_stream
+        data = bytes([0x10, 0x20, 0x00])  # Two notes then REST
+        events = parse_mbs_stream(data)
+        assert len(events) == 3
+        assert events[0]['type'] == 'NOTE'
+        assert events[0]['value'] == 0x10
+        assert events[2]['type'] == 'NOTE'
+        assert events[2]['name'] == 'REST'
+
+    def test_parse_end(self):
+        from u3edit.sound import parse_mbs_stream
+        data = bytes([0x10, 0x82])  # Note then END
+        events = parse_mbs_stream(data)
+        assert len(events) == 2
+        assert events[1]['type'] == 'END'
+
+    def test_parse_tempo(self):
+        from u3edit.sound import parse_mbs_stream
+        data = bytes([0x84, 0x20, 0x82])  # TEMPO $20 then END
+        events = parse_mbs_stream(data)
+        assert events[0]['type'] == 'TEMPO'
+        assert events[0]['operand'] == 0x20
+
+    def test_parse_write_register(self):
+        from u3edit.sound import parse_mbs_stream
+        data = bytes([0x83, 0x08, 0x0F, 0x82])  # WRITE R8=$0F then END
+        events = parse_mbs_stream(data)
+        assert events[0]['type'] == 'WRITE'
+        assert events[0]['register'] == 8
+        assert events[0]['reg_value'] == 0x0F
+
+    def test_parse_jump(self):
+        from u3edit.sound import parse_mbs_stream
+        data = bytes([0x81, 0x00, 0x9A, 0x82])  # JUMP $9A00 then END
+        events = parse_mbs_stream(data)
+        assert events[0]['type'] == 'JUMP'
+        assert events[0]['target'] == 0x9A00
+
+    def test_note_names(self):
+        from u3edit.sound import mbs_note_name
+        assert mbs_note_name(0) == 'REST'
+        assert mbs_note_name(1) == 'C1'
+        assert mbs_note_name(13) == 'C2'
+
+    def test_unknown_byte_stops_parsing(self):
+        from u3edit.sound import parse_mbs_stream
+        # $40-$7F are not notes or opcodes
+        data = bytes([0x10, 0x50, 0x82])
+        events = parse_mbs_stream(data)
+        assert len(events) == 1  # Only the first note
+
+
+# =============================================================================
+# Special location metadata tests
+# =============================================================================
+
+class TestSpecialMetadata:
+    def test_metadata_extracted(self, sample_special_bytes):
+        from u3edit.special import get_metadata
+        meta = get_metadata(sample_special_bytes)
+        assert len(meta) == 7
+
+    def test_metadata_nonzero(self):
+        from u3edit.special import get_metadata, SPECIAL_META_OFFSET
+        data = bytearray(128)
+        data[SPECIAL_META_OFFSET] = 0x42
+        data[SPECIAL_META_OFFSET + 3] = 0xFF
+        meta = get_metadata(data)
+        assert meta[0] == 0x42
+        assert meta[3] == 0xFF
+
+    def test_metadata_in_render(self):
+        from u3edit.special import render_special_map, SPECIAL_META_OFFSET
+        data = bytearray(128)
+        data[SPECIAL_META_OFFSET] = 0xAB
+        rendered = render_special_map(data)
+        assert 'Metadata' in rendered
+        assert 'AB' in rendered
+
+    def test_metadata_not_shown_when_zero(self, sample_special_bytes):
+        from u3edit.special import render_special_map
+        rendered = render_special_map(sample_special_bytes)
+        assert 'Metadata' not in rendered
+
+
+# =============================================================================
+# Shapes overlay string extraction tests
+# =============================================================================
+
+class TestShapesOverlay:
+    def test_extract_overlay_strings(self):
+        from u3edit.shapes import extract_overlay_strings
+        # Build a fake overlay with JSR $46BA + inline text
+        data = bytearray(64)
+        # JSR $46BA at offset 0
+        data[0] = 0x20
+        data[1] = 0xBA
+        data[2] = 0x46
+        # Inline high-ASCII text "HELLO" + null
+        for i, ch in enumerate('HELLO'):
+            data[3 + i] = ord(ch) | 0x80
+        data[8] = 0x00  # terminator
+        strings = extract_overlay_strings(data)
+        assert len(strings) == 1
+        assert strings[0]['text'] == 'HELLO'
+        assert strings[0]['text_offset'] == 3
+
+    def test_extract_multiple_strings(self):
+        from u3edit.shapes import extract_overlay_strings
+        data = bytearray(64)
+        # First string at offset 0
+        data[0:3] = bytes([0x20, 0xBA, 0x46])
+        data[3] = ord('A') | 0x80
+        data[4] = 0x00
+        # Some code bytes
+        data[5] = 0xA9
+        data[6] = 0x00
+        # Second string at offset 7
+        data[7:10] = bytes([0x20, 0xBA, 0x46])
+        data[10] = ord('B') | 0x80
+        data[11] = ord('C') | 0x80
+        data[12] = 0x00
+        strings = extract_overlay_strings(data)
+        assert len(strings) == 2
+        assert strings[0]['text'] == 'A'
+        assert strings[1]['text'] == 'BC'
+
+    def test_overlay_with_newline(self):
+        from u3edit.shapes import extract_overlay_strings
+        data = bytearray(32)
+        data[0:3] = bytes([0x20, 0xBA, 0x46])
+        data[3] = ord('H') | 0x80
+        data[4] = ord('I') | 0x80
+        data[5] = 0xFF  # line break
+        data[6] = ord('!') | 0x80
+        data[7] = 0x00
+        strings = extract_overlay_strings(data)
+        assert len(strings) == 1
+        assert strings[0]['text'] == 'HI\n!'
+
+    def test_detect_overlay_shop_type(self):
+        from u3edit.shapes import detect_format, SHP_SHOP_TYPES
+        data = bytes(960)
+        fmt = detect_format(data, 'SHP3#069400')
+        assert fmt['type'] == 'overlay'
+        assert fmt['shop_type'] == 'Pub/Tavern'
+
+    def test_detect_text_as_hgr_bitmap(self):
+        from u3edit.shapes import detect_format
+        data = bytes(1024)
+        fmt = detect_format(data, 'TEXT#061000')
+        assert fmt['type'] == 'hgr_bitmap'
+        assert 'title screen' in fmt['description']
+
+
+# =============================================================================
+# SHPS code guard tests
+# =============================================================================
+
+class TestShpsCodeGuard:
+    def test_check_code_region_empty(self):
+        from u3edit.shapes import check_shps_code_region, SHPS_FILE_SIZE
+        data = bytearray(SHPS_FILE_SIZE)
+        assert not check_shps_code_region(data)
+
+    def test_check_code_region_populated(self):
+        from u3edit.shapes import (
+            check_shps_code_region, SHPS_CODE_OFFSET, SHPS_FILE_SIZE,
+        )
+        data = bytearray(SHPS_FILE_SIZE)
+        data[SHPS_CODE_OFFSET] = 0x4C  # JMP instruction
+        data[SHPS_CODE_OFFSET + 1] = 0x00
+        data[SHPS_CODE_OFFSET + 2] = 0x08
+        assert check_shps_code_region(data)
 
 
 # =============================================================================

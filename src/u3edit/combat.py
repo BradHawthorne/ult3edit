@@ -1,11 +1,14 @@
 """Ultima III: Exodus - Combat Battlefield Viewer.
 
-CON files: 192 bytes. Structure:
+CON files: 192 bytes (0xC0). Structure:
   0x00-0x78: 11x11 battlefield tiles (121 bytes)
+  0x79-0x7F: Descriptor block 1 — unknown (7 bytes)
   0x80-0x87: Monster start X positions (8 monsters)
   0x88-0x8F: Monster start Y positions (8 monsters)
+  0x90-0x9F: Descriptor block 2 — unknown (16 bytes)
   0xA0-0xA3: PC start X positions (4 PCs)
   0xA4-0xA7: PC start Y positions (4 PCs)
+  0xA8-0xBF: Descriptor block 3 — unknown (24 bytes)
 """
 
 import argparse
@@ -24,6 +27,15 @@ from .fileutil import resolve_game_file, backup_file
 from .json_export import export_json
 
 
+# Descriptor block offsets (gaps between known position data)
+CON_DESC1_OFFSET = 0x79  # 7 bytes after tile map
+CON_DESC1_SIZE = 7
+CON_DESC2_OFFSET = 0x90  # 16 bytes between monster Y and PC X
+CON_DESC2_SIZE = 16
+CON_DESC3_OFFSET = 0xA8  # 24 bytes after PC Y to end of file
+CON_DESC3_SIZE = 24
+
+
 class CombatMap:
     """A single combat battlefield."""
 
@@ -37,6 +49,13 @@ class CombatMap:
                      for i in range(CON_PC_COUNT)]
         self.pc_y = [data[CON_PC_Y_OFFSET + i] if CON_PC_Y_OFFSET + i < len(data) else 0
                      for i in range(CON_PC_COUNT)]
+        # Descriptor blocks — unknown purpose, preserved for round-trip
+        self.desc1 = list(data[CON_DESC1_OFFSET:CON_DESC1_OFFSET + CON_DESC1_SIZE]) \
+            if len(data) > CON_DESC1_OFFSET else [0] * CON_DESC1_SIZE
+        self.desc2 = list(data[CON_DESC2_OFFSET:CON_DESC2_OFFSET + CON_DESC2_SIZE]) \
+            if len(data) > CON_DESC2_OFFSET else [0] * CON_DESC2_SIZE
+        self.desc3 = list(data[CON_DESC3_OFFSET:CON_DESC3_OFFSET + CON_DESC3_SIZE]) \
+            if len(data) > CON_DESC3_OFFSET else [0] * CON_DESC3_SIZE
 
     def render(self) -> str:
         """Render 11x11 battlefield with position overlays."""
@@ -67,10 +86,22 @@ class CombatMap:
         lines = ['     ' + ''.join(f'{x % 10}' for x in range(CON_MAP_WIDTH))]
         for y, row in enumerate(grid):
             lines.append(f'  {y:2d}  {"".join(row)}')
+
+        # Show descriptor blocks if non-zero
+        has_desc = any(self.desc1) or any(self.desc2) or any(self.desc3)
+        if has_desc:
+            lines.append('')
+            if any(self.desc1):
+                lines.append(f'  Desc1 (0x79): {" ".join(f"{b:02X}" for b in self.desc1)}')
+            if any(self.desc2):
+                lines.append(f'  Desc2 (0x90): {" ".join(f"{b:02X}" for b in self.desc2)}')
+            if any(self.desc3):
+                lines.append(f'  Desc3 (0xA8): {" ".join(f"{b:02X}" for b in self.desc3)}')
+
         return '\n'.join(lines)
 
     def to_dict(self) -> dict:
-        return {
+        result = {
             'tiles': [[tile_char(self.tiles[y * CON_MAP_WIDTH + x])
                         for x in range(CON_MAP_WIDTH)
                         if y * CON_MAP_WIDTH + x < len(self.tiles)]
@@ -81,7 +112,13 @@ class CombatMap:
                          if self.monster_x[i] or self.monster_y[i]],
             'pcs': [{'x': self.pc_x[i], 'y': self.pc_y[i]}
                     for i in range(CON_PC_COUNT)],
+            'descriptor': {
+                'block1': self.desc1,
+                'block2': self.desc2,
+                'block3': self.desc3,
+            },
         }
+        return result
 
 
 def cmd_view(args) -> None:
@@ -178,6 +215,18 @@ def cmd_import(args) -> None:
     for i, p in enumerate(jdata.get('pcs', [])[:CON_PC_COUNT]):
         data[CON_PC_X_OFFSET + i] = p.get('x', 0)
         data[CON_PC_Y_OFFSET + i] = p.get('y', 0)
+
+    # Import descriptor blocks
+    desc = jdata.get('descriptor', {})
+    for i, b in enumerate(desc.get('block1', [])[:CON_DESC1_SIZE]):
+        if CON_DESC1_OFFSET + i < len(data):
+            data[CON_DESC1_OFFSET + i] = b
+    for i, b in enumerate(desc.get('block2', [])[:CON_DESC2_SIZE]):
+        if CON_DESC2_OFFSET + i < len(data):
+            data[CON_DESC2_OFFSET + i] = b
+    for i, b in enumerate(desc.get('block3', [])[:CON_DESC3_SIZE]):
+        if CON_DESC3_OFFSET + i < len(data):
+            data[CON_DESC3_OFFSET + i] = b
 
     output = args.output if args.output else args.file
     if do_backup and (not args.output or args.output == args.file):
