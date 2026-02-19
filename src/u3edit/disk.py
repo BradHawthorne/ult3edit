@@ -266,6 +266,106 @@ def cmd_extract(args) -> None:
         sys.exit(1)
 
 
+def cmd_audit(args) -> None:
+    """Analyze disk image for space usage and total conversion capacity."""
+    info = disk_info(args.image)
+    entries = disk_list(args.image)
+
+    if 'error' in info:
+        print(f"Error: {info['error']}", file=sys.stderr)
+        sys.exit(1)
+
+    # Parse disk size info
+    total_blocks = 0
+    for key in ('blocks', 'total blocks', 'total_blocks'):
+        if key in info:
+            try:
+                total_blocks = int(info[key].split()[0])
+            except (ValueError, IndexError):
+                pass
+            break
+
+    # ProDOS block = 512 bytes
+    block_size = 512
+    total_bytes = total_blocks * block_size
+
+    # Calculate per-file space usage
+    file_details = []
+    total_used = 0
+    for entry in entries:
+        size_str = entry.get('size', '0')
+        try:
+            size = int(size_str.replace(',', ''))
+        except ValueError:
+            size = 0
+        blocks_needed = (size + block_size - 1) // block_size if size > 0 else 0
+        wasted = blocks_needed * block_size - size
+        file_details.append({
+            'name': entry['name'],
+            'type': entry.get('type', ''),
+            'size': size,
+            'blocks': blocks_needed,
+            'wasted': wasted,
+        })
+        total_used += blocks_needed
+
+    free_blocks = total_blocks - total_used if total_blocks else 0
+    free_bytes = free_blocks * block_size
+    total_wasted = sum(f['wasted'] for f in file_details)
+
+    if args.json:
+        result = {
+            'image': os.path.basename(args.image),
+            'disk_info': info,
+            'total_blocks': total_blocks,
+            'total_bytes': total_bytes,
+            'used_blocks': total_used,
+            'free_blocks': free_blocks,
+            'free_bytes': free_bytes,
+            'alignment_waste': total_wasted,
+            'files': file_details,
+            'capacity_estimates': {
+                'tlk_records': free_bytes // 256,
+                'map_files': free_bytes // 4096,
+                'mon_files': free_bytes // 256,
+                'extra_tiles_8x8': free_bytes // 8,
+            },
+        }
+        export_json(result, args.output)
+        return
+
+    print(f"\n=== Disk Audit: {os.path.basename(args.image)} ===\n")
+
+    if total_blocks:
+        print(f"  Total capacity:  {total_blocks} blocks "
+              f"({total_bytes:,} bytes)")
+        print(f"  Used:            {total_used} blocks "
+              f"({total_used * block_size:,} bytes)")
+        print(f"  Free:            {free_blocks} blocks "
+              f"({free_bytes:,} bytes)")
+        print(f"  Alignment waste: {total_wasted:,} bytes "
+              f"(reclaimable padding)")
+    print()
+
+    if getattr(args, 'detail', False):
+        print(f"  {'File':<20s}  {'Type':<6s}  {'Size':>8s}  "
+              f"{'Blocks':>6s}  {'Waste':>6s}")
+        print(f"  {'----':<20s}  {'----':<6s}  {'----':>8s}  "
+              f"{'------':>6s}  {'-----':>6s}")
+        for f in file_details:
+            print(f"  {f['name']:<20s}  {f['type']:<6s}  "
+                  f"{f['size']:>8,}  {f['blocks']:>6}  {f['wasted']:>6}")
+        print()
+
+    if free_bytes > 0:
+        print(f"  Capacity estimates (with {free_bytes:,} free bytes):")
+        print(f"    TLK dialog files (256 bytes):    {free_bytes // 256}")
+        print(f"    Town maps (4096 bytes):           {free_bytes // 4096}")
+        print(f"    Monster files (256 bytes):        {free_bytes // 256}")
+        print(f"    Extra glyphs (8 bytes):           {free_bytes // 8}")
+    print()
+
+
 def register_parser(subparsers) -> None:
     p = subparsers.add_parser('disk', help='Disk image operations (requires diskiigs)')
     sub = p.add_subparsers(dest='disk_command')
@@ -285,6 +385,13 @@ def register_parser(subparsers) -> None:
     p_extract.add_argument('image', help='Disk image file')
     p_extract.add_argument('--output', '-o', help='Output directory (default: current)')
 
+    p_audit = sub.add_parser('audit', help='Analyze disk space usage')
+    p_audit.add_argument('image', help='Disk image file')
+    p_audit.add_argument('--detail', action='store_true',
+                         help='Show per-file allocation details')
+    p_audit.add_argument('--json', action='store_true', help='Output as JSON')
+    p_audit.add_argument('--output', '-o', help='Output file (for --json)')
+
 
 def dispatch(args) -> None:
     if args.disk_command == 'info':
@@ -293,8 +400,10 @@ def dispatch(args) -> None:
         cmd_list(args)
     elif args.disk_command == 'extract':
         cmd_extract(args)
+    elif args.disk_command == 'audit':
+        cmd_audit(args)
     else:
-        print("Usage: u3edit disk {info|list|extract} ...", file=sys.stderr)
+        print("Usage: u3edit disk {info|list|extract|audit} ...", file=sys.stderr)
 
 
 def main() -> None:
@@ -316,6 +425,12 @@ def main() -> None:
     p_extract = sub.add_parser('extract', help='Extract all files')
     p_extract.add_argument('image', help='Disk image file')
     p_extract.add_argument('--output', '-o')
+
+    p_audit = sub.add_parser('audit', help='Analyze disk space usage')
+    p_audit.add_argument('image', help='Disk image file')
+    p_audit.add_argument('--detail', action='store_true')
+    p_audit.add_argument('--json', action='store_true')
+    p_audit.add_argument('--output', '-o')
 
     args = parser.parse_args()
     dispatch(args)

@@ -29,6 +29,10 @@ from . import text
 from . import spell
 from . import equip
 from . import disk
+from . import shapes
+from . import sound
+from . import patch
+from . import ddrw
 
 
 def _cmd_unified_edit(args) -> None:
@@ -79,6 +83,10 @@ def main() -> None:
     spell.register_parser(subparsers)
     equip.register_parser(subparsers)
     disk.register_parser(subparsers)
+    shapes.register_parser(subparsers)
+    sound.register_parser(subparsers)
+    patch.register_parser(subparsers)
+    ddrw.register_parser(subparsers)
 
     args = parser.parse_args()
 
@@ -99,6 +107,10 @@ def main() -> None:
         'spell': spell.dispatch,
         'equip': equip.dispatch,
         'disk': disk.dispatch,
+        'shapes': shapes.dispatch,
+        'sound': sound.dispatch,
+        'patch': patch.dispatch,
+        'ddrw': ddrw.dispatch,
     }
 
     if args.tool == 'edit':

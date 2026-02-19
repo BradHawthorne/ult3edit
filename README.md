@@ -94,6 +94,10 @@ u3edit disk list game.po
 | `text` | Game text string viewer | `view`, `edit`, `import` |
 | `spell` | Spell reference (wizard + cleric) | `view` |
 | `equip` | Equipment stats and class restrictions | `view` |
+| `shapes` | Tile graphics / character set editor | `view`, `export`, `edit`, `import`, `info` |
+| `sound` | Sound data editor (SOSA, SOSM, MBS) | `view`, `edit`, `import` |
+| `patch` | Engine binary patcher (CIDAR offsets) | `view`, `edit`, `dump` |
+| `ddrw` | Dungeon drawing data editor | `view`, `edit`, `import` |
 
 Each tool is also available standalone: `u3-roster`, `u3-bestiary`, `u3-map`, etc.
 
@@ -199,6 +203,77 @@ u3edit roster view ROST#069500 --validate
 
 `--backup` and `--dry-run` are available on all edit and import commands.
 
+## Editing Tile Graphics
+
+```bash
+# View all tile glyphs in SHPS character set
+u3edit shapes view path/to/GAME/
+
+# View a specific tile (by tile ID)
+u3edit shapes view SHPS#060800 --tile 0
+
+# Export all glyphs as PNG files (scaled 4x)
+u3edit shapes export SHPS#060800 --output-dir tiles/ --scale 4 --sheet
+
+# Edit a glyph's raw bytes
+u3edit shapes edit SHPS#060800 --glyph 0 --data "55 2A 55 2A 55 2A 55 2A"
+
+# Show file format info
+u3edit shapes info SHPS#060800
+```
+
+SHPS is a 2048-byte character set (256 glyphs x 8 bytes). Tile IDs use multiples of 4 — the low 2 bits select animation frame, so each tile is 4 consecutive glyphs.
+
+## Editing Sound Data
+
+```bash
+# View all sound files in a directory
+u3edit sound view path/to/GAME/
+
+# View a specific sound file with hex dump
+u3edit sound view SOSA#061000
+
+# Patch bytes in a sound file
+u3edit sound edit MBS#069a00 --offset 0x10 --data "00 42 08 0F" --backup
+
+# Export/import via JSON
+u3edit sound view SOSA#061000 --json -o sosa.json
+u3edit sound import SOSA#061000 sosa.json --backup
+```
+
+Sound files: SOSA (4096 bytes, speaker patterns), SOSM (256 bytes, sound map), MBS (5456 bytes, Mockingboard AY-3-8910 sequences). All are external BLOAD data files.
+
+## Engine Binary Patching
+
+```bash
+# View patchable regions in ULT3 engine binary
+u3edit patch view ULT3#065000
+
+# View a specific region (e.g., tile name strings)
+u3edit patch view ULT3#065000 --region look-text
+
+# Patch a data region
+u3edit patch edit ULT3#065000 --region look-text --data "D7C1D4C5D200" --backup
+
+# Raw hex dump of any offset
+u3edit patch dump ULT3#065000 --offset 0x1566 --length 128
+```
+
+Targeted binary patches at CIDAR-identified offsets in ULT3/EXOD engine binaries. Known regions include Look text (tile names), town/dungeon coordinates, and moongate positions.
+
+## Disk Space Analysis
+
+```bash
+# Audit disk image space usage
+u3edit disk audit game.po
+
+# Detailed per-file allocation
+u3edit disk audit game.po --detail
+
+# JSON output for scripting
+u3edit disk audit game.po --json -o audit.json
+```
+
 ## File Formats
 
 ### Character Record (ROST, 64 bytes per slot, 20 slots)
@@ -265,7 +340,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-348 tests covering all modules with synthesized game data (no real game files needed).
+385 tests covering all modules with synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 

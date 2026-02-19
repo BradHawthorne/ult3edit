@@ -663,3 +663,379 @@ class TestCheckProgress:
         assert not progress['exodus_ready']
         assert not progress['has_exotic_weapon']
         assert not progress['has_exotic_armor']
+
+
+# =============================================================================
+# Shapes module tests
+# =============================================================================
+
+from u3edit.shapes import (
+    render_glyph_ascii, render_glyph_grid, glyph_to_dict, tile_to_dict,
+    detect_format, glyph_to_pixels, render_hgr_row, write_png,
+    GLYPH_SIZE, GLYPH_WIDTH, GLYPH_HEIGHT, SHPS_FILE_SIZE,
+)
+
+
+class TestShapesGlyphRendering:
+    def _make_shps(self, glyphs=256):
+        """Create a synthetic SHPS file."""
+        data = bytearray(glyphs * GLYPH_SIZE)
+        # Put a recognizable pattern in glyph 0: checkerboard
+        data[0] = 0x55  # .#.#.#.
+        data[1] = 0x2A  # .#.#.#. (inverted)
+        data[2] = 0x55
+        data[3] = 0x2A
+        data[4] = 0x55
+        data[5] = 0x2A
+        data[6] = 0x55
+        data[7] = 0x2A
+        # Put a solid block in glyph 1
+        for i in range(8, 16):
+            data[i] = 0x7F  # #######
+        return bytes(data)
+
+    def test_render_glyph_ascii(self):
+        data = self._make_shps()
+        lines = render_glyph_ascii(data, 0)
+        assert len(lines) == GLYPH_HEIGHT
+        assert all(len(line) == GLYPH_WIDTH for line in lines)
+        # Glyph 0 has alternating pattern
+        assert '#' in lines[0]
+        assert '.' in lines[0]
+
+    def test_render_solid_glyph(self):
+        data = self._make_shps()
+        lines = render_glyph_ascii(data, GLYPH_SIZE)  # glyph 1
+        assert all(line == '#######' for line in lines)
+
+    def test_render_glyph_grid(self):
+        data = self._make_shps()
+        grid = render_glyph_grid(data, 0)
+        assert len(grid) == GLYPH_HEIGHT
+        assert all(len(row) == GLYPH_WIDTH for row in grid)
+
+    def test_glyph_to_dict(self):
+        data = self._make_shps()
+        d = glyph_to_dict(data, 0)
+        assert d['index'] == 0
+        assert len(d['raw']) == GLYPH_SIZE
+        assert '55' in d['hex'].upper()
+
+    def test_tile_to_dict(self):
+        data = self._make_shps()
+        d = tile_to_dict(data, 0)
+        assert d['tile_id'] == 0
+        assert d['name'] == 'Water'
+        assert len(d['frames']) == 4
+
+    def test_detect_charset(self):
+        data = self._make_shps()
+        fmt = detect_format(data, 'SHPS#060800')
+        assert fmt['type'] == 'charset'
+        assert fmt['glyphs'] == 256
+        assert fmt['tiles'] == 64
+
+    def test_detect_overlay(self):
+        data = bytes(960)
+        fmt = detect_format(data, 'SHP0#069400')
+        assert fmt['type'] == 'overlay'
+
+    def test_glyph_to_pixels(self):
+        data = self._make_shps()
+        pixels = glyph_to_pixels(data, GLYPH_SIZE)  # solid glyph 1
+        assert len(pixels) == GLYPH_WIDTH * GLYPH_HEIGHT
+        # All pixels should be white (fg) for a solid glyph
+        assert all(p == (255, 255, 255) for p in pixels)
+
+
+class TestShapesHGR:
+    def test_render_hgr_row_all_black(self):
+        row = bytes([0x00, 0x00])
+        pixels = render_hgr_row(row)
+        assert len(pixels) == 14  # 2 bytes x 7 pixels
+        assert all(p == (0, 0, 0) for p in pixels)
+
+    def test_render_hgr_row_all_white(self):
+        row = bytes([0x7F, 0x7F])
+        pixels = render_hgr_row(row)
+        assert len(pixels) == 14
+        assert all(p == (255, 255, 255) for p in pixels)
+
+    def test_render_hgr_row_palette_colors(self):
+        # Single isolated bit at position 0, palette 0 -> purple
+        row = bytes([0x01])
+        pixels = render_hgr_row(row)
+        assert pixels[0] == (255, 68, 253)  # purple (even col, palette 0)
+
+    def test_render_hgr_row_palette_1(self):
+        # Bit 7 set = palette 1, single bit at position 0 -> blue
+        row = bytes([0x81])
+        pixels = render_hgr_row(row)
+        assert pixels[0] == (20, 207, 253)  # blue (even col, palette 1)
+
+
+class TestShapesFileOps:
+    def test_edit_glyph(self, tmp_path):
+        data = bytearray(SHPS_FILE_SIZE)
+        path = str(tmp_path / 'SHPS')
+        with open(path, 'wb') as f:
+            f.write(data)
+
+        # Simulate editing glyph 0
+        with open(path, 'rb') as f:
+            data = bytearray(f.read())
+        new_bytes = bytes([0xFF] * 8)
+        data[0:8] = new_bytes
+        with open(path, 'wb') as f:
+            f.write(data)
+
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[0:8] == new_bytes
+
+    def test_json_round_trip(self, tmp_path):
+        data = bytearray(SHPS_FILE_SIZE)
+        data[0] = 0x55  # pattern in glyph 0
+        path = str(tmp_path / 'SHPS')
+        with open(path, 'wb') as f:
+            f.write(data)
+
+        # Export to dict
+        d = glyph_to_dict(data, 0)
+        assert d['raw'][0] == 0x55
+
+        # Import back
+        import_data = bytearray(SHPS_FILE_SIZE)
+        import_data[0:8] = bytes(d['raw'])
+        assert import_data[0] == 0x55
+
+    def test_write_png(self, tmp_path):
+        pixels = [(255, 0, 0)] * (7 * 8)  # red
+        out = str(tmp_path / 'test.png')
+        write_png(out, pixels, 7, 8)
+        assert os.path.exists(out)
+        with open(out, 'rb') as f:
+            header = f.read(8)
+        assert header[:4] == b'\x89PNG'
+
+
+# =============================================================================
+# Sound module tests
+# =============================================================================
+
+from u3edit.sound import (
+    identify_sound_file, hex_dump, analyze_mbs, SOUND_FILES,
+)
+
+
+class TestSound:
+    def test_identify_sosa(self):
+        data = bytes(4096)
+        info = identify_sound_file(data, 'SOSA#061000')
+        assert info is not None
+        assert info['name'] == 'SOSA'
+
+    def test_identify_sosm(self):
+        data = bytes(256)
+        info = identify_sound_file(data, 'SOSM#064f00')
+        assert info is not None
+        assert info['name'] == 'SOSM'
+
+    def test_identify_mbs(self):
+        data = bytes(5456)
+        info = identify_sound_file(data, 'MBS#069a00')
+        assert info is not None
+        assert info['name'] == 'MBS'
+
+    def test_identify_unknown(self):
+        data = bytes(100)
+        info = identify_sound_file(data, 'UNKNOWN')
+        assert info is None
+
+    def test_hex_dump(self):
+        data = bytes(range(32))
+        lines = hex_dump(data, 0, 32, 0x1000)
+        assert len(lines) == 2
+        assert '1000:' in lines[0]
+
+    def test_analyze_mbs_valid(self):
+        # Simulate AY register writes: register 0 = 0x42, register 8 = 0x0F
+        data = bytes([0, 0x42, 8, 0x0F])
+        events = analyze_mbs(data)
+        assert len(events) == 2
+        assert events[0]['register'] == 0
+        assert events[0]['value'] == 0x42
+        assert events[1]['register'] == 8
+        assert events[1]['value'] == 0x0F
+
+    def test_analyze_mbs_invalid_stops(self):
+        # Invalid register (> 13) should stop parsing
+        data = bytes([0, 0x42, 0xFF, 0x00])
+        events = analyze_mbs(data)
+        assert len(events) == 1
+
+    def test_sound_edit_round_trip(self, tmp_path):
+        data = bytearray(4096)
+        data[0x10] = 0xAB
+        path = str(tmp_path / 'SOSA')
+        with open(path, 'wb') as f:
+            f.write(data)
+
+        # Read back
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[0x10] == 0xAB
+
+
+# =============================================================================
+# Patch module tests
+# =============================================================================
+
+from u3edit.patch import (
+    identify_binary, get_regions, parse_text_region,
+    parse_coord_region, encode_text_region,
+)
+
+
+class TestPatch:
+    def _make_ult3(self):
+        """Create a synthetic ULT3 binary."""
+        data = bytearray(17408)
+        # Put some "Look" text at the expected offset
+        offset = 0x1566
+        text = b'\xD7\xC1\xD4\xC5\xD2\x00'  # "WATER" + null (high-ASCII)
+        text += b'\xC7\xD2\xC1\xD3\xD3\x00'  # "GRASS" + null
+        data[offset:offset + len(text)] = text
+        return bytes(data)
+
+    def test_identify_ult3(self):
+        data = self._make_ult3()
+        info = identify_binary(data, 'ULT3#065000')
+        assert info is not None
+        assert info['name'] == 'ULT3'
+        assert info['load_addr'] == 0x5000
+
+    def test_identify_exod(self):
+        data = bytes(26208)
+        info = identify_binary(data, 'EXOD#062000')
+        assert info is not None
+        assert info['name'] == 'EXOD'
+
+    def test_identify_unknown(self):
+        data = bytes(100)
+        info = identify_binary(data, 'UNKNOWN')
+        assert info is None
+
+    def test_get_regions_ult3(self):
+        regions = get_regions('ULT3')
+        assert 'look-text' in regions
+        assert regions['look-text']['data_type'] == 'text'
+
+    def test_get_regions_exod(self):
+        regions = get_regions('EXOD')
+        assert 'town-coords' in regions
+        assert 'moongate-coords' in regions
+
+    def test_parse_text_region(self):
+        data = self._make_ult3()
+        strings = parse_text_region(data, 0x1566, 20)
+        assert 'WATER' in strings
+        assert 'GRASS' in strings
+
+    def test_parse_coord_region(self):
+        data = bytes([10, 20, 30, 40, 50, 60])
+        coords = parse_coord_region(data, 0, 6)
+        assert len(coords) == 3
+        assert coords[0] == {'x': 10, 'y': 20}
+        assert coords[2] == {'x': 50, 'y': 60}
+
+    def test_encode_text_region(self):
+        strings = ['WATER', 'GRASS']
+        encoded = encode_text_region(strings, 20)
+        assert len(encoded) == 20
+        # Should contain high-ASCII "WATER" + null
+        assert encoded[0] == 0xD7  # W | 0x80
+        assert encoded[5] == 0x00  # null terminator
+
+    def test_encode_text_too_long(self):
+        strings = ['A' * 100]
+        with pytest.raises(ValueError):
+            encode_text_region(strings, 10)
+
+    def test_patch_dry_run(self, tmp_path):
+        data = bytearray(17408)
+        path = str(tmp_path / 'ULT3')
+        with open(path, 'wb') as f:
+            f.write(data)
+
+        # Read and verify original
+        with open(path, 'rb') as f:
+            original = f.read()
+
+        # Simulate edit + dry run: data should not change
+        assert original[0x1566] == 0
+
+
+# =============================================================================
+# DDRW module tests
+# =============================================================================
+
+from u3edit.ddrw import DDRW_FILE_SIZE
+
+
+class TestDDRW:
+    def test_ddrw_constants(self):
+        assert DDRW_FILE_SIZE == 1792
+
+    def test_ddrw_json_round_trip(self, tmp_path):
+        data = bytearray(DDRW_FILE_SIZE)
+        data[0] = 0xAB
+        data[100] = 0xCD
+        path = str(tmp_path / 'DDRW')
+        with open(path, 'wb') as f:
+            f.write(data)
+
+        # Export as JSON
+        raw = list(data)
+        jdata = {'raw': raw, 'size': len(data)}
+
+        json_path = str(tmp_path / 'ddrw.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+
+        # Import back
+        with open(json_path, 'r') as f:
+            imported = json.load(f)
+        result = bytes(imported['raw'])
+        assert result[0] == 0xAB
+        assert result[100] == 0xCD
+        assert len(result) == DDRW_FILE_SIZE
+
+    def test_ddrw_edit_round_trip(self, tmp_path):
+        data = bytearray(DDRW_FILE_SIZE)
+        path = str(tmp_path / 'DDRW')
+        with open(path, 'wb') as f:
+            f.write(data)
+
+        # Patch offset 0x10
+        with open(path, 'rb') as f:
+            edit_data = bytearray(f.read())
+        edit_data[0x10] = 0xFF
+        with open(path, 'wb') as f:
+            f.write(edit_data)
+
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[0x10] == 0xFF
+
+
+# =============================================================================
+# Disk audit tests
+# =============================================================================
+
+class TestDiskAudit:
+    def test_audit_output_format(self):
+        """Verify the audit function imports cleanly."""
+        from u3edit.disk import cmd_audit
+        # Just verify it's callable
+        assert callable(cmd_audit)

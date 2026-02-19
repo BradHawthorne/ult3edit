@@ -38,6 +38,10 @@ u3-text = "u3edit.text:main"
 u3-spell = "u3edit.spell:main"
 u3-equip = "u3edit.equip:main"
 u3-disk = "u3edit.disk:main"
+u3-shapes = "u3edit.shapes:main"
+u3-sound = "u3edit.sound:main"
+u3-patch = "u3edit.patch:main"
+u3-ddrw = "u3edit.ddrw:main"
 
 [build-system]
 requires = ["hatchling"]

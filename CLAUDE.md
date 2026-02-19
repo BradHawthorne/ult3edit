@@ -11,7 +11,7 @@ u3edit is a data toolkit for Ultima III: Exodus (Apple II, 1983). It provides CL
 ```bash
 pip install -e ".[dev]"              # Install with pytest
 pip install -e ".[tui]"              # Install with prompt_toolkit for TUI editors
-pytest -v                            # Run all 348 tests
+pytest -v                            # Run all 385 tests
 pytest tests/test_roster.py          # Run one test module
 pytest -v tests/test_bcd.py::TestBcdToInt::test_zero  # Run single test
 u3edit roster view path/to/ROST      # CLI usage pattern
@@ -22,7 +22,7 @@ u3edit edit game.po                  # Unified TUI editor (requires prompt_toolk
 
 ### Module-per-data-type pattern
 
-Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tlk, combat, save, special, text, spell, equip). Every module follows the same contract:
+Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tlk, combat, save, special, text, spell, equip, shapes, sound, patch, ddrw). Every module follows the same contract:
 
 - **Data class** (e.g., `Character`, `Monster`): wraps `bytearray` with `@property` accessors
 - **`load_*(path)` / `save_*(path, obj)`**: File I/O
@@ -81,6 +81,11 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 - **`tlk search`**: Text search across TLK dialog files. Case-insensitive by default, `--regex` for regex patterns.
 - **`roster check-progress`**: Endgame readiness checker — marks, cards, exotic gear, party status.
 - **`save edit --plrs-slot`**: Edit active characters in PLRS file via save subcommand.
+- **`shapes view/export/edit/import`**: SHPS character set tile graphics — glyph rendering, PNG export (stdlib, no Pillow), HGR color logic.
+- **`sound view/edit/import`**: SOSA/SOSM/MBS sound data files — hex dump, AY-3-8910 register parsing for MBS.
+- **`patch view/edit/dump`**: Engine binary patcher for CIDAR-identified offsets in ULT3/EXOD — Look text, coordinates.
+- **`ddrw view/edit/import`**: Dungeon drawing data (1792 bytes).
+- **`disk audit`**: ProDOS disk space analysis — free blocks, alignment waste, capacity estimates.
 - **`TILE_CHARS_REVERSE` / `DUNGEON_TILE_CHARS_REVERSE`**: Reverse lookups in `constants.py` for char→tile-byte conversion (used by import commands).
 
 ## Data integrity rules
