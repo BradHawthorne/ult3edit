@@ -1,11 +1,14 @@
 """Ultima III: Exodus - Special Location Viewer.
 
-BRND/SHRN/FNTN/TIME files: 128 bytes each.
-First 121 bytes = 11x11 tile map, remaining 7 bytes = metadata.
-Metadata bytes may contain location identifiers, coordinates, or flags.
+BRND/SHRN/FNTN/TIME files: 128 bytes each, loaded at $9900.
+First 121 bytes = 11x11 tile map (same grid as CON files).
+Trailing 7 bytes (121-127) are unused padding — engine only reads the
+tile grid. The padding contains residual disk data (text fragments like
+"DECFOOD", "CLRBD", "! THAT'" from adjacent memory at creation time).
+Preserved for round-trip fidelity but not meaningful game data.
 """
 
-SPECIAL_META_OFFSET = 121  # Offset of 7 metadata bytes after 11x11 map
+SPECIAL_META_OFFSET = 121  # Offset of 7 trailing padding bytes
 SPECIAL_META_SIZE = 7
 
 import argparse
@@ -22,13 +25,21 @@ from .fileutil import resolve_single_file, backup_file
 from .json_export import export_json
 
 
-def get_metadata(data: bytes) -> list[int]:
-    """Extract the 7 metadata bytes after the 11x11 tile map."""
-    meta = []
+def get_trailing_bytes(data: bytes) -> list[int]:
+    """Extract the 7 trailing padding bytes after the 11x11 tile map.
+
+    These bytes are unused by the engine (disk residue) but preserved
+    for round-trip fidelity.
+    """
+    result = []
     for i in range(SPECIAL_META_SIZE):
         off = SPECIAL_META_OFFSET + i
-        meta.append(data[off] if off < len(data) else 0)
-    return meta
+        result.append(data[off] if off < len(data) else 0)
+    return result
+
+
+# Backward compatibility alias
+get_metadata = get_trailing_bytes
 
 
 def render_special_map(data: bytes) -> str:
@@ -44,11 +55,11 @@ def render_special_map(data: bytes) -> str:
                 row.append(' ')
         lines.append(f'  {y:2d}  {"".join(row)}')
 
-    # Show metadata bytes if present and non-zero
-    meta = get_metadata(data)
-    if any(meta):
-        hex_str = ' '.join(f'{b:02X}' for b in meta)
-        lines.append(f'  Metadata (0x79): {hex_str}')
+    # Show trailing padding bytes if non-zero (disk residue, not game data)
+    trailing = get_trailing_bytes(data)
+    if any(trailing):
+        hex_str = ' '.join(f'{b:02X}' for b in trailing)
+        lines.append(f'  Trailing padding (0x79): {hex_str}')
 
     return '\n'.join(lines)
 
@@ -80,7 +91,7 @@ def cmd_view(args) -> None:
                                 if y * SPECIAL_MAP_WIDTH + x < len(data)]
                                for y in range(SPECIAL_MAP_HEIGHT)
                                if y * SPECIAL_MAP_WIDTH < len(data)],
-                    'metadata': get_metadata(data),
+                    'trailing_bytes': get_trailing_bytes(data),
                 }
             export_json(result, args.output)
             return
@@ -147,9 +158,9 @@ def cmd_import(args) -> None:
             if offset < len(data):
                 data[offset] = TILE_CHARS_REVERSE.get(ch, 0x20)
 
-    # Import metadata bytes
-    meta = jdata.get('metadata', [])
-    for i, b in enumerate(meta[:SPECIAL_META_SIZE]):
+    # Import trailing padding bytes (accept both old and new key)
+    trailing = jdata.get('trailing_bytes', jdata.get('metadata', []))
+    for i, b in enumerate(trailing[:SPECIAL_META_SIZE]):
         off = SPECIAL_META_OFFSET + i
         if off < len(data):
             data[off] = b

@@ -236,7 +236,9 @@ CHAR_MAX_SLOTS = 20
 
 # Field offsets
 CHAR_NAME_OFFSET = 0x00
-CHAR_NAME_LENGTH = 10
+CHAR_NAME_LENGTH = 10       # Legacy: visible columns in roster display
+CHAR_NAME_MAX = 13           # Max input chars (engine CPY #$0D loop in BOOT.s)
+CHAR_NAME_FIELD = 14         # Full field: 13 chars + guaranteed null at 0x0D
 CHAR_MARKS_CARDS = 0x0E
 CHAR_TORCHES = 0x0F
 CHAR_IN_PARTY = 0x10
@@ -273,6 +275,17 @@ CHAR_WEAPON_START = 0x31  # 15 weapon counts (Dagger..Exotic)
 # =============================================================================
 # Each MON file: 256 bytes = 16 rows x 16 monsters (columnar)
 # Row N, Monster M = file[N * 16 + M]
+#
+# At runtime ($4F00), the engine repurposes rows 0-9 as five 32-entry
+# parallel arrays for overworld creature tracking:
+#   $4F00,X: creature tile/sprite     $4F20,X: animation frame
+#   $4F40,X: creature X coordinate    $4F60,X: creature Y coordinate
+#   $4F80,X: status flags ($C0=active)
+#
+# Rows 10-14 + most of row 15 are unused padding (92 bytes).
+# Last 4 bytes ($4FFC-$4FFF) are runtime ship navigation workspace:
+#   $4FFC: ship X position    $4FFD: ship Y position
+#   $4FFE: X velocity         $4FFF: Y velocity
 
 MON_ATTR_TILE1 = 0
 MON_ATTR_TILE2 = 1
@@ -284,7 +297,8 @@ MON_ATTR_DEFENSE = 6
 MON_ATTR_SPEED = 7
 MON_ATTR_ABILITY1 = 8
 MON_ATTR_ABILITY2 = 9
-MON_ATTR_COUNT = 10
+MON_ATTR_COUNT = 10       # Only 10 meaningful attribute rows
+MON_TOTAL_ROWS = 16       # Rows 10-15 are padding/runtime workspace
 MON_MONSTERS_PER_FILE = 16
 
 MON_ATTR_NAMES = [
@@ -412,16 +426,36 @@ CON_NAMES = {
 
 CON_LETTERS = 'ABCFGMQRS'
 
-# Combat map dimensions
+# Combat map dimensions and layout (192 bytes, loaded at $9900)
+# Layout verified by tracing engine code in ULT3.s:
+#   0x00-0x78: 11x11 tile grid (121 bytes, accessed via lookup_add at $7E18)
+#   0x79-0x7F: Unused padding (7 bytes, never read by engine)
+#   0x80-0x87: Monster start X positions [0-7] (read during spawn)
+#   0x88-0x8F: Monster start Y positions [0-7] (read during spawn)
+#   0x90-0x97: Runtime: saved tile under monster (overwritten at combat init)
+#   0x98-0x9F: Runtime: monster type/status (overwritten at combat init)
+#   0xA0-0xA3: PC start X positions [0-3] (read during init)
+#   0xA4-0xA7: PC start Y positions [0-3] (read during init)
+#   0xA8-0xAB: Runtime: saved tile under PC (overwritten at init)
+#   0xAC-0xAF: Runtime: PC appearance tile (overwritten by JSR $7F5D)
+#   0xB0-0xBF: Unused tail padding (16 bytes, never read by engine)
 CON_MAP_WIDTH = 11
 CON_MAP_HEIGHT = 11
 CON_MAP_TILES = CON_MAP_WIDTH * CON_MAP_HEIGHT  # 121 bytes
+CON_PADDING1_OFFSET = 0x79   # 7 bytes unused padding after tile grid
+CON_PADDING1_SIZE = 7
 CON_MONSTER_X_OFFSET = 0x80
 CON_MONSTER_Y_OFFSET = 0x88
 CON_MONSTER_COUNT = 8
+CON_RUNTIME_MONSAVE_OFFSET = 0x90  # 8 bytes: saved tile under monster (runtime)
+CON_RUNTIME_MONSTATUS_OFFSET = 0x98  # 8 bytes: monster type/status (runtime)
 CON_PC_X_OFFSET = 0xA0
 CON_PC_Y_OFFSET = 0xA4
 CON_PC_COUNT = 4
+CON_RUNTIME_PCSAVE_OFFSET = 0xA8  # 4 bytes: saved tile under PC (runtime)
+CON_RUNTIME_PCTILE_OFFSET = 0xAC  # 4 bytes: PC appearance tile (runtime)
+CON_PADDING2_OFFSET = 0xB0   # 16 bytes unused tail padding
+CON_PADDING2_SIZE = 16
 
 # =============================================================================
 # TLK (Dialog) File Constants
@@ -469,8 +503,25 @@ SPECIAL_MAP_HEIGHT = 11
 SPECIAL_MAP_TILES = SPECIAL_MAP_WIDTH * SPECIAL_MAP_HEIGHT  # 121 bytes
 
 # =============================================================================
-# Save State Constants (PRTY file)
+# Save State Constants (PRTY file — 16 bytes at zero-page $E0-$EF)
 # =============================================================================
+# Layout verified by tracing engine code in ult3_analysis.s:
+#   $E0 = transport/movement mode (SPEEDZ)
+#   $E1 = party member count (0-4)
+#   $E2 = location type (0=Sosaria, 1=Dungeon, 2=Town, etc.)
+#   $E3 = saved overworld X coordinate
+#   $E4 = saved overworld Y coordinate (ERRFLG)
+#   $E5 = status sentinel ($FF when party is active)
+#   $E6-$E9 = roster slot IDs for 4 party members
+#   $EA-$EF = unused
+
+PRTY_OFF_TRANSPORT = 0     # $E0 — movement/transport mode
+PRTY_OFF_PARTY_SIZE = 1    # $E1 — party member count (0-4)
+PRTY_OFF_LOCATION = 2      # $E2 — location type code
+PRTY_OFF_SAVED_X = 3       # $E3 — saved overworld X
+PRTY_OFF_SAVED_Y = 4       # $E4 — saved overworld Y
+PRTY_OFF_SENTINEL = 5      # $E5 — active party flag ($FF = active)
+PRTY_OFF_SLOT_IDS = 6      # $E6-$E9 — roster slot indices (4 bytes)
 
 PRTY_TRANSPORT = {
     0x00: 'None',

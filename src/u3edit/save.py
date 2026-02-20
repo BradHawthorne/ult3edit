@@ -2,7 +2,10 @@
 
 Reads multiple save files from a GAME directory:
   SOSA (4096 bytes) - Overworld map state (64x64 tiles)
-  PRTY (16 bytes) - Transport, location type, coordinates, party size, slot IDs
+  PRTY (16 bytes) - Party state at zero-page $E0-$EF:
+    $E0: transport mode, $E1: party size (0-4), $E2: location type,
+    $E3: saved overworld X, $E4: saved overworld Y, $E5: sentinel,
+    $E6-$E9: roster slot IDs
   PLRS (256 bytes) - 4 active character records (4x64 bytes)
   SOSM (256 bytes) - Overworld monster positions
 """
@@ -14,6 +17,9 @@ import sys
 
 from .constants import (
     PRTY_TRANSPORT, PRTY_TRANSPORT_CODES, PRTY_LOCATION_TYPE,
+    PRTY_OFF_TRANSPORT, PRTY_OFF_PARTY_SIZE, PRTY_OFF_LOCATION,
+    PRTY_OFF_SAVED_X, PRTY_OFF_SAVED_Y, PRTY_OFF_SENTINEL,
+    PRTY_OFF_SLOT_IDS,
     PRTY_FILE_SIZE, PLRS_FILE_SIZE, SOSA_FILE_SIZE, SOSM_FILE_SIZE,
     CHAR_RECORD_SIZE, tile_char,
 )
@@ -32,65 +38,79 @@ class PartyState:
 
     @property
     def transport(self) -> str:
-        return PRTY_TRANSPORT.get(self.raw[0], f'Unknown(${self.raw[0]:02X})')
+        return PRTY_TRANSPORT.get(self.raw[PRTY_OFF_TRANSPORT],
+                                  f'Unknown(${self.raw[PRTY_OFF_TRANSPORT]:02X})')
 
     @transport.setter
     def transport(self, name: str) -> None:
         code = PRTY_TRANSPORT_CODES.get(name.lower())
         if code is not None:
-            self.raw[0] = code
-
-    @property
-    def location_type(self) -> str:
-        return PRTY_LOCATION_TYPE.get(self.raw[1], f'Unknown(${self.raw[1]:02X})')
-
-    @property
-    def x(self) -> int:
-        return self.raw[2]
-
-    @x.setter
-    def x(self, val: int) -> None:
-        self.raw[2] = max(0, min(63, val))
-
-    @property
-    def y(self) -> int:
-        return self.raw[3]
-
-    @y.setter
-    def y(self, val: int) -> None:
-        self.raw[3] = max(0, min(63, val))
+            self.raw[PRTY_OFF_TRANSPORT] = code
 
     @property
     def party_size(self) -> int:
-        return self.raw[4]
+        return self.raw[PRTY_OFF_PARTY_SIZE]
 
     @party_size.setter
     def party_size(self, val: int) -> None:
-        self.raw[4] = max(0, min(4, val))
+        self.raw[PRTY_OFF_PARTY_SIZE] = max(0, min(4, val))
+
+    @property
+    def location_type(self) -> str:
+        return PRTY_LOCATION_TYPE.get(self.raw[PRTY_OFF_LOCATION],
+                                      f'Unknown(${self.raw[PRTY_OFF_LOCATION]:02X})')
+
+    @property
+    def location_code(self) -> int:
+        return self.raw[PRTY_OFF_LOCATION]
+
+    @location_code.setter
+    def location_code(self, val: int) -> None:
+        self.raw[PRTY_OFF_LOCATION] = val & 0xFF
+
+    @property
+    def x(self) -> int:
+        return self.raw[PRTY_OFF_SAVED_X]
+
+    @x.setter
+    def x(self, val: int) -> None:
+        self.raw[PRTY_OFF_SAVED_X] = max(0, min(63, val))
+
+    @property
+    def y(self) -> int:
+        return self.raw[PRTY_OFF_SAVED_Y]
+
+    @y.setter
+    def y(self, val: int) -> None:
+        self.raw[PRTY_OFF_SAVED_Y] = max(0, min(63, val))
+
+    @property
+    def sentinel(self) -> int:
+        return self.raw[PRTY_OFF_SENTINEL]
 
     @property
     def slot_ids(self) -> list[int]:
-        return [self.raw[5 + i] for i in range(4)]
+        return [self.raw[PRTY_OFF_SLOT_IDS + i] for i in range(4)]
 
     @slot_ids.setter
     def slot_ids(self, ids: list[int]) -> None:
         for i, sid in enumerate(ids[:4]):
-            self.raw[5 + i] = max(0, min(19, sid))
+            self.raw[PRTY_OFF_SLOT_IDS + i] = max(0, min(19, sid))
 
     def to_dict(self) -> dict:
         return {
             'transport': self.transport,
+            'party_size': self.party_size,
             'location_type': self.location_type,
             'x': self.x, 'y': self.y,
-            'party_size': self.party_size,
             'slot_ids': self.slot_ids,
         }
 
     def display(self) -> None:
         print(f"  Transport:     {self.transport}")
+        print(f"  Party size:    {self.party_size}")
         print(f"  Location:      {self.location_type}")
         print(f"  Coordinates:   ({self.x}, {self.y})")
-        print(f"  Party size:    {self.party_size}")
         print(f"  Roster slots:  {self.slot_ids}")
 
 
@@ -280,12 +300,12 @@ def cmd_import(args) -> None:
 
         if 'transport' in party_data:
             party.transport = party_data['transport']
+        if 'party_size' in party_data:
+            party.party_size = party_data['party_size']
         if 'x' in party_data:
             party.x = party_data['x']
         if 'y' in party_data:
             party.y = party_data['y']
-        if 'party_size' in party_data:
-            party.party_size = party_data['party_size']
         if 'slot_ids' in party_data:
             party.slot_ids = party_data['slot_ids']
 

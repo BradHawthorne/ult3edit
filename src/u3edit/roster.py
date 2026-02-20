@@ -21,7 +21,8 @@ from .constants import (
     RACES, RACE_CODES, CLASSES, CLASS_CODES, GENDERS, STATUS_CODES,
     WEAPONS, ARMORS, MARKS_BITS, CARDS_BITS, RACE_MAX_STATS,
     CLASS_MAX_WEAPON, CLASS_MAX_ARMOR,
-    CHAR_NAME_OFFSET, CHAR_NAME_LENGTH, CHAR_MARKS_CARDS, CHAR_TORCHES,
+    CHAR_NAME_OFFSET, CHAR_NAME_LENGTH, CHAR_NAME_MAX, CHAR_NAME_FIELD,
+    CHAR_MARKS_CARDS, CHAR_TORCHES,
     CHAR_IN_PARTY, CHAR_STATUS, CHAR_STR, CHAR_DEX, CHAR_INT, CHAR_WIS,
     CHAR_RACE, CHAR_CLASS, CHAR_GENDER, CHAR_MP,
     CHAR_HP_HI, CHAR_HP_LO, CHAR_MAX_HP_HI, CHAR_MAX_HP_LO,
@@ -47,15 +48,22 @@ class Character:
     def is_empty(self) -> bool:
         return all(b == 0 for b in self.raw)
 
-    # --- Name ---
+    # --- Name (14-byte field: up to 13 chars + null terminator at 0x0D) ---
+    # Engine BOOT.s input loop: CPY #$0D limits name to 13 characters.
+    # Display routine in SUBS.s ($46F9) reads until null byte.
     @property
     def name(self) -> str:
-        return decode_high_ascii(self.raw[CHAR_NAME_OFFSET:CHAR_NAME_OFFSET + CHAR_NAME_LENGTH])
+        return decode_high_ascii(self.raw[CHAR_NAME_OFFSET:CHAR_NAME_OFFSET + CHAR_NAME_FIELD])
 
     @name.setter
     def name(self, val: str) -> None:
-        self.raw[CHAR_NAME_OFFSET:CHAR_NAME_OFFSET + CHAR_NAME_LENGTH] = \
-            encode_high_ascii(val, CHAR_NAME_LENGTH)
+        # Null-fill the full 14-byte field, then write name chars.
+        # This matches the engine's character creation behavior (zero-fill
+        # then overwrite with typed characters, null-terminated).
+        field = bytearray(CHAR_NAME_FIELD)  # all zeros
+        for i, ch in enumerate(val[:CHAR_NAME_MAX].upper()):
+            field[i] = ord(ch) | 0x80
+        self.raw[CHAR_NAME_OFFSET:CHAR_NAME_OFFSET + CHAR_NAME_FIELD] = field
 
     # --- Marks and Cards (byte 0x0E) ---
     # R-2 FIX: High nibble = marks (bits 7-4), low nibble = cards (bits 3-0)

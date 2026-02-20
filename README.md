@@ -344,7 +344,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-415 tests covering all modules with synthesized game data (no real game files needed).
+425 tests covering all modules with synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 
@@ -357,6 +357,7 @@ pytest -v
 | B-1 | bestiary | Replaced wrong TILE_NAMES dict with correct MONSTER_NAMES + TILES |
 | B-2 | bestiary | Removed dead FLAG1_BITS dict |
 | M-1 | map | Full tile table with &0xFC masking (was 0x00-0x1F only) |
+| S-1 | save | Fixed PRTY field mapping — party_size/location_type/x/y were at wrong byte offsets |
 
 ## License
 

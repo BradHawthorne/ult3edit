@@ -11,7 +11,7 @@ u3edit is a data toolkit for Ultima III: Exodus (Apple II, 1983). It provides CL
 ```bash
 pip install -e ".[dev]"              # Install with pytest
 pip install -e ".[tui]"              # Install with prompt_toolkit for TUI editors
-pytest -v                            # Run all 415 tests
+pytest -v                            # Run all 425 tests
 pytest tests/test_roster.py          # Run one test module
 pytest -v tests/test_bcd.py::TestBcdToInt::test_zero  # Run single test
 u3edit roster view path/to/ROST      # CLI usage pattern
@@ -87,8 +87,9 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 - **`ddrw view/edit/import`**: Dungeon drawing data (1792 bytes) with structured perspective vector and tile record parsing.
 - **`disk audit`**: ProDOS disk space analysis — free blocks, alignment waste, capacity estimates.
 - **`TILE_CHARS_REVERSE` / `DUNGEON_TILE_CHARS_REVERSE`**: Reverse lookups in `constants.py` for char→tile-byte conversion (used by import commands).
-- **CON descriptor blocks**: Combat maps have 47 unexplored bytes in 3 gaps between known position data — exposed for research.
-- **Special location metadata**: BRND/SHRN/FNTN/TIME files have 7 bytes after the 11×11 tile map — now exposed in view/export/import.
+- **CON file layout** (fully resolved via engine code tracing): 0x79-0x7F = unused padding, 0x90-0x9F = runtime monster arrays (saved-tile + status, overwritten at init), 0xA8-0xAF = runtime PC arrays (saved-tile + appearance, overwritten at init), 0xB0-0xBF = unused tail padding. Preserved for round-trip fidelity.
+- **PRTY file layout** (verified against zero-page $E0-$EF): $E0=transport, $E1=party_size, $E2=location_type, $E3=saved_x, $E4=saved_y, $E5=sentinel, $E6-$E9=slot_ids. Constants in `PRTY_OFF_*`.
+- **Special location trailing bytes**: BRND/SHRN/FNTN/TIME files' last 7 bytes are unused disk residue (text fragments), not game data. Preserved for round-trip fidelity.
 
 ## Data integrity rules
 

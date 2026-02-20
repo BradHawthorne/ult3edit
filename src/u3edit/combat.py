@@ -1,14 +1,18 @@
 """Ultima III: Exodus - Combat Battlefield Viewer.
 
-CON files: 192 bytes (0xC0). Structure:
+CON files: 192 bytes (0xC0), loaded at $9900. Layout verified via engine
+code tracing (ULT3.s lookup_add at $7E18, spawn loop, PC init loop):
   0x00-0x78: 11x11 battlefield tiles (121 bytes)
-  0x79-0x7F: Descriptor block 1 — unknown (7 bytes)
-  0x80-0x87: Monster start X positions (8 monsters)
-  0x88-0x8F: Monster start Y positions (8 monsters)
-  0x90-0x9F: Descriptor block 2 — unknown (16 bytes)
-  0xA0-0xA3: PC start X positions (4 PCs)
-  0xA4-0xA7: PC start Y positions (4 PCs)
-  0xA8-0xBF: Descriptor block 3 — unknown (24 bytes)
+  0x79-0x7F: Unused padding (7 bytes, never read by engine)
+  0x80-0x87: Monster start X positions [0-7]
+  0x88-0x8F: Monster start Y positions [0-7]
+  0x90-0x97: Runtime: saved tile under monster (overwritten at combat init)
+  0x98-0x9F: Runtime: monster type/status (overwritten at combat init)
+  0xA0-0xA3: PC start X positions [0-3]
+  0xA4-0xA7: PC start Y positions [0-3]
+  0xA8-0xAB: Runtime: saved tile under PC (overwritten at init)
+  0xAC-0xAF: Runtime: PC appearance tile (overwritten by JSR $7F5D)
+  0xB0-0xBF: Unused tail padding (16 bytes, never read by engine)
 """
 
 import argparse
@@ -21,19 +25,14 @@ from .constants import (
     CON_MAP_WIDTH, CON_MAP_HEIGHT, CON_MAP_TILES,
     CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET, CON_MONSTER_COUNT,
     CON_PC_X_OFFSET, CON_PC_Y_OFFSET, CON_PC_COUNT,
+    CON_PADDING1_OFFSET, CON_PADDING1_SIZE,
+    CON_RUNTIME_MONSAVE_OFFSET, CON_RUNTIME_MONSTATUS_OFFSET,
+    CON_RUNTIME_PCSAVE_OFFSET, CON_RUNTIME_PCTILE_OFFSET,
+    CON_PADDING2_OFFSET, CON_PADDING2_SIZE,
     tile_char, TILE_CHARS_REVERSE,
 )
 from .fileutil import resolve_game_file, backup_file
 from .json_export import export_json
-
-
-# Descriptor block offsets (gaps between known position data)
-CON_DESC1_OFFSET = 0x79  # 7 bytes after tile map
-CON_DESC1_SIZE = 7
-CON_DESC2_OFFSET = 0x90  # 16 bytes between monster Y and PC X
-CON_DESC2_SIZE = 16
-CON_DESC3_OFFSET = 0xA8  # 24 bytes after PC Y to end of file
-CON_DESC3_SIZE = 24
 
 
 class CombatMap:
@@ -49,13 +48,19 @@ class CombatMap:
                      for i in range(CON_PC_COUNT)]
         self.pc_y = [data[CON_PC_Y_OFFSET + i] if CON_PC_Y_OFFSET + i < len(data) else 0
                      for i in range(CON_PC_COUNT)]
-        # Descriptor blocks — unknown purpose, preserved for round-trip
-        self.desc1 = list(data[CON_DESC1_OFFSET:CON_DESC1_OFFSET + CON_DESC1_SIZE]) \
-            if len(data) > CON_DESC1_OFFSET else [0] * CON_DESC1_SIZE
-        self.desc2 = list(data[CON_DESC2_OFFSET:CON_DESC2_OFFSET + CON_DESC2_SIZE]) \
-            if len(data) > CON_DESC2_OFFSET else [0] * CON_DESC2_SIZE
-        self.desc3 = list(data[CON_DESC3_OFFSET:CON_DESC3_OFFSET + CON_DESC3_SIZE]) \
-            if len(data) > CON_DESC3_OFFSET else [0] * CON_DESC3_SIZE
+        # Padding and runtime arrays — preserved for round-trip fidelity
+        # padding1: 7 bytes between tile grid and monster positions (unused)
+        self.padding1 = list(data[CON_PADDING1_OFFSET:CON_PADDING1_OFFSET + CON_PADDING1_SIZE]) \
+            if len(data) > CON_PADDING1_OFFSET else [0] * CON_PADDING1_SIZE
+        # runtime_data: 16 bytes of runtime arrays (saved-tile + status, overwritten at init)
+        self.runtime_monster = list(data[CON_RUNTIME_MONSAVE_OFFSET:CON_RUNTIME_MONSTATUS_OFFSET + 8]) \
+            if len(data) > CON_RUNTIME_MONSAVE_OFFSET else [0] * 16
+        # runtime_pc: 8 bytes of runtime arrays (saved-tile + appearance, overwritten at init)
+        self.runtime_pc = list(data[CON_RUNTIME_PCSAVE_OFFSET:CON_RUNTIME_PCTILE_OFFSET + 4]) \
+            if len(data) > CON_RUNTIME_PCSAVE_OFFSET else [0] * 8
+        # padding2: 16 bytes of unused tail padding
+        self.padding2 = list(data[CON_PADDING2_OFFSET:CON_PADDING2_OFFSET + CON_PADDING2_SIZE]) \
+            if len(data) > CON_PADDING2_OFFSET else [0] * CON_PADDING2_SIZE
 
     def render(self) -> str:
         """Render 11x11 battlefield with position overlays."""
@@ -87,16 +92,16 @@ class CombatMap:
         for y, row in enumerate(grid):
             lines.append(f'  {y:2d}  {"".join(row)}')
 
-        # Show descriptor blocks if non-zero
-        has_desc = any(self.desc1) or any(self.desc2) or any(self.desc3)
-        if has_desc:
+        # Show padding/runtime data if non-zero (for debugging/analysis)
+        has_extra = any(self.padding1) or any(self.runtime_monster) or any(self.padding2)
+        if has_extra:
             lines.append('')
-            if any(self.desc1):
-                lines.append(f'  Desc1 (0x79): {" ".join(f"{b:02X}" for b in self.desc1)}')
-            if any(self.desc2):
-                lines.append(f'  Desc2 (0x90): {" ".join(f"{b:02X}" for b in self.desc2)}')
-            if any(self.desc3):
-                lines.append(f'  Desc3 (0xA8): {" ".join(f"{b:02X}" for b in self.desc3)}')
+            if any(self.padding1):
+                lines.append(f'  Padding (0x79): {" ".join(f"{b:02X}" for b in self.padding1)}')
+            if any(self.runtime_monster):
+                lines.append(f'  Runtime monster (0x90): {" ".join(f"{b:02X}" for b in self.runtime_monster)}')
+            if any(self.padding2):
+                lines.append(f'  Padding (0xB0): {" ".join(f"{b:02X}" for b in self.padding2)}')
 
         return '\n'.join(lines)
 
@@ -112,10 +117,13 @@ class CombatMap:
                          if self.monster_x[i] or self.monster_y[i]],
             'pcs': [{'x': self.pc_x[i], 'y': self.pc_y[i]}
                     for i in range(CON_PC_COUNT)],
-            'descriptor': {
-                'block1': self.desc1,
-                'block2': self.desc2,
-                'block3': self.desc3,
+            'padding': {
+                'pre_monster': self.padding1,
+                'tail': self.padding2,
+            },
+            'runtime': {
+                'monster_save_and_status': self.runtime_monster,
+                'pc_save_and_tile': self.runtime_pc,
             },
         }
         return result
@@ -216,17 +224,27 @@ def cmd_import(args) -> None:
         data[CON_PC_X_OFFSET + i] = p.get('x', 0)
         data[CON_PC_Y_OFFSET + i] = p.get('y', 0)
 
-    # Import descriptor blocks
+    # Import padding/runtime data for round-trip fidelity
+    padding = jdata.get('padding', {})
+    for i, b in enumerate(padding.get('pre_monster', [])[:CON_PADDING1_SIZE]):
+        if CON_PADDING1_OFFSET + i < len(data):
+            data[CON_PADDING1_OFFSET + i] = b
+    for i, b in enumerate(padding.get('tail', [])[:CON_PADDING2_SIZE]):
+        if CON_PADDING2_OFFSET + i < len(data):
+            data[CON_PADDING2_OFFSET + i] = b
+    runtime = jdata.get('runtime', {})
+    for i, b in enumerate(runtime.get('monster_save_and_status', [])[:16]):
+        if CON_RUNTIME_MONSAVE_OFFSET + i < len(data):
+            data[CON_RUNTIME_MONSAVE_OFFSET + i] = b
+    for i, b in enumerate(runtime.get('pc_save_and_tile', [])[:8]):
+        if CON_RUNTIME_PCSAVE_OFFSET + i < len(data):
+            data[CON_RUNTIME_PCSAVE_OFFSET + i] = b
+    # Backward compat: accept old 'descriptor' key
     desc = jdata.get('descriptor', {})
-    for i, b in enumerate(desc.get('block1', [])[:CON_DESC1_SIZE]):
-        if CON_DESC1_OFFSET + i < len(data):
-            data[CON_DESC1_OFFSET + i] = b
-    for i, b in enumerate(desc.get('block2', [])[:CON_DESC2_SIZE]):
-        if CON_DESC2_OFFSET + i < len(data):
-            data[CON_DESC2_OFFSET + i] = b
-    for i, b in enumerate(desc.get('block3', [])[:CON_DESC3_SIZE]):
-        if CON_DESC3_OFFSET + i < len(data):
-            data[CON_DESC3_OFFSET + i] = b
+    if desc:
+        for i, b in enumerate(desc.get('block1', [])[:CON_PADDING1_SIZE]):
+            if CON_PADDING1_OFFSET + i < len(data):
+                data[CON_PADDING1_OFFSET + i] = b
 
     output = args.output if args.output else args.file
     if do_backup and (not args.output or args.output == args.file):

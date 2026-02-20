@@ -357,6 +357,64 @@ class TestPlrsEditing:
 # Save import
 # =============================================================================
 
+class TestPrtyFieldMapping:
+    """Verify PRTY byte layout matches engine-traced zero-page $E0-$EF."""
+
+    def test_transport_at_offset_0(self, sample_prty_bytes):
+        party = PartyState(sample_prty_bytes)
+        assert party.transport == 'On Foot'
+
+    def test_party_size_at_offset_1(self, sample_prty_bytes):
+        party = PartyState(sample_prty_bytes)
+        assert party.party_size == 4
+
+    def test_location_type_at_offset_2(self, sample_prty_bytes):
+        party = PartyState(sample_prty_bytes)
+        assert party.location_type == 'Sosaria'
+
+    def test_saved_x_at_offset_3(self, sample_prty_bytes):
+        party = PartyState(sample_prty_bytes)
+        assert party.x == 32
+
+    def test_saved_y_at_offset_4(self, sample_prty_bytes):
+        party = PartyState(sample_prty_bytes)
+        assert party.y == 32
+
+    def test_sentinel_at_offset_5(self, sample_prty_bytes):
+        party = PartyState(sample_prty_bytes)
+        assert party.sentinel == 0xFF
+
+    def test_slot_ids_at_offset_6(self, sample_prty_bytes):
+        party = PartyState(sample_prty_bytes)
+        assert party.slot_ids == [0, 1, 2, 3]
+
+    def test_setters_write_correct_offsets(self):
+        """Verify setters write to the engine-correct byte positions."""
+        data = bytearray(16)
+        party = PartyState(data)
+        party.party_size = 3
+        party.x = 44
+        party.y = 20
+        party.slot_ids = [5, 6, 7, 8]
+        assert party.raw[1] == 3     # $E1 = party_size
+        assert party.raw[3] == 44    # $E3 = saved_x
+        assert party.raw[4] == 20    # $E4 = saved_y
+        assert party.raw[6] == 5     # $E6 = slot 0
+        assert party.raw[7] == 6     # $E7 = slot 1
+        assert party.raw[8] == 7     # $E8 = slot 2
+        assert party.raw[9] == 8     # $E9 = slot 3
+
+    def test_to_dict_keys(self, sample_prty_bytes):
+        party = PartyState(sample_prty_bytes)
+        d = party.to_dict()
+        assert 'transport' in d
+        assert 'party_size' in d
+        assert 'location_type' in d
+        assert 'x' in d
+        assert 'y' in d
+        assert 'slot_ids' in d
+
+
 class TestSaveImport:
     def test_import_party_state(self, tmp_dir, sample_prty_bytes):
         path = os.path.join(tmp_dir, 'PRTY')
@@ -1112,43 +1170,48 @@ class TestDDRW:
 
 
 # =============================================================================
-# Combat descriptor block tests
+# CON file layout tests (resolved via engine code tracing)
 # =============================================================================
 
-class TestCombatDescriptor:
-    def test_descriptor_blocks_parsed(self, sample_con_bytes):
+class TestCombatLayout:
+    def test_padding_and_runtime_parsed(self, sample_con_bytes):
         from u3edit.combat import CombatMap
         cm = CombatMap(sample_con_bytes)
-        assert len(cm.desc1) == 7
-        assert len(cm.desc2) == 16
-        assert len(cm.desc3) == 24
+        assert len(cm.padding1) == 7
+        assert len(cm.runtime_monster) == 16
+        assert len(cm.runtime_pc) == 8
+        assert len(cm.padding2) == 16
 
-    def test_descriptor_in_dict(self, sample_con_bytes):
+    def test_layout_in_dict(self, sample_con_bytes):
         from u3edit.combat import CombatMap
         cm = CombatMap(sample_con_bytes)
         d = cm.to_dict()
-        assert 'descriptor' in d
-        assert 'block1' in d['descriptor']
-        assert 'block2' in d['descriptor']
-        assert 'block3' in d['descriptor']
+        assert 'padding' in d
+        assert 'pre_monster' in d['padding']
+        assert 'tail' in d['padding']
+        assert 'runtime' in d
+        assert 'monster_save_and_status' in d['runtime']
+        assert 'pc_save_and_tile' in d['runtime']
 
-    def test_descriptor_nonzero(self):
-        """Descriptor blocks with non-zero data should be preserved."""
-        from u3edit.combat import CombatMap, CON_DESC1_OFFSET
+    def test_padding_nonzero(self):
+        """Padding with non-zero data should be preserved."""
+        from u3edit.combat import CombatMap
+        from u3edit.constants import CON_PADDING1_OFFSET
         data = bytearray(192)
-        data[CON_DESC1_OFFSET] = 0x42
-        data[CON_DESC1_OFFSET + 1] = 0x55
+        data[CON_PADDING1_OFFSET] = 0x42
+        data[CON_PADDING1_OFFSET + 1] = 0x55
         cm = CombatMap(data)
-        assert cm.desc1[0] == 0x42
-        assert cm.desc1[1] == 0x55
+        assert cm.padding1[0] == 0x42
+        assert cm.padding1[1] == 0x55
 
-    def test_descriptor_render_shows_nonzero(self):
-        from u3edit.combat import CombatMap, CON_DESC1_OFFSET
+    def test_padding_render_shows_nonzero(self):
+        from u3edit.combat import CombatMap
+        from u3edit.constants import CON_PADDING1_OFFSET
         data = bytearray(192)
-        data[CON_DESC1_OFFSET] = 0xAB
+        data[CON_PADDING1_OFFSET] = 0xAB
         cm = CombatMap(data)
         rendered = cm.render()
-        assert 'Desc1' in rendered
+        assert 'Padding (0x79)' in rendered
         assert 'AB' in rendered
 
 
@@ -1211,36 +1274,41 @@ class TestMBSStream:
 
 
 # =============================================================================
-# Special location metadata tests
+# Special location trailing bytes tests (unused padding, verified via engine)
 # =============================================================================
 
-class TestSpecialMetadata:
-    def test_metadata_extracted(self, sample_special_bytes):
-        from u3edit.special import get_metadata
-        meta = get_metadata(sample_special_bytes)
-        assert len(meta) == 7
+class TestSpecialTrailingBytes:
+    def test_trailing_bytes_extracted(self, sample_special_bytes):
+        from u3edit.special import get_trailing_bytes
+        trailing = get_trailing_bytes(sample_special_bytes)
+        assert len(trailing) == 7
 
-    def test_metadata_nonzero(self):
-        from u3edit.special import get_metadata, SPECIAL_META_OFFSET
+    def test_trailing_bytes_nonzero(self):
+        from u3edit.special import get_trailing_bytes, SPECIAL_META_OFFSET
         data = bytearray(128)
         data[SPECIAL_META_OFFSET] = 0x42
         data[SPECIAL_META_OFFSET + 3] = 0xFF
-        meta = get_metadata(data)
-        assert meta[0] == 0x42
-        assert meta[3] == 0xFF
+        trailing = get_trailing_bytes(data)
+        assert trailing[0] == 0x42
+        assert trailing[3] == 0xFF
 
-    def test_metadata_in_render(self):
+    def test_trailing_bytes_in_render(self):
         from u3edit.special import render_special_map, SPECIAL_META_OFFSET
         data = bytearray(128)
         data[SPECIAL_META_OFFSET] = 0xAB
         rendered = render_special_map(data)
-        assert 'Metadata' in rendered
+        assert 'Trailing padding' in rendered
         assert 'AB' in rendered
 
-    def test_metadata_not_shown_when_zero(self, sample_special_bytes):
+    def test_trailing_bytes_not_shown_when_zero(self, sample_special_bytes):
         from u3edit.special import render_special_map
         rendered = render_special_map(sample_special_bytes)
-        assert 'Metadata' not in rendered
+        assert 'Trailing' not in rendered
+
+    def test_backward_compat_alias(self):
+        """get_metadata still works as backward-compat alias."""
+        from u3edit.special import get_metadata, get_trailing_bytes
+        assert get_metadata is get_trailing_bytes
 
 
 # =============================================================================

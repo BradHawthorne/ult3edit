@@ -236,15 +236,16 @@ def sample_text_bytes():
 
 @pytest.fixture
 def sample_prty_bytes():
-    """Build a 16-byte PRTY file."""
+    """Build a 16-byte PRTY file matching engine layout ($E0-$EF)."""
     data = bytearray(PRTY_FILE_SIZE)
-    data[0] = 0x01  # On Foot
-    data[1] = 0x00  # Sosaria
-    data[2] = 32    # X
-    data[3] = 32    # Y
-    data[4] = 4     # Party size
-    data[5] = 0     # Slot 0
-    data[6] = 1     # Slot 1
-    data[7] = 2     # Slot 2
-    data[8] = 3     # Slot 3
+    data[0] = 0x01  # $E0: Transport = On Foot
+    data[1] = 4     # $E1: Party size = 4
+    data[2] = 0x00  # $E2: Location type = Sosaria
+    data[3] = 32    # $E3: Saved overworld X
+    data[4] = 32    # $E4: Saved overworld Y
+    data[5] = 0xFF  # $E5: Sentinel (active party)
+    data[6] = 0     # $E6: Slot 0
+    data[7] = 1     # $E7: Slot 1
+    data[8] = 2     # $E8: Slot 2
+    data[9] = 3     # $E9: Slot 3
     return bytes(data)
