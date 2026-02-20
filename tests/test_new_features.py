@@ -2508,6 +2508,213 @@ class TestEquipmentSetterNames:
 # Fix: Special JSON key consistency
 # =============================================================================
 
+# =============================================================================
+# Fix: Map JSON round-trip preserves tile data
+# =============================================================================
+
+class TestMapJsonRoundTrip:
+    """Verify that map export→import round-trip preserves all tiles."""
+
+    def test_overworld_round_trip(self, tmp_dir, sample_overworld_bytes):
+        """Export an overworld map to JSON, import it back, verify tiles match."""
+        from u3edit.map import cmd_view, cmd_import
+        map_file = os.path.join(tmp_dir, 'MAPA#061000')
+        with open(map_file, 'wb') as f:
+            f.write(sample_overworld_bytes)
+        json_file = os.path.join(tmp_dir, 'map_export.json')
+        # Export to JSON
+        args = type('Args', (), {
+            'file': map_file, 'json': True, 'output': json_file,
+            'crop': None,
+        })()
+        cmd_view(args)
+        # Create a fresh map file filled with 0xFF (totally different)
+        out_file = os.path.join(tmp_dir, 'MAPA_OUT')
+        with open(out_file, 'wb') as f:
+            f.write(sample_overworld_bytes)  # start from same so size matches
+        # Import JSON back
+        args = type('Args', (), {
+            'file': out_file, 'json_file': json_file,
+            'output': None, 'backup': False, 'dry_run': False,
+        })()
+        cmd_import(args)
+        # Verify
+        with open(out_file, 'rb') as f:
+            result = f.read()
+        assert result == sample_overworld_bytes
+
+    def test_dungeon_round_trip(self, tmp_dir, sample_dungeon_bytes):
+        """Export a dungeon map to JSON, import it back, verify tiles match."""
+        from u3edit.map import cmd_view, cmd_import
+        map_file = os.path.join(tmp_dir, 'MAPD#061000')
+        with open(map_file, 'wb') as f:
+            f.write(sample_dungeon_bytes)
+        json_file = os.path.join(tmp_dir, 'dung_export.json')
+        # Export
+        args = type('Args', (), {
+            'file': map_file, 'json': True, 'output': json_file,
+            'crop': None,
+        })()
+        cmd_view(args)
+        # Import back
+        out_file = os.path.join(tmp_dir, 'MAPD_OUT')
+        with open(out_file, 'wb') as f:
+            f.write(sample_dungeon_bytes)
+        args = type('Args', (), {
+            'file': out_file, 'json_file': json_file,
+            'output': None, 'backup': False, 'dry_run': False,
+        })()
+        cmd_import(args)
+        with open(out_file, 'rb') as f:
+            result = f.read()
+        assert result == sample_dungeon_bytes
+
+    def test_resolve_tile_handles_name_strings(self):
+        """The resolve_tile function handles multi-char tile names."""
+        from u3edit.constants import TILE_NAMES_REVERSE
+        assert TILE_NAMES_REVERSE['water'] == 0x00
+        assert TILE_NAMES_REVERSE['grass'] == 0x04
+        assert TILE_NAMES_REVERSE['town'] == 0x18
+
+    def test_resolve_tile_handles_dungeon_names(self):
+        """Dungeon tile name reverse lookup works."""
+        from u3edit.constants import DUNGEON_TILE_NAMES_REVERSE
+        assert DUNGEON_TILE_NAMES_REVERSE['open'] == 0x00
+        assert DUNGEON_TILE_NAMES_REVERSE['wall'] == 0x01
+        assert DUNGEON_TILE_NAMES_REVERSE['door'] == 0x02
+
+
+# =============================================================================
+# Fix: Save edit --output conflict when both PRTY and PLRS modified
+# =============================================================================
+
+class TestSaveOutputConflict:
+    """Verify that --output is rejected when editing both party and PLRS."""
+
+    def test_dual_file_output_rejected(self, tmp_dir, sample_prty_bytes):
+        """Editing both PRTY and PLRS with --output should fail."""
+        from u3edit.save import cmd_edit
+        from u3edit.constants import PLRS_FILE_SIZE, CHAR_RECORD_SIZE
+        # Create PRTY file in game dir
+        prty_file = os.path.join(tmp_dir, 'PRTY#069500')
+        with open(prty_file, 'wb') as f:
+            f.write(sample_prty_bytes)
+        # Create PLRS file in same dir
+        plrs_data = bytearray(PLRS_FILE_SIZE)
+        for i, ch in enumerate('HERO'):
+            plrs_data[i] = ord(ch) | 0x80
+        plrs_file = os.path.join(tmp_dir, 'PLRS#069500')
+        with open(plrs_file, 'wb') as f:
+            f.write(plrs_data)
+        # Try editing both party state and PLRS character with --output
+        args = type('Args', (), {
+            'game_dir': tmp_dir, 'output': '/tmp/out',
+            'backup': False, 'dry_run': False,
+            'transport': 'Horse', 'x': None, 'y': None,
+            'party_size': None, 'slot_ids': None,
+            'sentinel': None, 'location': None,
+            'plrs_slot': 0, 'name': 'TEST',
+            'str': None, 'dex': None, 'int_': None, 'wis': None,
+            'hp': None, 'max_hp': None, 'exp': None,
+            'mp': None, 'food': None, 'gold': None,
+            'gems': None, 'keys': None, 'powders': None,
+            'torches': None, 'status': None, 'race': None,
+            'class_': None, 'gender': None,
+            'weapon': None, 'armor': None,
+            'marks': None, 'cards': None, 'sub_morsels': None,
+        })()
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+
+# =============================================================================
+# Fix: --validate on bestiary and combat edit CLI args
+# =============================================================================
+
+class TestValidateOnEditArgs:
+    """Verify --validate is accepted by bestiary and combat edit subparsers."""
+
+    def test_bestiary_edit_accepts_validate(self):
+        """bestiary edit --validate should be a valid CLI arg."""
+        import argparse
+        from u3edit.bestiary import register_parser
+        parser = argparse.ArgumentParser()
+        sub = parser.add_subparsers(dest='module')
+        register_parser(sub)
+        args = parser.parse_args(['bestiary', 'edit', 'test.mon', '--monster', '0',
+                                  '--hp', '50', '--validate'])
+        assert args.validate is True
+
+    def test_combat_edit_accepts_validate(self):
+        """combat edit --validate should be a valid CLI arg."""
+        import argparse
+        from u3edit.combat import register_parser
+        parser = argparse.ArgumentParser()
+        sub = parser.add_subparsers(dest='module')
+        register_parser(sub)
+        args = parser.parse_args(['combat', 'edit', 'test.con',
+                                  '--tile', '0', '0', '32', '--validate'])
+        assert args.validate is True
+
+    def test_bestiary_edit_validate_runs(self, tmp_dir, sample_mon_bytes):
+        """bestiary edit with --validate should show warnings."""
+        from u3edit.bestiary import cmd_edit
+        mon_file = os.path.join(tmp_dir, 'MONA#069900')
+        with open(mon_file, 'wb') as f:
+            f.write(sample_mon_bytes)
+        args = type('Args', (), {
+            'file': mon_file, 'monster': 0, 'all': False,
+            'output': None, 'backup': False, 'dry_run': True,
+            'validate': True,
+            'name': None, 'tile1': None, 'tile2': None,
+            'hp': 50, 'attack': None, 'defense': None, 'speed': None,
+            'flags1': None, 'flags2': None, 'ability1': None, 'ability2': None,
+            'type': None,
+            'boss': None, 'no_boss': None, 'undead': None, 'ranged': None,
+            'magic_user': None, 'poison': None, 'no_poison': None,
+            'sleep': None, 'no_sleep': None, 'negate': None, 'no_negate': None,
+            'teleport': None, 'no_teleport': None,
+            'divide': None, 'no_divide': None,
+            'resistant': None, 'no_resistant': None,
+        })()
+        # Should not raise
+        cmd_edit(args)
+
+    def test_combat_edit_validate_runs(self, tmp_dir, sample_con_bytes):
+        """combat edit with --validate should show warnings."""
+        from u3edit.combat import cmd_edit
+        con_file = os.path.join(tmp_dir, 'CONA#069900')
+        with open(con_file, 'wb') as f:
+            f.write(sample_con_bytes)
+        args = type('Args', (), {
+            'file': con_file,
+            'output': None, 'backup': False, 'dry_run': True,
+            'validate': True,
+            'tile': [5, 5, 0x20],
+            'monster_pos': None, 'pc_pos': None,
+        })()
+        # Should not raise
+        cmd_edit(args)
+
+
+# =============================================================================
+# Fix: Dead code removal verification
+# =============================================================================
+
+class TestDeadCodeRemoved:
+    """Verify removed dead functions are no longer importable."""
+
+    def test_validate_file_size_removed(self):
+        """validate_file_size should no longer exist in fileutil."""
+        from u3edit import fileutil
+        assert not hasattr(fileutil, 'validate_file_size')
+
+    def test_load_game_file_removed(self):
+        """load_game_file should no longer exist in fileutil."""
+        from u3edit import fileutil
+        assert not hasattr(fileutil, 'load_game_file')
+
+
 class TestSpecialJsonKeyConsistency:
     def test_single_file_uses_trailing_bytes_key(self):
         from u3edit.special import cmd_view

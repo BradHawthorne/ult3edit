@@ -49,18 +49,6 @@ def resolve_single_file(directory: str, name: str) -> str | None:
     return None
 
 
-def load_game_file(path: str) -> bytes:
-    """Read a binary game file."""
-    with open(path, 'rb') as f:
-        return f.read()
-
-
-def validate_file_size(data: bytes, expected: int, label: str) -> None:
-    """Validate file size, raise ValueError if wrong."""
-    if len(data) != expected:
-        raise ValueError(f"{label} should be {expected} bytes, got {len(data)}")
-
-
 def decode_high_ascii(data: bytes) -> str:
     """Decode Apple II high-bit ASCII text to a Python string.
 

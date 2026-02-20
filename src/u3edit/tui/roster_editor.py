@@ -93,6 +93,19 @@ def _character_fields(char):
                              lambda: char.torches,
                              lambda v: setattr(char, 'torches', int(v)),
                              fmt='int'))
+    fields.append(FormField('Sub-morsels',
+                             lambda: char.sub_morsels,
+                             lambda v: setattr(char, 'sub_morsels', int(v)),
+                             fmt='int'))
+    fields.append(FormField('In Party',
+                             lambda: 'Yes' if char.in_party else 'No',
+                             lambda v: setattr(char, 'in_party', v.lower() in ('yes', 'true', '1', 'y'))))
+    fields.append(FormField('Marks',
+                             lambda: ', '.join(char.marks) if char.marks else 'None',
+                             lambda v: setattr(char, 'marks', [m.strip() for m in v.split(',')] if v.strip() and v.strip().lower() != 'none' else [])))
+    fields.append(FormField('Cards',
+                             lambda: ', '.join(char.cards) if char.cards else 'None',
+                             lambda v: setattr(char, 'cards', [c.strip() for c in v.split(',')] if v.strip() and v.strip().lower() != 'none' else [])))
     fields.append(FormField('Weapon',
                              lambda: f'{char.raw[CHAR_READIED_WEAPON]} ({char.equipped_weapon})',
                              lambda v: setattr(char, 'equipped_weapon', int(v)),

@@ -372,6 +372,8 @@ def cmd_edit(args) -> None:
     do_backup = getattr(args, 'backup', False)
     edit_all = getattr(args, 'all', False)
 
+    do_validate = getattr(args, 'validate', False)
+
     if edit_all:
         modified = False
         for m in monsters:
@@ -379,6 +381,9 @@ def cmd_edit(args) -> None:
                 if _apply_edits(m, args):
                     print(f"Modified monster #{m.index}:")
                     m.display(compact=False)
+                    if do_validate:
+                        for w in validate_monster(m):
+                            print(f"  WARNING: {w}", file=sys.stderr)
                     modified = True
         if not modified:
             print("No modifications specified.")
@@ -398,6 +403,9 @@ def cmd_edit(args) -> None:
             return
         print(f"Modified monster #{monster_idx}:")
         m.display(compact=False)
+        if do_validate:
+            for w in validate_monster(m):
+                print(f"  WARNING: {w}", file=sys.stderr)
 
     if dry_run:
         print("Dry run - no changes written.")
@@ -512,6 +520,7 @@ def register_parser(subparsers) -> None:
     p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_edit.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
     p_edit.add_argument('--dry-run', action='store_true', help='Show changes without writing')
+    p_edit.add_argument('--validate', action='store_true', help='Check data integrity after edit')
     _add_mon_edit_args(p_edit)
     _add_mon_flag_args(p_edit)
 
@@ -561,6 +570,7 @@ def main() -> None:
     p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_edit.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
     p_edit.add_argument('--dry-run', action='store_true', help='Show changes without writing')
+    p_edit.add_argument('--validate', action='store_true', help='Check data integrity after edit')
     _add_mon_edit_args(p_edit)
     _add_mon_flag_args(p_edit)
 

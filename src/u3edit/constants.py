@@ -83,6 +83,7 @@ def tile_name(byte_val: int, is_dungeon: bool = False) -> str:
 
 # Reverse lookup: display char -> canonical tile byte (for map import)
 TILE_CHARS_REVERSE = {ch: tile_id for tile_id, (ch, _) in TILES.items()}
+TILE_NAMES_REVERSE = {name.lower(): tile_id for tile_id, (_, name) in TILES.items()}
 
 # =============================================================================
 # Dungeon Tile Table
@@ -109,6 +110,7 @@ DUNGEON_TILES = {
 }
 
 DUNGEON_TILE_CHARS_REVERSE = {ch: tile_id for tile_id, (ch, _) in DUNGEON_TILES.items()}
+DUNGEON_TILE_NAMES_REVERSE = {name.lower(): tile_id for tile_id, (_, name) in DUNGEON_TILES.items()}
 
 # =============================================================================
 # Character Races and Classes

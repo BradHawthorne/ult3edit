@@ -9,7 +9,6 @@ import json
 import os
 import sys
 
-from .constants import TEXT_FILE_SIZE
 from .fileutil import decode_high_ascii, encode_high_ascii, backup_file
 from .json_export import export_json
 

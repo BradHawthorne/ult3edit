@@ -328,6 +328,11 @@ def cmd_edit(args) -> None:
         print("No changes specified.")
         return
 
+    if getattr(args, 'validate', False):
+        cm = CombatMap(data)
+        for w in validate_combat_map(cm):
+            print(f"  WARNING: {w}", file=sys.stderr)
+
     if dry_run:
         print("Dry run - no changes written.")
         return
@@ -440,6 +445,7 @@ def register_parser(subparsers) -> None:
     p_edit.add_argument('--pc-pos', type=int, nargs=3, metavar=('INDEX', 'X', 'Y'),
                         help='Set PC INDEX start position to (X, Y)')
     _add_combat_write_args(p_edit)
+    p_edit.add_argument('--validate', action='store_true', help='Check data integrity after edit')
 
     p_import = sub.add_parser('import', help='Import combat map from JSON')
     p_import.add_argument('file', help='CON file path')
@@ -483,6 +489,7 @@ def main() -> None:
                         metavar=('INDEX', 'X', 'Y'),
                         help='Set PC INDEX start position to (X, Y)')
     _add_combat_write_args(p_edit)
+    p_edit.add_argument('--validate', action='store_true', help='Check data integrity after edit')
 
     p_import = sub.add_parser('import', help='Import combat map from JSON')
     p_import.add_argument('file', help='CON file path')

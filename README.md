@@ -69,7 +69,7 @@ u3edit edit game.po
 u3edit edit path/to/GAME/
 ```
 
-The TUI supports tile painting for maps, form editing for character stats and monster attributes, and in-place dialog editing. Changes are written back to the disk image or directory on save.
+The TUI supports tile painting for maps, form editing for character stats (including sub-morsels, in-party, marks, and cards) and monster attributes, party state (including location type and sentinel), and in-place dialog editing. Changes are written back to the disk image or directory on save.
 
 ## Disk Image Support
 
@@ -223,14 +223,20 @@ u3edit text edit TEXT#061000 --record 0 --text "NEW TITLE" --dry-run
 # Teleport the party
 u3edit save edit path/to/GAME/ --x 32 --y 32 --transport horse
 
-# Edit active party characters
+# Set location type
+u3edit save edit path/to/GAME/ --location dungeon
+
+# Edit active party characters (all character fields supported)
 u3edit save edit path/to/GAME/ --plrs-slot 0 --hp 9999 --gold 9999
+u3edit save edit path/to/GAME/ --plrs-slot 0 --str 99 --status G --race E --class W
+u3edit save edit path/to/GAME/ --plrs-slot 0 --gems 50 --keys 25 --weapon 5 --armor 3
 
 # Set party sentinel (0xFF=active, 0x00=inactive)
 u3edit save edit path/to/GAME/ --sentinel 255
 
-# Transport accepts names or raw hex (for total conversions)
+# Transport and location accept names or raw hex (for total conversions)
 u3edit save edit path/to/GAME/ --transport 0x0A
+u3edit save edit path/to/GAME/ --location 0x80
 ```
 
 ## JSON Import/Export
@@ -247,7 +253,13 @@ u3edit roster import ROST#069500 roster.json --backup
 # Same pattern for all modules
 u3edit bestiary view MONA#069900 --json -o monsters.json
 u3edit bestiary import MONA#069900 monsters.json --backup
+
+# Maps use full tile names for round-trip fidelity
+u3edit map view MAPA#061000 --json -o map.json
+u3edit map import MAPA#061000 map.json --backup
 ```
+
+All JSON exports use human-readable tile names (e.g., "Grass", "Water", "Town") that round-trip correctly on import.
 
 ## Safety Features
 
@@ -263,9 +275,28 @@ u3edit roster view ROST#069500 --validate
 u3edit bestiary view MONA#069900 --validate
 u3edit save view path/to/GAME/ --validate
 u3edit combat view CONA#069900 --validate
+
+# Validate after editing (bestiary, combat)
+u3edit bestiary edit MONA#069900 --monster 0 --hp 200 --validate
+u3edit combat edit CONA#069900 --tile 5 5 0x04 --validate
 ```
 
 `--backup` and `--dry-run` are available on all edit and import commands.
+
+## Total Conversion Support
+
+Enum-like setters (status, race, class, gender, transport, location, equipment) follow a **named-first, raw-fallback** pattern:
+
+```bash
+# Named values (friendly)
+u3edit roster edit ROST --slot 0 --status G --race H --class F
+
+# Raw int/hex values (for mods with custom values beyond vanilla)
+u3edit roster edit ROST --slot 0 --status 0x47 --race 0x58
+u3edit save edit path/to/GAME/ --transport 0x0A --location 0x80
+```
+
+Equipment indices accept the full byte range (0-255), not just vanilla game limits. Validation via `--validate` is advisory (warnings, not errors).
 
 ## Editing Tile Graphics
 
@@ -443,7 +474,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-648 tests covering all modules with synthesized game data (no real game files needed).
+659 tests covering all modules with synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 
@@ -457,6 +488,13 @@ pytest -v
 | B-2 | bestiary | Removed dead FLAG1_BITS dict |
 | M-1 | map | Full tile table with &0xFC masking (was 0x00-0x1F only) |
 | S-1 | save | Fixed PRTY field mapping — party_size/location_type/x/y were at wrong byte offsets |
+| S-2 | save | Fixed transport setter silent no-op on unknown values (now raises ValueError) |
+| S-3 | save | Expanded PLRS import to handle all Character fields (was dropping ~15) |
+| S-4 | save | Guard against --output when editing both PRTY and PLRS simultaneously |
+| M-2 | map | Fixed JSON round-trip data destruction (import now handles full tile names) |
+| C-1 | combat | Fixed to_dict() filtering out monsters at position (0,0) |
+| R-5 | roster | Fixed gender setter crash on raw int input |
+| R-6 | roster | Added HP > max_hp validation check |
 
 ## License
 

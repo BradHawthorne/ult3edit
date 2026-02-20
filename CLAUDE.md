@@ -11,7 +11,7 @@ u3edit is a data toolkit for Ultima III: Exodus (Apple II, 1983). It provides CL
 ```bash
 pip install -e ".[dev]"              # Install with pytest
 pip install -e ".[tui]"              # Install with prompt_toolkit for TUI editors
-pytest -v                            # Run all 648 tests
+pytest -v                            # Run all 659 tests
 pytest tests/test_roster.py          # Run one test module
 pytest -v tests/test_bcd.py::TestBcdToInt::test_zero  # Run single test
 u3edit roster view path/to/ROST      # CLI usage pattern
@@ -74,7 +74,7 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 
 - **`--backup`**: Creates `.bak` copy before overwriting (edit/import commands). Uses `fileutil.backup_file()`.
 - **`--dry-run`**: Shows changes without writing. Available on all `edit` and `import` commands across all modules.
-- **`--validate`**: Data validation — checks for out-of-range values, invalid codes, rule violations. Available on roster (BCD integrity, race stat caps, class equipment limits), bestiary (tile validity, flag bits), save (transport, party size, coordinates, sentinel), and combat (tile alignment, position bounds, overlapping starts).
+- **`--validate`**: Data validation — checks for out-of-range values, invalid codes, rule violations. Available on `view` and `edit` for roster (BCD integrity, race stat caps, class equipment limits, HP > max HP), bestiary (tile validity, flag bits), save (transport, party size, coordinates, sentinel), and combat (tile alignment, position bounds, overlapping starts).
 - **`--all`**: Bulk editing — applies edits to all non-empty slots/monsters (roster: `--slot`/`--all`, bestiary: `--monster`/`--all`).
 - **`import`**: Every editable module supports `import <binary_file> <json_file>` to apply JSON data. Roster import handles equipment (weapon/armor names) and inventory counts. Save import handles both PRTY party state and PLRS active characters.
 - **`map set/fill/replace/find`**: Map CLI editing — set tiles, fill regions, replace tile types, search.
@@ -85,7 +85,7 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 - **`roster check-progress`**: Endgame readiness checker — marks, cards, exotic gear, party status.
 - **`diff`**: Compare two game files or directories — text/JSON/summary output, auto-detects file types, supports all data formats (roster, bestiary, combat, save, maps, special, TLK).
 - **`bestiary edit`**: Named flag toggles (`--undead`, `--ranged`, `--magic-user`, `--boss`, `--poison`, `--sleep`, `--negate`, `--teleport`, `--divide`, `--resistant` + `--no-*` counterparts), `--type Name` for monster type by name, `--all` for bulk editing.
-- **`save edit --plrs-slot`**: Edit active characters in PLRS file via save subcommand. `--sentinel` sets the party sentinel byte (0xFF=active). `--transport` accepts named values or raw int/hex for total conversions.
+- **`save edit --plrs-slot`**: Edit active characters in PLRS file via save subcommand — supports all Character fields (stats, equipment, status, race, class, gender, marks, cards, sub-morsels). `--sentinel` sets the party sentinel byte (0xFF=active). `--location` sets location type (sosaria/dungeon/town/castle or raw hex). `--transport` accepts named values or raw int/hex for total conversions. Note: `--output` is rejected when editing both PRTY and PLRS simultaneously (they are separate files).
 - **`roster edit --in-party/--not-in-party`**: Toggle character's in-party status. `--sub-morsels` sets food fraction (0-99).
 - **`text edit --record/--text`**: Per-record CLI editing for TEXT game strings (uppercased to match engine). Falls through to TUI when no CLI args provided.
 - **`shapes view/export/edit/edit-string/import`**: SHPS character set tile graphics — glyph rendering, PNG export (stdlib, no Pillow), HGR color logic, SHP overlay inline string extraction and replacement (`edit-string --offset --text`), SHPS embedded code guard at $9F9, TEXT detection as HGR bitmap.
@@ -93,7 +93,7 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 - **`patch view/edit/dump`**: Engine binary patcher for CIDAR-identified offsets in ULT3/EXOD — name table (921 bytes, terrain/monster/weapon/armor/spell names), moongate coordinates, food depletion rate, town/dungeon coords.
 - **`ddrw view/edit/import`**: Dungeon drawing data (1792 bytes) with structured perspective vector and tile record parsing.
 - **`disk info/list/extract/audit`**: ProDOS disk image operations — show volume info, list files, extract all files, audit disk space (free blocks, alignment waste, capacity estimates). Requires external `diskiigs` tool.
-- **`TILE_CHARS_REVERSE` / `DUNGEON_TILE_CHARS_REVERSE`**: Reverse lookups in `constants.py` for char→tile-byte conversion (used by import commands).
+- **`TILE_CHARS_REVERSE` / `DUNGEON_TILE_CHARS_REVERSE`**: Reverse lookups in `constants.py` for char→tile-byte conversion (used by import commands). **`TILE_NAMES_REVERSE` / `DUNGEON_TILE_NAMES_REVERSE`**: Full name→tile-byte reverse lookups for JSON round-trip (e.g., "Grass"→0x04).
 - **CON file layout** (fully resolved via engine code tracing): 0x79-0x7F = unused padding, 0x90-0x9F = runtime monster arrays (saved-tile + status, overwritten at init), 0xA8-0xAF = runtime PC arrays (saved-tile + appearance, overwritten at init), 0xB0-0xBF = unused tail padding. Preserved for round-trip fidelity.
 - **PRTY file layout** (verified against zero-page $E0-$EF): $E0=transport, $E1=party_size, $E2=location_type, $E3=saved_x, $E4=saved_y, $E5=sentinel, $E6-$E9=slot_ids. Constants in `PRTY_OFF_*`.
 - **Special location trailing bytes**: BRND/SHRN/FNTN/TIME files' last 7 bytes are unused disk residue (text fragments), not game data. Preserved for round-trip fidelity.
@@ -109,6 +109,6 @@ Setters follow a **named-first, raw-fallback** pattern for total conversion scen
 ## Data integrity rules
 
 - Setter properties validate and clamp to valid ranges (e.g., coordinates 0–63, BCD max 99/9999)
-- File size validation via `fileutil.validate_file_size()`
+- Map JSON round-trip uses `TILE_NAMES_REVERSE` / `DUNGEON_TILE_NAMES_REVERSE` for full name→tile_id resolution
 - TLK records use `is_text_record()` to filter binary data from dialog
 - `DiskContext` preserves ProDOS file type/aux info through read-modify-write cycles

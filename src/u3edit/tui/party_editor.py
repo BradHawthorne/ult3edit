@@ -27,6 +27,13 @@ def _party_fields(party):
                    lambda: ', '.join(str(s) for s in party.slot_ids),
                    lambda v: setattr(party, 'slot_ids',
                                       [int(x.strip()) for x in v.split(',')[:4]])),
+        FormField('Location',
+                   lambda: party.location_type,
+                   lambda v: setattr(party, 'location_type', v)),
+        FormField('Sentinel',
+                   lambda: f'${party.sentinel:02X}',
+                   lambda v: setattr(party, 'sentinel', int(v, 0)),
+                   fmt='hex'),
     ]
 
 

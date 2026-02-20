@@ -193,10 +193,12 @@ class TestPartyEditor:
         tab = make_party_tab(sample_prty_bytes, lambda d: None)
         party = tab.records[0]
         fields = _party_fields(party)
-        assert len(fields) == 5
+        assert len(fields) == 7
         labels = [f.label for f in fields]
         assert 'Transport' in labels
         assert 'Party Size' in labels
+        assert 'Location' in labels
+        assert 'Sentinel' in labels
 
     def test_party_save_roundtrip(self, sample_prty_bytes):
         from u3edit.tui.party_editor import make_party_tab

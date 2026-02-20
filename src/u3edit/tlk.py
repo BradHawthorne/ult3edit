@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 from .constants import TLK_LETTERS, TLK_NAMES, TLK_LINE_BREAK, TLK_RECORD_END
-from .fileutil import resolve_game_file, decode_high_ascii, backup_file
+from .fileutil import resolve_game_file, backup_file
 from .json_export import export_json
 
 

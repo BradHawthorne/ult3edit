@@ -392,6 +392,13 @@ def cmd_edit(args) -> None:
         print("No modifications specified.")
         return
 
+    if prty_modified and plrs_modified and args.output:
+        print("Error: --output cannot be used when editing both party state and "
+              "PLRS characters (they are separate files). Remove --output to "
+              "write each file in place, or edit them in separate commands.",
+              file=sys.stderr)
+        sys.exit(1)
+
     if prty_modified:
         if dry_run:
             print("Dry run - no changes written.")

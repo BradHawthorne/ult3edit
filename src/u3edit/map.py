@@ -17,6 +17,7 @@ from .constants import (
     MAP_NAMES, MAP_LETTERS, MAP_OVERWORLD_SIZE, MAP_DUNGEON_SIZE,
     tile_char, tile_name, TILES, DUNGEON_TILES,
     TILE_CHARS_REVERSE, DUNGEON_TILE_CHARS_REVERSE,
+    TILE_NAMES_REVERSE, DUNGEON_TILE_NAMES_REVERSE,
 )
 from .fileutil import resolve_game_file, backup_file
 from .json_export import export_json
@@ -368,7 +369,15 @@ def cmd_import(args) -> None:
     with open(args.json_file, 'r', encoding='utf-8') as f:
         jdata = json.load(f)
 
-    reverse = DUNGEON_TILE_CHARS_REVERSE if is_dungeon else TILE_CHARS_REVERSE
+    char_reverse = DUNGEON_TILE_CHARS_REVERSE if is_dungeon else TILE_CHARS_REVERSE
+    name_reverse = DUNGEON_TILE_NAMES_REVERSE if is_dungeon else TILE_NAMES_REVERSE
+    default_tile = 0 if is_dungeon else 0x04
+
+    def resolve_tile(name):
+        """Resolve a tile name or display char to a byte value."""
+        if len(name) == 1:
+            return char_reverse.get(name, default_tile)
+        return name_reverse.get(name.lower(), default_tile)
 
     if is_dungeon and 'levels' in jdata:
         for level_data in jdata['levels']:
@@ -377,19 +386,15 @@ def cmd_import(args) -> None:
             base = lvl * 256
             for y, row in enumerate(tiles[:16]):
                 for x, name in enumerate(row[:16]):
-                    ch = name[0] if len(name) == 1 else tile_char(0, is_dungeon=True)
-                    byte_val = reverse.get(ch, 0)
-                    data[base + y * 16 + x] = byte_val
+                    data[base + y * 16 + x] = resolve_tile(name)
     else:
         tiles = jdata.get('tiles', [])
         width = jdata.get('width', 64)
         for y, row in enumerate(tiles):
             for x, name in enumerate(row):
-                ch = name[0] if len(name) == 1 else tile_char(0)
-                byte_val = reverse.get(ch, 0x04)
                 offset = y * width + x
                 if offset < len(data):
-                    data[offset] = byte_val
+                    data[offset] = resolve_tile(name)
 
     if dry_run:
         print("Dry run - no changes written.")
