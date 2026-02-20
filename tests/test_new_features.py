@@ -18,7 +18,8 @@ from u3edit.constants import (
     CHAR_HP_HI, CHAR_HP_LO, CHAR_MARKS_CARDS,
     CHAR_IN_PARTY, CHAR_SUB_MORSELS,
     TILE_CHARS_REVERSE, DUNGEON_TILE_CHARS_REVERSE,
-    PRTY_OFF_SENTINEL, PRTY_OFF_TRANSPORT,
+    PRTY_OFF_SENTINEL, PRTY_OFF_TRANSPORT, PRTY_OFF_LOCATION,
+    PRTY_LOCATION_CODES,
 )
 from u3edit.fileutil import backup_file
 from u3edit.roster import (
@@ -2165,3 +2166,251 @@ class TestCliParityShapesEditString:
         assert result.returncode == 0
         assert '--offset' in result.stdout
         assert '--text' in result.stdout
+
+
+# =============================================================================
+# Fix: Gender setter accepts raw int/hex
+# =============================================================================
+
+class TestGenderSetterTotalConversion:
+    def test_gender_raw_int(self):
+        char = Character(bytearray(CHAR_RECORD_SIZE))
+        char.gender = 0x58  # raw byte
+        assert char.raw[CHAR_GENDER] == 0x58
+
+    def test_gender_hex_string(self):
+        char = Character(bytearray(CHAR_RECORD_SIZE))
+        char.gender = '0x58'
+        assert char.raw[CHAR_GENDER] == 0x58
+
+    def test_gender_named_still_works(self):
+        char = Character(bytearray(CHAR_RECORD_SIZE))
+        char.gender = 'M'
+        assert char.raw[CHAR_GENDER] == ord('M')
+
+    def test_gender_unknown_raises(self):
+        char = Character(bytearray(CHAR_RECORD_SIZE))
+        with pytest.raises(ValueError, match='Unknown gender'):
+            char.gender = 'X'
+
+
+# =============================================================================
+# Fix: validate_character checks HP > max_hp
+# =============================================================================
+
+class TestValidateHpVsMaxHp:
+    def test_hp_exceeds_max_hp(self):
+        char = Character(bytearray(CHAR_RECORD_SIZE))
+        char.name = 'TEST'
+        char.raw[CHAR_STATUS] = ord('G')
+        char.hp = 500
+        char.max_hp = 200
+        warnings = validate_character(char)
+        assert any('HP 500 exceeds Max HP 200' in w for w in warnings)
+
+    def test_hp_equal_max_hp_ok(self):
+        char = Character(bytearray(CHAR_RECORD_SIZE))
+        char.name = 'TEST'
+        char.raw[CHAR_STATUS] = ord('G')
+        char.hp = 200
+        char.max_hp = 200
+        warnings = validate_character(char)
+        assert not any('exceeds Max HP' in w for w in warnings)
+
+
+# =============================================================================
+# Fix: Roster import warns on unknown weapon/armor names
+# =============================================================================
+
+class TestRosterImportWarnings:
+    def test_unknown_weapon_warns(self, capsys):
+        data = bytearray(ROSTER_FILE_SIZE)
+        # Put a valid character in slot 0
+        data[0:4] = b'\xC8\xC5\xD2\xCF'  # "HERO" high-ASCII
+        data[CHAR_STATUS] = ord('G')
+        with tempfile.NamedTemporaryFile(suffix='.bin', delete=False) as f:
+            f.write(data)
+            rost_path = f.name
+        json_data = [{'slot': 0, 'weapon': 'NONEXISTENT_WEAPON'}]
+        with tempfile.NamedTemporaryFile(suffix='.json', delete=False, mode='w') as f:
+            json.dump(json_data, f)
+            json_path = f.name
+        try:
+            args = type('Args', (), {
+                'file': rost_path, 'json_file': json_path,
+                'output': None, 'backup': False, 'dry_run': True,
+            })()
+            cmd_import(args)
+            captured = capsys.readouterr()
+            assert 'Unknown weapon' in captured.err
+        finally:
+            os.unlink(rost_path)
+            os.unlink(json_path)
+
+
+# =============================================================================
+# Fix: location_type setter on PartyState
+# =============================================================================
+
+class TestLocationTypeSetter:
+    def test_set_by_name(self):
+        party = PartyState(bytearray(PRTY_FILE_SIZE))
+        party.location_type = 'dungeon'
+        assert party.raw[PRTY_OFF_LOCATION] == 0x01
+
+    def test_set_by_name_case_insensitive(self):
+        party = PartyState(bytearray(PRTY_FILE_SIZE))
+        party.location_type = 'Town'
+        assert party.raw[PRTY_OFF_LOCATION] == 0x02
+
+    def test_set_by_raw_int(self):
+        party = PartyState(bytearray(PRTY_FILE_SIZE))
+        party.location_type = 0x80
+        assert party.raw[PRTY_OFF_LOCATION] == 0x80
+
+    def test_set_by_hex_string(self):
+        party = PartyState(bytearray(PRTY_FILE_SIZE))
+        party.location_type = '0xFF'
+        assert party.raw[PRTY_OFF_LOCATION] == 0xFF
+
+    def test_unknown_raises(self):
+        party = PartyState(bytearray(PRTY_FILE_SIZE))
+        with pytest.raises(ValueError, match='Unknown location type'):
+            party.location_type = 'narnia'
+
+
+# =============================================================================
+# Fix: PLRS import handles all Character fields
+# =============================================================================
+
+class TestPlrsImportAllFields:
+    def test_roundtrip_all_fields(self):
+        """Export a Character via to_dict, import into PLRS, verify all fields."""
+        # Build a character with known values
+        char = Character(bytearray(CHAR_RECORD_SIZE))
+        char.name = 'WARRIOR'
+        char.race = 'H'
+        char.char_class = 'F'
+        char.gender = 'M'
+        char.raw[CHAR_STATUS] = ord('G')
+        char.strength = 25
+        char.dexterity = 20
+        char.intelligence = 15
+        char.wisdom = 10
+        char.hp = 500
+        char.max_hp = 500
+        char.mp = 30
+        char.exp = 1234
+        char.gold = 5000
+        char.food = 3000
+        char.gems = 10
+        char.keys = 5
+        char.powders = 3
+        char.torches = 8
+        char.sub_morsels = 50
+        char.marks = ['Kings', 'Snake']
+        char.cards = ['Death']
+        char.equipped_weapon = 5
+        char.equipped_armor = 3
+        char.set_weapon_count(1, 2)  # 2 Daggers
+        char.set_armor_count(1, 1)   # 1 Cloth
+
+        d = char.to_dict()
+
+        # Now import into a fresh PLRS-sized buffer
+        plrs_data = bytearray(PLRS_FILE_SIZE)
+        # Put the character data in slot 0
+        plrs_data[0:CHAR_RECORD_SIZE] = char.raw
+
+        # Build a JSON with the dict (like active_characters export)
+        json_data = {'active_characters': [d]}
+
+        with tempfile.TemporaryDirectory() as game_dir:
+            # Write PRTY
+            prty_path = os.path.join(game_dir, 'PRTY#060000')
+            with open(prty_path, 'wb') as f:
+                f.write(bytearray(PRTY_FILE_SIZE))
+            # Write PLRS (empty — we want import to fill it)
+            plrs_path = os.path.join(game_dir, 'PLRS#060000')
+            with open(plrs_path, 'wb') as f:
+                f.write(bytearray(PLRS_FILE_SIZE))
+            # Write JSON
+            json_path = os.path.join(game_dir, 'import.json')
+            with open(json_path, 'w') as f:
+                json.dump(json_data, f)
+
+            from u3edit.save import cmd_import as save_import
+            args = type('Args', (), {
+                'game_dir': game_dir, 'json_file': json_path,
+                'output': None, 'backup': False, 'dry_run': False,
+            })()
+            save_import(args)
+
+            # Read back the PLRS and verify
+            with open(plrs_path, 'rb') as f:
+                result = f.read()
+            imported = Character(result[0:CHAR_RECORD_SIZE])
+            assert imported.name == 'WARRIOR'
+            assert imported.gems == 10
+            assert imported.keys == 5
+            assert imported.powders == 3
+            assert imported.torches == 8
+            assert imported.sub_morsels == 50
+            assert 'Kings' in imported.marks
+            assert 'Death' in imported.cards
+            assert imported.equipped_weapon == 'Bow'  # index 5
+            assert imported.equipped_armor == 'Chain'  # index 3
+
+
+# =============================================================================
+# Fix: PLRS edit CLI supports all character fields
+# =============================================================================
+
+class TestPlrsEditExpandedArgs:
+    def test_help_shows_new_args(self):
+        import subprocess
+        import sys
+        result = subprocess.run(
+            [sys.executable, '-m', 'u3edit.save', 'edit', '--help'],
+            capture_output=True, text=True, timeout=10,
+        )
+        assert result.returncode == 0
+        assert '--gems' in result.stdout
+        assert '--keys' in result.stdout
+        assert '--torches' in result.stdout
+        assert '--status' in result.stdout
+        assert '--race' in result.stdout
+        assert '--weapon' in result.stdout
+        assert '--armor' in result.stdout
+        assert '--marks' in result.stdout
+        assert '--location' in result.stdout
+
+
+# =============================================================================
+# Fix: location_type import in party JSON
+# =============================================================================
+
+class TestLocationTypeImport:
+    def test_location_type_imported(self):
+        json_data = {
+            'party': {'location_type': 'Town'},
+        }
+        with tempfile.TemporaryDirectory() as game_dir:
+            prty_path = os.path.join(game_dir, 'PRTY#060000')
+            with open(prty_path, 'wb') as f:
+                f.write(bytearray(PRTY_FILE_SIZE))
+            json_path = os.path.join(game_dir, 'import.json')
+            with open(json_path, 'w') as f:
+                json.dump(json_data, f)
+
+            from u3edit.save import cmd_import as save_import
+            args = type('Args', (), {
+                'game_dir': game_dir, 'json_file': json_path,
+                'output': None, 'backup': False, 'dry_run': False,
+            })()
+            save_import(args)
+
+            with open(prty_path, 'rb') as f:
+                result = f.read()
+            party = PartyState(result)
+            assert party.raw[PRTY_OFF_LOCATION] == 0x02  # Town

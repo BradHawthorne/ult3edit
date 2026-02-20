@@ -16,12 +16,14 @@ import os
 import sys
 
 from .constants import (
-    PRTY_TRANSPORT, PRTY_TRANSPORT_CODES, PRTY_LOCATION_TYPE,
+    PRTY_TRANSPORT, PRTY_TRANSPORT_CODES,
+    PRTY_LOCATION_TYPE, PRTY_LOCATION_CODES,
     PRTY_OFF_TRANSPORT, PRTY_OFF_PARTY_SIZE, PRTY_OFF_LOCATION,
     PRTY_OFF_SAVED_X, PRTY_OFF_SAVED_Y, PRTY_OFF_SENTINEL,
     PRTY_OFF_SLOT_IDS,
     PRTY_FILE_SIZE, PLRS_FILE_SIZE, SOSA_FILE_SIZE, SOSM_FILE_SIZE,
     CHAR_RECORD_SIZE, tile_char,
+    WEAPONS, ARMORS,
 )
 from .fileutil import resolve_single_file, backup_file
 from .roster import Character
@@ -81,6 +83,26 @@ class PartyState:
     @location_code.setter
     def location_code(self, val: int) -> None:
         self.raw[PRTY_OFF_LOCATION] = val & 0xFF
+
+    @location_type.setter
+    def location_type(self, name_or_code) -> None:
+        if isinstance(name_or_code, int):
+            self.raw[PRTY_OFF_LOCATION] = name_or_code & 0xFF
+            return
+        name = str(name_or_code)
+        code = PRTY_LOCATION_CODES.get(name.lower())
+        if code is not None:
+            self.raw[PRTY_OFF_LOCATION] = code
+            return
+        # Raw int/hex string fallback for total conversions
+        try:
+            self.raw[PRTY_OFF_LOCATION] = int(name, 0) & 0xFF
+            return
+        except ValueError:
+            pass
+        raise ValueError(f"Unknown location type: {name_or_code!r} "
+                         f"(valid: {', '.join(PRTY_LOCATION_CODES.keys())}, "
+                         f"or raw int/hex)")
 
     @property
     def x(self) -> int:
@@ -277,6 +299,12 @@ def cmd_edit(args) -> None:
         party.slot_ids = args.slot_ids; prty_modified = True
     if getattr(args, 'sentinel', None) is not None:
         party.sentinel = args.sentinel; prty_modified = True
+    if getattr(args, 'location', None) is not None:
+        try:
+            party.location_type = args.location; prty_modified = True
+        except ValueError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            sys.exit(1)
 
     # PLRS character editing
     plrs_modified = False
@@ -320,6 +348,32 @@ def cmd_edit(args) -> None:
             char.exp = args.exp; plrs_modified = True
         if getattr(args, 'food', None) is not None:
             char.food = args.food; plrs_modified = True
+        if getattr(args, 'gems', None) is not None:
+            char.gems = args.gems; plrs_modified = True
+        if getattr(args, 'keys', None) is not None:
+            char.keys = args.keys; plrs_modified = True
+        if getattr(args, 'powders', None) is not None:
+            char.powders = args.powders; plrs_modified = True
+        if getattr(args, 'torches', None) is not None:
+            char.torches = args.torches; plrs_modified = True
+        if getattr(args, 'status', None) is not None:
+            char.status = args.status; plrs_modified = True
+        if getattr(args, 'race', None) is not None:
+            char.race = args.race; plrs_modified = True
+        if getattr(args, 'class_', None) is not None:
+            char.char_class = args.class_; plrs_modified = True
+        if getattr(args, 'gender', None) is not None:
+            char.gender = args.gender; plrs_modified = True
+        if getattr(args, 'weapon', None) is not None:
+            char.equipped_weapon = args.weapon; plrs_modified = True
+        if getattr(args, 'armor', None) is not None:
+            char.equipped_armor = args.armor; plrs_modified = True
+        if getattr(args, 'marks', None) is not None:
+            char.marks = [m.strip() for m in args.marks.split(',')]; plrs_modified = True
+        if getattr(args, 'cards', None) is not None:
+            char.cards = [c.strip() for c in args.cards.split(',')]; plrs_modified = True
+        if getattr(args, 'sub_morsels', None) is not None:
+            char.sub_morsels = args.sub_morsels; plrs_modified = True
 
         if plrs_modified:
             plrs_data[offset:offset + CHAR_RECORD_SIZE] = char.raw
@@ -380,6 +434,11 @@ def cmd_import(args) -> None:
                 print(f"Warning: {e}", file=sys.stderr)
         if 'party_size' in party_data:
             party.party_size = party_data['party_size']
+        if 'location_type' in party_data:
+            try:
+                party.location_type = party_data['location_type']
+            except ValueError as e:
+                print(f"Warning: {e}", file=sys.stderr)
         if 'x' in party_data:
             party.x = party_data['x']
         if 'y' in party_data:
@@ -416,6 +475,16 @@ def cmd_import(args) -> None:
                 char = Character(plrs_raw[offset:offset + CHAR_RECORD_SIZE])
                 if 'name' in entry:
                     char.name = entry['name']
+                if 'race' in entry:
+                    char.race = entry['race']
+                if 'class' in entry:
+                    char.char_class = entry['class']
+                if 'gender' in entry:
+                    char.gender = entry['gender']
+                if 'status' in entry:
+                    char.status = entry['status']
+                if 'in_party' in entry:
+                    char.in_party = entry['in_party']
                 stats = entry.get('stats', {})
                 if 'str' in stats:
                     char.strength = stats['str']
@@ -437,6 +506,46 @@ def cmd_import(args) -> None:
                     char.gold = entry['gold']
                 if 'food' in entry:
                     char.food = entry['food']
+                if 'gems' in entry:
+                    char.gems = entry['gems']
+                if 'keys' in entry:
+                    char.keys = entry['keys']
+                if 'powders' in entry:
+                    char.powders = entry['powders']
+                if 'torches' in entry:
+                    char.torches = entry['torches']
+                if 'sub_morsels' in entry:
+                    char.sub_morsels = entry['sub_morsels']
+                if 'marks' in entry:
+                    char.marks = entry['marks']
+                if 'cards' in entry:
+                    char.cards = entry['cards']
+                if 'weapon' in entry:
+                    try:
+                        char.equipped_weapon = WEAPONS.index(entry['weapon'])
+                    except ValueError:
+                        print(f"  Warning: Unknown weapon '{entry['weapon']}' in PLRS slot {i}",
+                              file=sys.stderr)
+                if 'armor' in entry:
+                    try:
+                        char.equipped_armor = ARMORS.index(entry['armor'])
+                    except ValueError:
+                        print(f"  Warning: Unknown armor '{entry['armor']}' in PLRS slot {i}",
+                              file=sys.stderr)
+                if 'weapons' in entry:
+                    for wname, wcount in entry['weapons'].items():
+                        try:
+                            char.set_weapon_count(WEAPONS.index(wname), wcount)
+                        except ValueError:
+                            print(f"  Warning: Unknown weapon '{wname}' in PLRS slot {i} inventory",
+                                  file=sys.stderr)
+                if 'armors' in entry:
+                    for aname, acount in entry['armors'].items():
+                        try:
+                            char.set_armor_count(ARMORS.index(aname), acount)
+                        except ValueError:
+                            print(f"  Warning: Unknown armor '{aname}' in PLRS slot {i} inventory",
+                                  file=sys.stderr)
                 plrs_raw[offset:offset + CHAR_RECORD_SIZE] = char.raw
                 count += 1
 
@@ -467,6 +576,19 @@ def _add_plrs_edit_args(p) -> None:
     p.add_argument('--gold', type=int, help='Gold (0-9999)')
     p.add_argument('--exp', type=int, help='Experience (0-9999)')
     p.add_argument('--food', type=int, help='Food (0-9999)')
+    p.add_argument('--gems', type=int, help='Gems (0-99)')
+    p.add_argument('--keys', type=int, help='Keys (0-99)')
+    p.add_argument('--powders', type=int, help='Powders (0-99)')
+    p.add_argument('--torches', type=int, help='Torches (0-99)')
+    p.add_argument('--status', help='Status: G(ood) P(oisoned) D(ead) A(shes)')
+    p.add_argument('--race', help='Race: H(uman) E(lf) D(warf) B(obbit) F(uzzy)')
+    p.add_argument('--class', dest='class_', help='Class: F C W T L I D A R P B')
+    p.add_argument('--gender', help='Gender: M(ale) F(emale) O(ther)')
+    p.add_argument('--weapon', type=int, help='Equipped weapon index (0-15)')
+    p.add_argument('--armor', type=int, help='Equipped armor index (0-7)')
+    p.add_argument('--marks', help='Marks (comma-separated: Kings,Snake,Fire,Force)')
+    p.add_argument('--cards', help='Cards (comma-separated: Death,Sol,Love,Moons)')
+    p.add_argument('--sub-morsels', type=int, help='Sub-morsels food fraction (0-99)')
 
 
 def register_parser(subparsers) -> None:
@@ -490,6 +612,8 @@ def register_parser(subparsers) -> None:
     p_edit.add_argument('--slot-ids', type=int, nargs='+', help='Roster slot IDs (e.g., 0 1 2 3)')
     p_edit.add_argument('--sentinel', type=int,
                         help='Party sentinel byte (0xFF=active, 0x00=inactive)')
+    p_edit.add_argument('--location',
+                        help='Location type: sosaria, dungeon, town, castle, or raw hex')
     p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_edit.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
     p_edit.add_argument('--dry-run', action='store_true', help='Show changes without writing')
@@ -538,6 +662,8 @@ def main() -> None:
                         help='Roster slot IDs (e.g., 0 1 2 3)')
     p_edit.add_argument('--sentinel', type=int,
                         help='Party sentinel byte (0xFF=active, 0x00=inactive)')
+    p_edit.add_argument('--location',
+                        help='Location type: sosaria, dungeon, town, castle, or raw hex')
     p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_edit.add_argument('--backup', action='store_true',
                         help='Create .bak backup before overwrite')

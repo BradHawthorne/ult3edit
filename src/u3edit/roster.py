@@ -223,12 +223,21 @@ class Character:
         return GENDERS.get(self.raw[CHAR_GENDER], f'?({self.raw[CHAR_GENDER]:02X})')
 
     @gender.setter
-    def gender(self, code: str) -> None:
-        code = code.upper()
+    def gender(self, code) -> None:
+        if isinstance(code, int):
+            self.raw[CHAR_GENDER] = code & 0xFF
+            return
+        code_str = str(code).upper()
         for k, v in GENDERS.items():
-            if v[0].upper() == code or v.upper() == code:
+            if v[0].upper() == code_str or v.upper() == code_str:
                 self.raw[CHAR_GENDER] = k
                 return
+        # Raw int/hex string fallback for total conversions
+        try:
+            self.raw[CHAR_GENDER] = int(str(code), 0) & 0xFF
+            return
+        except ValueError:
+            pass
         raise ValueError(f'Unknown gender: {code}')
 
     @property
@@ -470,6 +479,10 @@ def validate_character(char: Character) -> list[str]:
     for offset, label in bcd_fields:
         if not is_valid_bcd(char.raw[offset]):
             warnings.append(f"Invalid BCD in {label}: ${char.raw[offset]:02X}")
+
+    # HP vs Max HP
+    if char.hp > char.max_hp:
+        warnings.append(f"HP {char.hp} exceeds Max HP {char.max_hp}")
 
     # Race stat maximums
     race = char.race
@@ -779,24 +792,28 @@ def cmd_import(args) -> None:
             try:
                 char.equipped_weapon = WEAPONS.index(entry['weapon'])
             except ValueError:
-                pass
+                print(f"  Warning: Unknown weapon '{entry['weapon']}' in slot {slot}, skipping",
+                      file=sys.stderr)
         if 'armor' in entry:
             try:
                 char.equipped_armor = ARMORS.index(entry['armor'])
             except ValueError:
-                pass
+                print(f"  Warning: Unknown armor '{entry['armor']}' in slot {slot}, skipping",
+                      file=sys.stderr)
         if 'weapons' in entry:
             for wname, wcount in entry['weapons'].items():
                 try:
                     char.set_weapon_count(WEAPONS.index(wname), wcount)
                 except ValueError:
-                    pass
+                    print(f"  Warning: Unknown weapon '{wname}' in slot {slot} inventory, skipping",
+                          file=sys.stderr)
         if 'armors' in entry:
             for aname, acount in entry['armors'].items():
                 try:
                     char.set_armor_count(ARMORS.index(aname), acount)
                 except ValueError:
-                    pass
+                    print(f"  Warning: Unknown armor '{aname}' in slot {slot} inventory, skipping",
+                          file=sys.stderr)
         count += 1
 
     print(f"Import: {count} character(s) to update")

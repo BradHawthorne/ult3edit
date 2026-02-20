@@ -572,6 +572,8 @@ PRTY_LOCATION_TYPE = {
     0xFF: 'Ambrosia',
 }
 
+PRTY_LOCATION_CODES = {v.lower(): k for k, v in PRTY_LOCATION_TYPE.items()}
+
 # =============================================================================
 # File Size Constants (for validation)
 # =============================================================================
