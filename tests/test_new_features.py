@@ -623,35 +623,114 @@ class TestSaveImport:
 
 class TestCombatImport:
     def test_import_combat_map(self, tmp_dir, sample_con_bytes):
+        """cmd_import() applies monster position changes from JSON."""
+        from u3edit.combat import cmd_import as combat_cmd_import, CombatMap
         path = os.path.join(tmp_dir, 'CONA')
         with open(path, 'wb') as f:
             f.write(sample_con_bytes)
 
-        from u3edit.combat import CombatMap
         cm = CombatMap(sample_con_bytes)
         d = cm.to_dict()
-
-        # Modify and import back
         d['monsters'][0]['x'] = 7
+        d['monsters'][1]['y'] = 9
+
         json_path = os.path.join(tmp_dir, 'con.json')
         with open(json_path, 'w') as f:
             json.dump(d, f)
 
-        # Read JSON back and apply
-        with open(json_path, 'r') as f:
-            jdata = json.load(f)
-        with open(path, 'rb') as f:
-            data = bytearray(f.read())
-        from u3edit.constants import CON_MONSTER_X_OFFSET
-        for i, m in enumerate(jdata.get('monsters', [])):
-            data[CON_MONSTER_X_OFFSET + i] = m.get('x', 0)
-        with open(path, 'wb') as f:
-            f.write(data)
+        args = type('Args', (), {
+            'file': path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': False,
+        })()
+        combat_cmd_import(args)
 
         with open(path, 'rb') as f:
             result = f.read()
         cm2 = CombatMap(result)
         assert cm2.monster_x[0] == 7
+        assert cm2.monster_y[1] == 9
+
+    def test_import_combat_tiles(self, tmp_dir, sample_con_bytes):
+        """cmd_import() applies tile changes from JSON."""
+        from u3edit.combat import cmd_import as combat_cmd_import, CombatMap
+        path = os.path.join(tmp_dir, 'CONA')
+        with open(path, 'wb') as f:
+            f.write(sample_con_bytes)
+
+        cm = CombatMap(sample_con_bytes)
+        d = cm.to_dict()
+        # Set tile (0,0) to a known char
+        d['tiles'][0][0] = '~'  # Water tile
+
+        json_path = os.path.join(tmp_dir, 'con.json')
+        with open(json_path, 'w') as f:
+            json.dump(d, f)
+
+        args = type('Args', (), {
+            'file': path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': False,
+        })()
+        combat_cmd_import(args)
+
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[0] == TILE_CHARS_REVERSE['~']
+
+    def test_import_combat_dry_run(self, tmp_dir, sample_con_bytes):
+        """cmd_import() with dry_run does not modify file."""
+        from u3edit.combat import cmd_import as combat_cmd_import, CombatMap
+        path = os.path.join(tmp_dir, 'CONA')
+        with open(path, 'wb') as f:
+            f.write(sample_con_bytes)
+
+        cm = CombatMap(sample_con_bytes)
+        d = cm.to_dict()
+        d['monsters'][0]['x'] = 99
+
+        json_path = os.path.join(tmp_dir, 'con.json')
+        with open(json_path, 'w') as f:
+            json.dump(d, f)
+
+        args = type('Args', (), {
+            'file': path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': True,
+        })()
+        combat_cmd_import(args)
+
+        with open(path, 'rb') as f:
+            result = f.read()
+        # Original data should be unchanged
+        assert result == sample_con_bytes
+
+    def test_import_combat_round_trip(self, tmp_dir, sample_con_bytes):
+        """Full view→import round-trip preserves all data including padding."""
+        from u3edit.combat import cmd_import as combat_cmd_import, CombatMap
+        path = os.path.join(tmp_dir, 'CONA')
+        with open(path, 'wb') as f:
+            f.write(sample_con_bytes)
+
+        cm = CombatMap(sample_con_bytes)
+        d = cm.to_dict()
+
+        json_path = os.path.join(tmp_dir, 'con.json')
+        with open(json_path, 'w') as f:
+            json.dump(d, f)
+
+        out_path = os.path.join(tmp_dir, 'CONA_OUT')
+        args = type('Args', (), {
+            'file': path, 'json_file': json_path,
+            'output': out_path, 'backup': False, 'dry_run': False,
+        })()
+        combat_cmd_import(args)
+
+        with open(out_path, 'rb') as f:
+            result = f.read()
+        # Tile data and positions should survive round-trip
+        cm2 = CombatMap(result)
+        assert cm2.monster_x == cm.monster_x
+        assert cm2.monster_y == cm.monster_y
+        assert cm2.pc_x == cm.pc_x
+        assert cm2.pc_y == cm.pc_y
 
 
 # =============================================================================
@@ -660,20 +739,96 @@ class TestCombatImport:
 
 class TestSpecialImport:
     def test_import_special_map(self, tmp_dir, sample_special_bytes):
+        """cmd_import() applies tile changes from JSON."""
+        from u3edit.special import cmd_import as special_cmd_import
         path = os.path.join(tmp_dir, 'SHRN')
         with open(path, 'wb') as f:
             f.write(sample_special_bytes)
 
-        # Change a tile via raw byte manipulation (simulating import)
-        with open(path, 'rb') as f:
-            data = bytearray(f.read())
-        data[0] = 0x8C  # Wall
-        with open(path, 'wb') as f:
-            f.write(data)
+        # Build JSON with a modified tile grid
+        from u3edit.constants import tile_char, SPECIAL_MAP_WIDTH, SPECIAL_MAP_HEIGHT
+        tiles = []
+        for y in range(SPECIAL_MAP_HEIGHT):
+            row = []
+            for x in range(SPECIAL_MAP_WIDTH):
+                off = y * SPECIAL_MAP_WIDTH + x
+                row.append(tile_char(sample_special_bytes[off]) if off < len(sample_special_bytes) else ' ')
+            tiles.append(row)
+        # Change tile (0,0) to water
+        tiles[0][0] = '~'
+
+        json_path = os.path.join(tmp_dir, 'special.json')
+        jdata = {'tiles': tiles, 'trailing_bytes': [0] * 7}
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+
+        args = type('Args', (), {
+            'file': path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': False,
+        })()
+        special_cmd_import(args)
 
         with open(path, 'rb') as f:
             result = f.read()
-        assert result[0] == 0x8C
+        assert result[0] == TILE_CHARS_REVERSE['~']
+
+    def test_import_special_dry_run(self, tmp_dir, sample_special_bytes):
+        """cmd_import() with dry_run does not modify file."""
+        from u3edit.special import cmd_import as special_cmd_import
+        path = os.path.join(tmp_dir, 'SHRN')
+        with open(path, 'wb') as f:
+            f.write(sample_special_bytes)
+
+        jdata = {'tiles': [['~'] * 11] * 11, 'trailing_bytes': [0] * 7}
+        json_path = os.path.join(tmp_dir, 'special.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+
+        args = type('Args', (), {
+            'file': path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': True,
+        })()
+        special_cmd_import(args)
+
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result == sample_special_bytes
+
+    def test_import_special_trailing_bytes(self, tmp_dir, sample_special_bytes):
+        """cmd_import() preserves trailing padding bytes from JSON."""
+        from u3edit.special import cmd_import as special_cmd_import
+        from u3edit.constants import tile_char, SPECIAL_MAP_WIDTH, SPECIAL_MAP_HEIGHT
+        path = os.path.join(tmp_dir, 'SHRN')
+        with open(path, 'wb') as f:
+            f.write(sample_special_bytes)
+
+        # Build tiles from existing data (no changes)
+        tiles = []
+        for y in range(SPECIAL_MAP_HEIGHT):
+            row = []
+            for x in range(SPECIAL_MAP_WIDTH):
+                off = y * SPECIAL_MAP_WIDTH + x
+                row.append(tile_char(sample_special_bytes[off]))
+            tiles.append(row)
+
+        # Set non-zero trailing bytes
+        jdata = {'tiles': tiles, 'trailing_bytes': [0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x00, 0x00]}
+        json_path = os.path.join(tmp_dir, 'special.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+
+        args = type('Args', (), {
+            'file': path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': False,
+        })()
+        special_cmd_import(args)
+
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[121] == 0xDE
+        assert result[122] == 0xAD
+        assert result[123] == 0xBE
+        assert result[124] == 0xEF
 
 
 # =============================================================================
@@ -682,6 +837,8 @@ class TestSpecialImport:
 
 class TestTextImport:
     def test_import_text_records(self, tmp_dir, sample_text_bytes):
+        """cmd_import() applies text records from JSON."""
+        from u3edit.text import cmd_import as text_cmd_import
         path = os.path.join(tmp_dir, 'TEXT')
         with open(path, 'wb') as f:
             f.write(sample_text_bytes)
@@ -690,23 +847,44 @@ class TestTextImport:
         assert len(records) >= 3
         assert records[0] == 'ULTIMA III'
 
-        # Import modified records
-        from u3edit.fileutil import encode_high_ascii
-        data = bytearray(TEXT_FILE_SIZE)
-        offset = 0
-        new_records = ['MODIFIED', 'TEXT', 'DATA']
-        for text in new_records:
-            encoded = encode_high_ascii(text, len(text))
-            data[offset:offset + len(encoded)] = encoded
-            data[offset + len(encoded)] = 0x00
-            offset += len(encoded) + 1
+        # Import via cmd_import
+        jdata = [{'text': 'MODIFIED'}, {'text': 'RECORDS'}, {'text': 'HERE'}]
+        json_path = os.path.join(tmp_dir, 'text.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
 
-        with open(path, 'wb') as f:
-            f.write(data)
+        args = type('Args', (), {
+            'file': path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': False,
+        })()
+        text_cmd_import(args)
 
         records2 = load_text_records(path)
         assert records2[0] == 'MODIFIED'
-        assert records2[1] == 'TEXT'
+        assert records2[1] == 'RECORDS'
+        assert records2[2] == 'HERE'
+
+    def test_import_text_dry_run(self, tmp_dir, sample_text_bytes):
+        """cmd_import() with dry_run does not modify file."""
+        from u3edit.text import cmd_import as text_cmd_import
+        path = os.path.join(tmp_dir, 'TEXT')
+        with open(path, 'wb') as f:
+            f.write(sample_text_bytes)
+
+        jdata = [{'text': 'CHANGED'}]
+        json_path = os.path.join(tmp_dir, 'text.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+
+        args = type('Args', (), {
+            'file': path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': True,
+        })()
+        text_cmd_import(args)
+
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result == sample_text_bytes
 
 
 # =============================================================================
