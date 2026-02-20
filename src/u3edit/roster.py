@@ -668,6 +668,7 @@ def cmd_import(args) -> None:
     """Import character data from a JSON file into a roster."""
     chars, original = load_roster(args.file)
     do_backup = getattr(args, 'backup', False)
+    dry_run = getattr(args, 'dry_run', False)
 
     with open(args.json_file, 'r', encoding='utf-8') as f:
         data = json.load(f)
@@ -729,6 +730,12 @@ def cmd_import(args) -> None:
         if 'cards' in entry:
             char.cards = entry['cards']
         count += 1
+
+    print(f"Import: {count} character(s) to update")
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
 
     output = args.output if args.output else args.file
     if do_backup and (not args.output or args.output == args.file):
@@ -924,6 +931,7 @@ def register_parser(subparsers) -> None:
     p_import.add_argument('json_file', help='JSON file to import')
     p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_import.add_argument('--dry-run', action='store_true', help='Show changes without writing')
 
     # Check progress
     p_progress = sub.add_parser('check-progress', help='Check endgame readiness')
@@ -993,6 +1001,7 @@ def main() -> None:
     p_import.add_argument('json_file', help='JSON file to import')
     p_import.add_argument('--output', '-o')
     p_import.add_argument('--backup', action='store_true')
+    p_import.add_argument('--dry-run', action='store_true')
 
     p_progress = sub.add_parser('check-progress', help='Check endgame readiness')
     p_progress.add_argument('file', help='ROST file path')

@@ -129,8 +129,56 @@ class CombatMap:
         return result
 
 
+def validate_combat_map(cm: CombatMap) -> list[str]:
+    """Check a combat map for data integrity issues.
+
+    Returns a list of warning strings (empty if valid).
+    """
+    warnings = []
+
+    # Check tile alignment (should be multiples of 4 for animation masking)
+    misaligned = 0
+    for i, t in enumerate(cm.tiles):
+        if t != 0 and (t & 0x03) != 0:
+            misaligned += 1
+    if misaligned:
+        warnings.append(f"{misaligned} tile(s) not aligned to 4-byte boundary (animation frame masking)")
+
+    # Monster positions should be within grid bounds
+    for i in range(CON_MONSTER_COUNT):
+        mx, my = cm.monster_x[i], cm.monster_y[i]
+        if (mx or my) and (mx >= CON_MAP_WIDTH or my >= CON_MAP_HEIGHT):
+            warnings.append(f"Monster {i} position ({mx}, {my}) out of bounds")
+
+    # PC positions should be within grid bounds
+    for i in range(CON_PC_COUNT):
+        px, py = cm.pc_x[i], cm.pc_y[i]
+        if px >= CON_MAP_WIDTH or py >= CON_MAP_HEIGHT:
+            warnings.append(f"PC {i} position ({px}, {py}) out of bounds")
+
+    # Check for overlapping start positions (only count non-zero positions)
+    positions = {}
+    for i in range(CON_MONSTER_COUNT):
+        mx, my = cm.monster_x[i], cm.monster_y[i]
+        if mx or my:
+            key = (mx, my)
+            if key in positions:
+                warnings.append(f"Monster {i} overlaps with {positions[key]} at ({mx}, {my})")
+            positions[key] = f"monster {i}"
+    for i in range(CON_PC_COUNT):
+        px, py = cm.pc_x[i], cm.pc_y[i]
+        if px or py:
+            key = (px, py)
+            if key in positions:
+                warnings.append(f"PC {i} overlaps with {positions[key]} at ({px}, {py})")
+            positions[key] = f"PC {i}"
+
+    return warnings
+
+
 def cmd_view(args) -> None:
     path_or_dir = args.path
+    do_validate = getattr(args, 'validate', False)
 
     if os.path.isdir(path_or_dir):
         con_files = []
@@ -149,10 +197,13 @@ def cmd_view(args) -> None:
                 with open(path, 'rb') as f:
                     data = f.read()
                 cm = CombatMap(data)
-                result[f'CON{letter}'] = {
+                d = {
                     'name': CON_NAMES.get(letter, 'Unknown'),
                     **cm.to_dict(),
                 }
+                if do_validate:
+                    d['warnings'] = validate_combat_map(cm)
+                result[f'CON{letter}'] = d
             export_json(result, args.output)
             return
 
@@ -165,6 +216,9 @@ def cmd_view(args) -> None:
             print(f"  CON{letter} - {name}")
             print(cm.render())
             print(f"  Legend: @ = PC start, m = monster start")
+            if do_validate:
+                for w in validate_combat_map(cm):
+                    print(f"  WARNING: {w}", file=sys.stderr)
             print()
     else:
         with open(path_or_dir, 'rb') as f:
@@ -174,28 +228,117 @@ def cmd_view(args) -> None:
 
         if args.json:
             cm = CombatMap(data)
-            result = {'file': filename, **cm.to_dict()}
-            export_json(result, args.output)
+            d = {'file': filename, **cm.to_dict()}
+            if do_validate:
+                d['warnings'] = validate_combat_map(cm)
+            export_json(d, args.output)
             return
 
         cm = CombatMap(data)
         print(f"\n=== Combat Map: {filename} ({len(data)} bytes) ===\n")
         print(cm.render())
         print(f"\n  Legend: @ = PC start, m = monster start")
+        if do_validate:
+            for w in validate_combat_map(cm):
+                print(f"  WARNING: {w}", file=sys.stderr)
         print()
 
 
+def _has_cli_edit_args(args) -> bool:
+    """Check if any CLI editing flags were provided."""
+    return (getattr(args, 'tile', None) is not None
+            or getattr(args, 'monster_pos', None) is not None
+            or getattr(args, 'pc_pos', None) is not None)
+
+
 def cmd_edit(args) -> None:
-    """Launch TUI combat map editor."""
-    from .tui import require_prompt_toolkit
-    require_prompt_toolkit()
-    from .tui.combat_editor import CombatEditor
+    """Edit a combat map via CLI args or TUI fallback."""
+    if not _has_cli_edit_args(args):
+        # No CLI args — launch TUI editor
+        from .tui import require_prompt_toolkit
+        require_prompt_toolkit()
+        from .tui.combat_editor import CombatEditor
 
+        with open(args.file, 'rb') as f:
+            data = f.read()
+
+        editor = CombatEditor(args.file, data)
+        editor.run()
+        return
+
+    # CLI editing mode
     with open(args.file, 'rb') as f:
-        data = f.read()
+        data = bytearray(f.read())
+    dry_run = getattr(args, 'dry_run', False)
+    do_backup = getattr(args, 'backup', False)
+    changes = 0
 
-    editor = CombatEditor(args.file, data)
-    editor.run()
+    # --tile X Y VALUE
+    if getattr(args, 'tile', None) is not None:
+        tx, ty, tval = args.tile
+        if not (0 <= tx < CON_MAP_WIDTH and 0 <= ty < CON_MAP_HEIGHT):
+            print(f"Error: tile ({tx}, {ty}) out of bounds (0-{CON_MAP_WIDTH - 1})",
+                  file=sys.stderr)
+            sys.exit(1)
+        if not (0 <= tval <= 255):
+            print(f"Error: tile value {tval} out of range (0-255)", file=sys.stderr)
+            sys.exit(1)
+        offset = ty * CON_MAP_WIDTH + tx
+        old_val = data[offset]
+        data[offset] = tval
+        print(f"Tile ({tx}, {ty}): ${old_val:02X} -> ${tval:02X}")
+        changes += 1
+
+    # --monster-pos INDEX X Y
+    if getattr(args, 'monster_pos', None) is not None:
+        idx, mx, my = args.monster_pos
+        if not (0 <= idx < CON_MONSTER_COUNT):
+            print(f"Error: monster index {idx} out of range (0-{CON_MONSTER_COUNT - 1})",
+                  file=sys.stderr)
+            sys.exit(1)
+        if not (0 <= mx < CON_MAP_WIDTH and 0 <= my < CON_MAP_HEIGHT):
+            print(f"Error: position ({mx}, {my}) out of bounds (0-{CON_MAP_WIDTH - 1})",
+                  file=sys.stderr)
+            sys.exit(1)
+        old_x = data[CON_MONSTER_X_OFFSET + idx]
+        old_y = data[CON_MONSTER_Y_OFFSET + idx]
+        data[CON_MONSTER_X_OFFSET + idx] = mx
+        data[CON_MONSTER_Y_OFFSET + idx] = my
+        print(f"Monster {idx}: ({old_x}, {old_y}) -> ({mx}, {my})")
+        changes += 1
+
+    # --pc-pos INDEX X Y
+    if getattr(args, 'pc_pos', None) is not None:
+        idx, px, py = args.pc_pos
+        if not (0 <= idx < CON_PC_COUNT):
+            print(f"Error: PC index {idx} out of range (0-{CON_PC_COUNT - 1})",
+                  file=sys.stderr)
+            sys.exit(1)
+        if not (0 <= px < CON_MAP_WIDTH and 0 <= py < CON_MAP_HEIGHT):
+            print(f"Error: position ({px}, {py}) out of bounds (0-{CON_MAP_WIDTH - 1})",
+                  file=sys.stderr)
+            sys.exit(1)
+        old_x = data[CON_PC_X_OFFSET + idx]
+        old_y = data[CON_PC_Y_OFFSET + idx]
+        data[CON_PC_X_OFFSET + idx] = px
+        data[CON_PC_Y_OFFSET + idx] = py
+        print(f"PC {idx}: ({old_x}, {old_y}) -> ({px}, {py})")
+        changes += 1
+
+    if changes == 0:
+        print("No changes specified.")
+        return
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
+
+    output = getattr(args, 'output', None) or args.file
+    if do_backup and (not getattr(args, 'output', None) or args.output == args.file):
+        backup_file(args.file)
+    with open(output, 'wb') as f:
+        f.write(data)
+    print(f"Saved to {output}")
 
 
 def cmd_import(args) -> None:
@@ -203,26 +346,38 @@ def cmd_import(args) -> None:
     with open(args.file, 'rb') as f:
         data = bytearray(f.read())
     do_backup = getattr(args, 'backup', False)
+    dry_run = getattr(args, 'dry_run', False)
 
     with open(args.json_file, 'r', encoding='utf-8') as f:
         jdata = json.load(f)
 
     # Import tiles
+    tile_changes = 0
     tiles = jdata.get('tiles', [])
     for y, row in enumerate(tiles[:CON_MAP_HEIGHT]):
         for x, ch in enumerate(row[:CON_MAP_WIDTH]):
             offset = y * CON_MAP_WIDTH + x
-            data[offset] = TILE_CHARS_REVERSE.get(ch, 0x20)
+            new_val = TILE_CHARS_REVERSE.get(ch, 0x20)
+            if data[offset] != new_val:
+                tile_changes += 1
+            data[offset] = new_val
 
     # Import monster positions
+    pos_changes = 0
     for i, m in enumerate(jdata.get('monsters', [])[:CON_MONSTER_COUNT]):
-        data[CON_MONSTER_X_OFFSET + i] = m.get('x', 0)
-        data[CON_MONSTER_Y_OFFSET + i] = m.get('y', 0)
+        nx, ny = m.get('x', 0), m.get('y', 0)
+        if data[CON_MONSTER_X_OFFSET + i] != nx or data[CON_MONSTER_Y_OFFSET + i] != ny:
+            pos_changes += 1
+        data[CON_MONSTER_X_OFFSET + i] = nx
+        data[CON_MONSTER_Y_OFFSET + i] = ny
 
     # Import PC positions
     for i, p in enumerate(jdata.get('pcs', [])[:CON_PC_COUNT]):
-        data[CON_PC_X_OFFSET + i] = p.get('x', 0)
-        data[CON_PC_Y_OFFSET + i] = p.get('y', 0)
+        nx, ny = p.get('x', 0), p.get('y', 0)
+        if data[CON_PC_X_OFFSET + i] != nx or data[CON_PC_Y_OFFSET + i] != ny:
+            pos_changes += 1
+        data[CON_PC_X_OFFSET + i] = nx
+        data[CON_PC_Y_OFFSET + i] = ny
 
     # Import padding/runtime data for round-trip fidelity
     padding = jdata.get('padding', {})
@@ -246,12 +401,25 @@ def cmd_import(args) -> None:
             if CON_PADDING1_OFFSET + i < len(data):
                 data[CON_PADDING1_OFFSET + i] = b
 
+    print(f"Import: {tile_changes} tile(s) changed, {pos_changes} position(s) changed")
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
+
     output = args.output if args.output else args.file
     if do_backup and (not args.output or args.output == args.file):
         backup_file(args.file)
     with open(output, 'wb') as f:
         f.write(data)
     print(f"Imported combat map to {output}")
+
+
+def _add_combat_write_args(p) -> None:
+    """Add common write arguments for combat edit commands."""
+    p.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p.add_argument('--dry-run', action='store_true', help='Show changes without writing')
 
 
 def register_parser(subparsers) -> None:
@@ -262,15 +430,24 @@ def register_parser(subparsers) -> None:
     p_view.add_argument('path', help='CON file or GAME directory')
     p_view.add_argument('--json', action='store_true', help='Output as JSON')
     p_view.add_argument('--output', '-o', help='Output file (for --json)')
+    p_view.add_argument('--validate', action='store_true', help='Check data integrity')
 
-    p_edit = sub.add_parser('edit', help='Edit a combat map (TUI)')
+    p_edit = sub.add_parser('edit', help='Edit a combat map (CLI or TUI)')
     p_edit.add_argument('file', help='CON file path')
+    p_edit.add_argument('--tile', type=int, nargs=3, metavar=('X', 'Y', 'VALUE'),
+                        help='Set tile at (X, Y) to VALUE')
+    p_edit.add_argument('--monster-pos', type=int, nargs=3, metavar=('INDEX', 'X', 'Y'),
+                        help='Set monster INDEX start position to (X, Y)')
+    p_edit.add_argument('--pc-pos', type=int, nargs=3, metavar=('INDEX', 'X', 'Y'),
+                        help='Set PC INDEX start position to (X, Y)')
+    _add_combat_write_args(p_edit)
 
     p_import = sub.add_parser('import', help='Import combat map from JSON')
     p_import.add_argument('file', help='CON file path')
     p_import.add_argument('json_file', help='JSON file to import')
     p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_import.add_argument('--dry-run', action='store_true', help='Show changes without writing')
 
 
 def dispatch(args) -> None:

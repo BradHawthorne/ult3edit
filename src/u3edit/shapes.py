@@ -621,6 +621,7 @@ def cmd_edit(args) -> None:
 def cmd_import(args) -> None:
     """Import glyphs from JSON."""
     do_backup = getattr(args, 'backup', False)
+    dry_run = getattr(args, 'dry_run', False)
 
     with open(args.json_file, 'r', encoding='utf-8') as f:
         jdata = json.load(f)
@@ -651,6 +652,12 @@ def cmd_import(args) -> None:
     else:
         print("Error: Unrecognized JSON format", file=sys.stderr)
         sys.exit(1)
+
+    print(f"Import: {count} glyph(s) to update")
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
 
     output = args.output if args.output else args.file
     if do_backup and os.path.exists(args.file) and (
@@ -734,6 +741,7 @@ def register_parser(subparsers) -> None:
     p_import.add_argument('json_file', help='JSON file to import')
     p_import.add_argument('--output', '-o', help='Output file')
     p_import.add_argument('--backup', action='store_true')
+    p_import.add_argument('--dry-run', action='store_true', help='Show changes without writing')
 
     p_info = sub.add_parser('info', help='Show file metadata')
     p_info.add_argument('file', help='Shape file')
@@ -790,6 +798,7 @@ def main() -> None:
     p_import.add_argument('json_file', help='JSON file to import')
     p_import.add_argument('--output', '-o')
     p_import.add_argument('--backup', action='store_true')
+    p_import.add_argument('--dry-run', action='store_true')
 
     p_info = sub.add_parser('info', help='Show file metadata')
     p_info.add_argument('file', help='Shape file')

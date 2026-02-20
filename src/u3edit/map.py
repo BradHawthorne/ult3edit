@@ -363,6 +363,7 @@ def cmd_import(args) -> None:
         data = bytearray(f.read())
     is_dungeon = len(data) <= MAP_DUNGEON_SIZE
     do_backup = getattr(args, 'backup', False)
+    dry_run = getattr(args, 'dry_run', False)
 
     with open(args.json_file, 'r', encoding='utf-8') as f:
         jdata = json.load(f)
@@ -389,6 +390,10 @@ def cmd_import(args) -> None:
                 offset = y * width + x
                 if offset < len(data):
                     data[offset] = byte_val
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
 
     output = args.output if args.output else args.file
     if do_backup and (not args.output or args.output == args.file):
@@ -462,6 +467,7 @@ def register_parser(subparsers) -> None:
     p_import.add_argument('json_file', help='JSON file to import')
     p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_import.add_argument('--dry-run', action='store_true', help='Show changes without writing')
 
 
 def dispatch(args) -> None:

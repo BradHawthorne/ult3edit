@@ -11,7 +11,7 @@ u3edit is a data toolkit for Ultima III: Exodus (Apple II, 1983). It provides CL
 ```bash
 pip install -e ".[dev]"              # Install with pytest
 pip install -e ".[tui]"              # Install with prompt_toolkit for TUI editors
-pytest -v                            # Run all 494 tests
+pytest -v                            # Run all 552 tests
 pytest tests/test_roster.py          # Run one test module
 pytest -v tests/test_bcd.py::TestBcdToInt::test_zero  # Run single test
 u3edit roster view path/to/ROST      # CLI usage pattern
@@ -73,12 +73,15 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 ## CLI features across modules
 
 - **`--backup`**: Creates `.bak` copy before overwriting (edit/import commands). Uses `fileutil.backup_file()`.
-- **`--dry-run`**: Shows changes without writing (edit commands on roster, bestiary, tlk, save, map).
-- **`--validate`**: Roster validation — checks BCD integrity, race stat caps, class equipment limits.
+- **`--dry-run`**: Shows changes without writing. Available on all `edit` and `import` commands across all modules.
+- **`--validate`**: Data validation — checks for out-of-range values, invalid codes, rule violations. Available on roster (BCD integrity, race stat caps, class equipment limits), bestiary (tile validity, flag bits), save (transport, party size, coordinates, sentinel), and combat (tile alignment, position bounds, overlapping starts).
 - **`--all`**: Bulk editing — applies edits to all non-empty slots/monsters (roster: `--slot`/`--all`, bestiary: `--monster`/`--all`).
 - **`import`**: Every editable module supports `import <binary_file> <json_file>` to apply JSON data.
 - **`map set/fill/replace/find`**: Map CLI editing — set tiles, fill regions, replace tile types, search.
+- **`combat edit`**: CLI editing — `--tile X Y VALUE`, `--monster-pos INDEX X Y`, `--pc-pos INDEX X Y`. Falls through to TUI when no CLI args provided.
+- **`special edit`**: CLI editing — `--tile X Y VALUE`. Falls through to TUI when no CLI args provided.
 - **`tlk search`**: Text search across TLK dialog files. Case-insensitive by default, `--regex` for regex patterns.
+- **`tlk edit --find/--replace`**: Search-and-replace across all text records in a TLK file. `--ignore-case` for case-insensitive matching. Supports `--dry-run`.
 - **`roster check-progress`**: Endgame readiness checker — marks, cards, exotic gear, party status.
 - **`diff`**: Compare two game files or directories — text/JSON/summary output, auto-detects file types, supports all data formats (roster, bestiary, combat, save, maps, special, TLK).
 - **`bestiary edit`**: Named flag toggles (`--undead`, `--ranged`, `--magic-user`, `--boss`, `--poison`, `--sleep`, `--negate`, `--teleport`, `--divide`, `--resistant` + `--no-*` counterparts), `--type Name` for monster type by name, `--all` for bulk editing.

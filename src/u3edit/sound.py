@@ -365,6 +365,7 @@ def cmd_edit(args) -> None:
 def cmd_import(args) -> None:
     """Import sound data from JSON."""
     do_backup = getattr(args, 'backup', False)
+    dry_run = getattr(args, 'dry_run', False)
 
     with open(args.json_file, 'r', encoding='utf-8') as f:
         jdata = json.load(f)
@@ -375,6 +376,12 @@ def cmd_import(args) -> None:
         sys.exit(1)
 
     data = bytes(raw)
+
+    print(f"Import: {len(data)} bytes")
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
 
     output = args.output if args.output else args.file
     if do_backup and os.path.exists(args.file) and (
@@ -415,6 +422,7 @@ def register_parser(subparsers) -> None:
     p_import.add_argument('json_file', help='JSON file to import')
     p_import.add_argument('--output', '-o')
     p_import.add_argument('--backup', action='store_true')
+    p_import.add_argument('--dry-run', action='store_true', help='Show changes without writing')
 
 
 def dispatch(args) -> None:

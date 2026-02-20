@@ -4,8 +4,12 @@ import argparse
 import os
 import pytest
 
-from u3edit.save import PartyState, cmd_edit
-from u3edit.constants import PRTY_FILE_SIZE
+from u3edit.save import PartyState, cmd_edit, validate_party_state
+from u3edit.constants import (
+    PRTY_FILE_SIZE, PRTY_OFF_TRANSPORT, PRTY_OFF_PARTY_SIZE,
+    PRTY_OFF_LOCATION, PRTY_OFF_SAVED_X, PRTY_OFF_SENTINEL,
+    PRTY_OFF_SLOT_IDS,
+)
 
 
 class TestPartyState:
@@ -108,3 +112,59 @@ class TestCmdEdit:
         with open(out, 'rb') as f:
             result = f.read()
         assert PartyState(result).transport == 'On Foot'
+
+
+class TestValidatePartyState:
+    def test_valid_party(self, sample_prty_bytes):
+        """Valid party should produce no warnings."""
+        party = PartyState(sample_prty_bytes)
+        assert validate_party_state(party) == []
+
+    def test_unknown_transport(self):
+        """Unknown transport code should warn."""
+        data = bytearray(PRTY_FILE_SIZE)
+        data[PRTY_OFF_TRANSPORT] = 0x42  # Unknown
+        data[PRTY_OFF_SENTINEL] = 0xFF
+        party = PartyState(bytes(data))
+        warnings = validate_party_state(party)
+        assert any('transport' in w.lower() for w in warnings)
+
+    def test_party_size_exceeds_max(self):
+        """Party size > 4 should warn."""
+        data = bytearray(PRTY_FILE_SIZE)
+        data[PRTY_OFF_PARTY_SIZE] = 5
+        data[PRTY_OFF_TRANSPORT] = 0x01
+        data[PRTY_OFF_SENTINEL] = 0xFF
+        party = PartyState(bytes(data))
+        warnings = validate_party_state(party)
+        assert any('Party size' in w for w in warnings)
+
+    def test_unknown_location_type(self):
+        """Unknown location type should warn."""
+        data = bytearray(PRTY_FILE_SIZE)
+        data[PRTY_OFF_TRANSPORT] = 0x01
+        data[PRTY_OFF_LOCATION] = 0x42  # Unknown
+        data[PRTY_OFF_SENTINEL] = 0xFF
+        party = PartyState(bytes(data))
+        warnings = validate_party_state(party)
+        assert any('location' in w.lower() for w in warnings)
+
+    def test_invalid_slot_ids(self):
+        """Slot IDs > 19 should warn."""
+        data = bytearray(PRTY_FILE_SIZE)
+        data[PRTY_OFF_TRANSPORT] = 0x01
+        data[PRTY_OFF_PARTY_SIZE] = 1
+        data[PRTY_OFF_SENTINEL] = 0xFF
+        data[PRTY_OFF_SLOT_IDS] = 25  # > 19
+        party = PartyState(bytes(data))
+        warnings = validate_party_state(party)
+        assert any('roster index' in w for w in warnings)
+
+    def test_unexpected_sentinel(self):
+        """Non-$FF/$00 sentinel should warn."""
+        data = bytearray(PRTY_FILE_SIZE)
+        data[PRTY_OFF_TRANSPORT] = 0x01
+        data[PRTY_OFF_SENTINEL] = 0x42  # Unexpected
+        party = PartyState(bytes(data))
+        warnings = validate_party_state(party)
+        assert any('sentinel' in w.lower() for w in warnings)

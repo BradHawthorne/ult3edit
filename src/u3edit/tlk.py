@@ -194,7 +194,21 @@ def cmd_build(args) -> None:
 
 
 def cmd_edit(args) -> None:
-    """Edit a specific record in-place, preserving binary records."""
+    """Edit a specific record in-place, or find-replace across all records."""
+    find_text = getattr(args, 'find', None)
+    replace_text = getattr(args, 'replace', None)
+    record = getattr(args, 'record', None)
+    text = getattr(args, 'text', None)
+
+    if find_text is not None and replace_text is not None:
+        _cmd_find_replace(args, find_text, replace_text)
+        return
+
+    if record is None or text is None:
+        print("Error: Either --record/--text or --find/--replace required",
+              file=sys.stderr)
+        sys.exit(1)
+
     with open(args.file, 'rb') as f:
         raw = f.read()
     dry_run = getattr(args, 'dry_run', False)
@@ -208,19 +222,19 @@ def cmd_edit(args) -> None:
         if not part:
             continue
         if is_text_record(part):
-            if text_index == args.record:
+            if text_index == record:
                 target_part = i
                 break
             text_index += 1
 
     text_count = sum(1 for p in raw_parts if p and is_text_record(p))
     if target_part is None:
-        print(f"Error: Record {args.record} out of range (0-{text_count-1})",
+        print(f"Error: Record {record} out of range (0-{text_count-1})",
               file=sys.stderr)
         sys.exit(1)
 
     # Replace only the target text record, preserve everything else
-    new_lines = args.text.split('\\n')
+    new_lines = text.split('\\n')
     new_encoded = encode_record(new_lines)
     # encode_record appends TLK_RECORD_END; strip it since split removed them
     raw_parts[target_part] = new_encoded[:-1]
@@ -229,7 +243,7 @@ def cmd_edit(args) -> None:
     out = bytes([TLK_RECORD_END]).join(raw_parts)
 
     if dry_run:
-        print(f"Would update record {args.record}")
+        print(f"Would update record {record}")
         print("Dry run - no changes written.")
         return
 
@@ -238,7 +252,63 @@ def cmd_edit(args) -> None:
         backup_file(args.file)
     with open(output, 'wb') as f:
         f.write(out)
-    print(f"Updated record {args.record} in {output}")
+    print(f"Updated record {record} in {output}")
+
+
+def _cmd_find_replace(args, find_text: str, replace_text: str) -> None:
+    """Find and replace text across all text records in a TLK file."""
+    with open(args.file, 'rb') as f:
+        raw = f.read()
+    dry_run = getattr(args, 'dry_run', False)
+    do_backup = getattr(args, 'backup', False)
+    ignore_case = getattr(args, 'ignore_case', False)
+
+    raw_parts = raw.split(bytes([TLK_RECORD_END]))
+    total_replacements = 0
+    records_changed = 0
+
+    for i, part in enumerate(raw_parts):
+        if not part or not is_text_record(part):
+            continue
+        lines = decode_record(part + bytes([TLK_RECORD_END]))
+        changed = False
+        new_lines = []
+        for line in lines:
+            if ignore_case:
+                # Case-insensitive find, preserve replacement case
+                pattern = re.compile(re.escape(find_text), re.IGNORECASE)
+                count = len(pattern.findall(line))
+                new_line = pattern.sub(replace_text, line)
+            else:
+                count = line.count(find_text)
+                new_line = line.replace(find_text, replace_text)
+            if count > 0:
+                changed = True
+                total_replacements += count
+            new_lines.append(new_line)
+        if changed:
+            records_changed += 1
+            new_encoded = encode_record(new_lines)
+            raw_parts[i] = new_encoded[:-1]
+
+    out = bytes([TLK_RECORD_END]).join(raw_parts)
+
+    print(f"Find '{find_text}' -> '{replace_text}': "
+          f"{total_replacements} replacement(s) in {records_changed} record(s)")
+
+    if total_replacements == 0:
+        return
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
+
+    output = args.output if args.output else args.file
+    if do_backup and (not args.output or args.output == args.file):
+        backup_file(args.file)
+    with open(output, 'wb') as f:
+        f.write(out)
+    print(f"Written to {output}")
 
 
 def _match_line(line: str, pattern: str, use_regex: bool) -> bool:
@@ -308,6 +378,7 @@ def cmd_search(args) -> None:
 def cmd_import(args) -> None:
     """Import dialog records from JSON."""
     do_backup = getattr(args, 'backup', False)
+    dry_run = getattr(args, 'dry_run', False)
 
     with open(args.json_file, 'r', encoding='utf-8') as f:
         jdata = json.load(f)
@@ -319,6 +390,12 @@ def cmd_import(args) -> None:
     for entry in records:
         lines = entry.get('lines', []) if isinstance(entry, dict) else entry
         out.extend(encode_record(lines))
+
+    print(f"Import: {len(records)} record(s)")
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
 
     if do_backup and os.path.exists(args.file) and (not args.output or args.output == args.file):
         backup_file(args.file)
@@ -349,8 +426,11 @@ def register_parser(subparsers) -> None:
 
     p_edit = sub.add_parser('edit', help='Edit a record in-place')
     p_edit.add_argument('file', help='TLK file')
-    p_edit.add_argument('--record', type=int, required=True, help='Record index')
-    p_edit.add_argument('--text', required=True, help='New text (use \\n for line breaks)')
+    p_edit.add_argument('--record', type=int, help='Record index (with --text)')
+    p_edit.add_argument('--text', help='New text (use \\n for line breaks, with --record)')
+    p_edit.add_argument('--find', help='Text to find (with --replace)')
+    p_edit.add_argument('--replace', help='Replacement text (with --find)')
+    p_edit.add_argument('--ignore-case', action='store_true', help='Case-insensitive find/replace')
     p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_edit.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
     p_edit.add_argument('--dry-run', action='store_true', help='Show changes without writing')
@@ -367,6 +447,7 @@ def register_parser(subparsers) -> None:
     p_import.add_argument('json_file', help='JSON file to import')
     p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_import.add_argument('--dry-run', action='store_true', help='Show changes without writing')
 
 
 def dispatch(args) -> None:
@@ -409,8 +490,11 @@ def main() -> None:
 
     p_edit = sub.add_parser('edit', help='Edit a record in-place')
     p_edit.add_argument('file', help='TLK file')
-    p_edit.add_argument('--record', type=int, required=True)
-    p_edit.add_argument('--text', required=True)
+    p_edit.add_argument('--record', type=int)
+    p_edit.add_argument('--text')
+    p_edit.add_argument('--find')
+    p_edit.add_argument('--replace')
+    p_edit.add_argument('--ignore-case', action='store_true')
     p_edit.add_argument('--output', '-o')
     p_edit.add_argument('--backup', action='store_true')
     p_edit.add_argument('--dry-run', action='store_true')
@@ -427,6 +511,7 @@ def main() -> None:
     p_import.add_argument('json_file', help='JSON file to import')
     p_import.add_argument('--output', '-o')
     p_import.add_argument('--backup', action='store_true')
+    p_import.add_argument('--dry-run', action='store_true')
 
     args = parser.parse_args()
     dispatch(args)

@@ -129,17 +129,63 @@ def cmd_view(args) -> None:
         print()
 
 
+def _has_cli_edit_args(args) -> bool:
+    """Check if any CLI editing flags were provided."""
+    return getattr(args, 'tile', None) is not None
+
+
 def cmd_edit(args) -> None:
-    """Launch TUI special location editor."""
-    from .tui import require_prompt_toolkit
-    require_prompt_toolkit()
-    from .tui.special_editor import SpecialEditor
+    """Edit a special location via CLI args or TUI fallback."""
+    if not _has_cli_edit_args(args):
+        # No CLI args — launch TUI editor
+        from .tui import require_prompt_toolkit
+        require_prompt_toolkit()
+        from .tui.special_editor import SpecialEditor
 
+        with open(args.file, 'rb') as f:
+            data = f.read()
+
+        editor = SpecialEditor(args.file, data)
+        editor.run()
+        return
+
+    # CLI editing mode
     with open(args.file, 'rb') as f:
-        data = f.read()
+        data = bytearray(f.read())
+    dry_run = getattr(args, 'dry_run', False)
+    do_backup = getattr(args, 'backup', False)
+    changes = 0
 
-    editor = SpecialEditor(args.file, data)
-    editor.run()
+    # --tile X Y VALUE
+    if getattr(args, 'tile', None) is not None:
+        tx, ty, tval = args.tile
+        if not (0 <= tx < SPECIAL_MAP_WIDTH and 0 <= ty < SPECIAL_MAP_HEIGHT):
+            print(f"Error: tile ({tx}, {ty}) out of bounds (0-{SPECIAL_MAP_WIDTH - 1})",
+                  file=sys.stderr)
+            sys.exit(1)
+        if not (0 <= tval <= 255):
+            print(f"Error: tile value {tval} out of range (0-255)", file=sys.stderr)
+            sys.exit(1)
+        offset = ty * SPECIAL_MAP_WIDTH + tx
+        old_val = data[offset]
+        data[offset] = tval
+        print(f"Tile ({tx}, {ty}): ${old_val:02X} -> ${tval:02X}")
+        changes += 1
+
+    if changes == 0:
+        print("No changes specified.")
+        return
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
+
+    output = getattr(args, 'output', None) or args.file
+    if do_backup and (not getattr(args, 'output', None) or args.output == args.file):
+        backup_file(args.file)
+    with open(output, 'wb') as f:
+        f.write(data)
+    print(f"Saved to {output}")
 
 
 def cmd_import(args) -> None:
@@ -147,16 +193,21 @@ def cmd_import(args) -> None:
     with open(args.file, 'rb') as f:
         data = bytearray(f.read())
     do_backup = getattr(args, 'backup', False)
+    dry_run = getattr(args, 'dry_run', False)
 
     with open(args.json_file, 'r', encoding='utf-8') as f:
         jdata = json.load(f)
 
+    tile_changes = 0
     tiles = jdata.get('tiles', [])
     for y, row in enumerate(tiles[:SPECIAL_MAP_HEIGHT]):
         for x, ch in enumerate(row[:SPECIAL_MAP_WIDTH]):
             offset = y * SPECIAL_MAP_WIDTH + x
             if offset < len(data):
-                data[offset] = TILE_CHARS_REVERSE.get(ch, 0x20)
+                new_val = TILE_CHARS_REVERSE.get(ch, 0x20)
+                if data[offset] != new_val:
+                    tile_changes += 1
+                data[offset] = new_val
 
     # Import trailing padding bytes (accept both old and new key)
     trailing = jdata.get('trailing_bytes', jdata.get('metadata', []))
@@ -165,12 +216,25 @@ def cmd_import(args) -> None:
         if off < len(data):
             data[off] = b
 
+    print(f"Import: {tile_changes} tile(s) changed")
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
+
     output = args.output if args.output else args.file
     if do_backup and (not args.output or args.output == args.file):
         backup_file(args.file)
     with open(output, 'wb') as f:
         f.write(data)
     print(f"Imported special map to {output}")
+
+
+def _add_special_write_args(p) -> None:
+    """Add common write arguments for special edit commands."""
+    p.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p.add_argument('--dry-run', action='store_true', help='Show changes without writing')
 
 
 def register_parser(subparsers) -> None:
@@ -182,14 +246,18 @@ def register_parser(subparsers) -> None:
     p_view.add_argument('--json', action='store_true', help='Output as JSON')
     p_view.add_argument('--output', '-o', help='Output file (for --json)')
 
-    p_edit = sub.add_parser('edit', help='Edit a special location (TUI)')
+    p_edit = sub.add_parser('edit', help='Edit a special location (CLI or TUI)')
     p_edit.add_argument('file', help='Special location file path')
+    p_edit.add_argument('--tile', type=int, nargs=3, metavar=('X', 'Y', 'VALUE'),
+                        help='Set tile at (X, Y) to VALUE')
+    _add_special_write_args(p_edit)
 
     p_import = sub.add_parser('import', help='Import special map from JSON')
     p_import.add_argument('file', help='Special location file path')
     p_import.add_argument('json_file', help='JSON file to import')
     p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_import.add_argument('--dry-run', action='store_true', help='Show changes without writing')
 
 
 def dispatch(args) -> None:

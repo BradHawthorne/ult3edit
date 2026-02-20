@@ -88,9 +88,9 @@ u3edit disk list game.po
 | `bestiary` | Monster bestiary viewer/editor | `view`, `dump`, `edit`, `import` |
 | `map` | Overworld, town, and dungeon map viewer/editor | `view`, `overview`, `legend`, `set`, `fill`, `replace`, `find`, `import` |
 | `tlk` | NPC dialog viewer/editor | `view`, `extract`, `build`, `edit`, `search`, `import` |
-| `combat` | Combat battlefield viewer | `view`, `edit`, `import` |
+| `combat` | Combat battlefield viewer/editor | `view`, `edit`, `import` |
 | `save` | Save state viewer/editor | `view`, `edit`, `import` |
-| `special` | Special location viewer (shrines, fountains) | `view`, `edit`, `import` |
+| `special` | Special location viewer/editor (shrines, fountains) | `view`, `edit`, `import` |
 | `text` | Game text string viewer | `view`, `edit`, `import` |
 | `spell` | Spell reference (wizard + cleric) | `view` |
 | `equip` | Equipment stats and class restrictions | `view` |
@@ -149,6 +149,29 @@ u3edit map find MAPA#061000 --tile 0x18
 u3edit map set MAPM#061000 --x 5 --y 5 --tile 0x02 --level 3
 ```
 
+## Editing Combat Battlefields
+
+```bash
+# Set a tile in a combat map
+u3edit combat edit CONA#069900 --tile 5 5 0x04
+
+# Move monster 0 start position
+u3edit combat edit CONA#069900 --monster-pos 0 7 3
+
+# Move PC 0 start position
+u3edit combat edit CONA#069900 --pc-pos 0 2 8
+
+# Validate combat map for issues
+u3edit combat view CONA#069900 --validate
+```
+
+## Editing Special Locations
+
+```bash
+# Set a tile in a special location (shrine, fountain, etc.)
+u3edit special edit SHRN#069900 --tile 5 5 0x8C
+```
+
 ## Searching Dialog
 
 ```bash
@@ -160,6 +183,19 @@ u3edit tlk search path/to/GAME/ "exo.*us" --regex
 
 # Export search results as JSON
 u3edit tlk search path/to/GAME/ "mark" --json -o results.json
+```
+
+## Find and Replace in Dialog
+
+```bash
+# Replace text across all records in a TLK file
+u3edit tlk edit TLKA#060000 --find "EXODUS" --replace "DARKNESS"
+
+# Case-insensitive find and replace
+u3edit tlk edit TLKA#060000 --find "exodus" --replace "DARKNESS" --ignore-case
+
+# Preview replacements without writing
+u3edit tlk edit TLKA#060000 --find "EXODUS" --replace "DARKNESS" --dry-run
 ```
 
 ## Editing Save State
@@ -197,8 +233,11 @@ u3edit roster edit ROST#069500 --slot 0 --hp 9999 --dry-run
 # Create a .bak backup before overwriting
 u3edit roster edit ROST#069500 --slot 0 --hp 9999 --backup
 
-# Validate character data integrity
+# Validate data integrity (roster, bestiary, save, combat)
 u3edit roster view ROST#069500 --validate
+u3edit bestiary view MONA#069900 --validate
+u3edit save view path/to/GAME/ --validate
+u3edit combat view CONA#069900 --validate
 ```
 
 `--backup` and `--dry-run` are available on all edit and import commands.
@@ -344,7 +383,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-494 tests covering all modules with synthesized game data (no real game files needed).
+552 tests covering all modules with synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 

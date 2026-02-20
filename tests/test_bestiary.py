@@ -7,6 +7,7 @@ import pytest
 
 from u3edit.bestiary import (
     Monster, load_mon_file, save_mon_file, cmd_edit, cmd_import, _apply_edits,
+    validate_monster,
 )
 from u3edit.constants import (
     MON_FILE_SIZE, MON_MONSTERS_PER_FILE,
@@ -428,3 +429,38 @@ def load_mon_file_from_bytes(data: bytes):
             attrs.append(data[offset] if offset < len(data) else 0)
         monsters.append(Monster(attrs, i))
     return monsters
+
+
+class TestValidateMonster:
+    def test_valid_monster(self, sample_mon_bytes):
+        """Valid monsters should produce no warnings."""
+        monsters = load_mon_file_from_bytes(sample_mon_bytes)
+        # Monster 0 has tile 0x48 which should be in MONSTER_NAMES
+        warnings = validate_monster(monsters[0])
+        assert warnings == []
+
+    def test_empty_monster_no_warnings(self):
+        """Empty monster should produce no warnings."""
+        m = Monster([0] * 10, 0)
+        assert validate_monster(m) == []
+
+    def test_unknown_tile(self):
+        """Unknown tile ID should warn."""
+        attrs = [0xE8, 0xE8, 0, 0, 50, 30, 20, 10, 0, 0]  # 0xE8 not in MONSTER_NAMES or TILES
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert any('Unknown tile' in w for w in warnings)
+
+    def test_tile_mismatch(self):
+        """tile1 != tile2 should warn."""
+        attrs = [0x48, 0x64, 0, 0, 50, 30, 20, 10, 0, 0]
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert any('mismatch' in w for w in warnings)
+
+    def test_undefined_ability_bits(self):
+        """Undefined ability1 bits should warn."""
+        attrs = [0x48, 0x48, 0, 0, 50, 30, 20, 10, 0x10, 0]  # bit 4 undefined
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert any('ability1' in w for w in warnings)

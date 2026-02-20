@@ -160,6 +160,24 @@ class TestRosterImport:
         assert chars2[0].strength == 10
         assert chars2[0].dexterity == 20
 
+    def test_import_dry_run(self, tmp_dir, sample_roster_file):
+        """Import with --dry-run should not write changes."""
+        import types
+        with open(sample_roster_file, 'rb') as f:
+            original = f.read()
+        roster_json = [{'slot': 0, 'name': 'WIZARD', 'stats': {'str': 99}}]
+        json_path = os.path.join(tmp_dir, 'roster.json')
+        with open(json_path, 'w') as f:
+            json.dump(roster_json, f)
+        args = types.SimpleNamespace(
+            file=sample_roster_file, json_file=json_path,
+            output=None, backup=False, dry_run=True,
+        )
+        cmd_import(args)
+        with open(sample_roster_file, 'rb') as f:
+            after = f.read()
+        assert original == after
+
 
 # =============================================================================
 # Bestiary import
@@ -182,6 +200,28 @@ class TestBestiaryImport:
         monsters2 = load_mon_file(path)
         assert monsters2[0].hp == 99
         assert monsters2[0].attack == 50
+
+    def test_import_dry_run(self, tmp_dir, sample_mon_bytes):
+        """Import with --dry-run should not write changes."""
+        import types
+        from u3edit.bestiary import cmd_import as bestiary_import
+        path = os.path.join(tmp_dir, 'MONA')
+        with open(path, 'wb') as f:
+            f.write(sample_mon_bytes)
+        with open(path, 'rb') as f:
+            original = f.read()
+        mon_json = [{'index': 0, 'hp': 255, 'attack': 255}]
+        json_path = os.path.join(tmp_dir, 'monsters.json')
+        with open(json_path, 'w') as f:
+            json.dump(mon_json, f)
+        args = types.SimpleNamespace(
+            file=path, json_file=json_path,
+            output=None, backup=False, dry_run=True,
+        )
+        bestiary_import(args)
+        with open(path, 'rb') as f:
+            after = f.read()
+        assert original == after
 
 
 # =============================================================================
@@ -255,6 +295,31 @@ class TestMapFind:
     def test_find_town(self, sample_overworld_bytes):
         # Town at (10, 10)
         assert sample_overworld_bytes[10 * 64 + 10] == 0x18
+
+
+class TestMapImportDryRun:
+    def test_import_dry_run(self, tmp_dir, sample_overworld_bytes):
+        """Map import with --dry-run should not write changes."""
+        import types
+        from u3edit.map import cmd_import as map_import
+        path = os.path.join(tmp_dir, 'MAPA')
+        with open(path, 'wb') as f:
+            f.write(sample_overworld_bytes)
+        with open(path, 'rb') as f:
+            original = f.read()
+        # All-water map
+        map_json = {'tiles': [['~' for _ in range(64)] for _ in range(64)], 'width': 64}
+        json_path = os.path.join(tmp_dir, 'map.json')
+        with open(json_path, 'w') as f:
+            json.dump(map_json, f)
+        args = types.SimpleNamespace(
+            file=path, json_file=json_path,
+            output=None, backup=False, dry_run=True,
+        )
+        map_import(args)
+        with open(path, 'rb') as f:
+            after = f.read()
+        assert original == after
 
 
 # =============================================================================

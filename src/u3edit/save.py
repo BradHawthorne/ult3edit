@@ -114,6 +114,43 @@ class PartyState:
         print(f"  Roster slots:  {self.slot_ids}")
 
 
+def validate_party_state(party: PartyState) -> list[str]:
+    """Check party state for data integrity issues.
+
+    Returns a list of warning strings (empty if valid).
+    """
+    warnings = []
+
+    # Transport should be a known value
+    if party.raw[PRTY_OFF_TRANSPORT] not in PRTY_TRANSPORT:
+        warnings.append(f"Unknown transport code: ${party.raw[PRTY_OFF_TRANSPORT]:02X}")
+
+    # Party size 0-4
+    if party.party_size > 4:
+        warnings.append(f"Party size {party.party_size} exceeds maximum 4")
+
+    # Location type should be known
+    if party.raw[PRTY_OFF_LOCATION] not in PRTY_LOCATION_TYPE:
+        warnings.append(f"Unknown location type: ${party.raw[PRTY_OFF_LOCATION]:02X}")
+
+    # Coordinates should be in map bounds (0-63)
+    if party.x > 63:
+        warnings.append(f"X coordinate {party.x} out of bounds (0-63)")
+    if party.y > 63:
+        warnings.append(f"Y coordinate {party.y} out of bounds (0-63)")
+
+    # Sentinel should be $FF for active party
+    if party.sentinel != 0xFF and party.sentinel != 0x00:
+        warnings.append(f"Unexpected sentinel: ${party.sentinel:02X} (expected $FF or $00)")
+
+    # Slot IDs should be valid roster indices (0-19)
+    for i, sid in enumerate(party.slot_ids[:party.party_size]):
+        if sid > 19:
+            warnings.append(f"Slot {i} references invalid roster index {sid} (max 19)")
+
+    return warnings
+
+
 def cmd_view(args) -> None:
     game_dir = args.game_dir
 
@@ -136,9 +173,14 @@ def cmd_view(args) -> None:
             offset = i * CHAR_RECORD_SIZE
             active_chars.append(Character(plrs_data[offset:offset + CHAR_RECORD_SIZE]))
 
+    do_validate = getattr(args, 'validate', False)
+
     if args.json:
+        party_dict = party.to_dict()
+        if do_validate:
+            party_dict['warnings'] = validate_party_state(party)
         result = {
-            'party': party.to_dict(),
+            'party': party_dict,
             'active_characters': [c.to_dict() for c in active_chars if not c.is_empty],
         }
         export_json(result, args.output)
@@ -147,6 +189,9 @@ def cmd_view(args) -> None:
     print(f"\n=== Ultima III Save State ===\n")
     print(f"  --- Party Info (PRTY) ---")
     party.display()
+    if do_validate:
+        for w in validate_party_state(party):
+            print(f"  WARNING: {w}", file=sys.stderr)
 
     if active_chars:
         print(f"\n  --- Active Characters (PLRS) ---\n")
@@ -342,6 +387,7 @@ def register_parser(subparsers) -> None:
     p_view.add_argument('--brief', action='store_true', help='Skip overworld map')
     p_view.add_argument('--json', action='store_true', help='Output as JSON')
     p_view.add_argument('--output', '-o', help='Output file (for --json)')
+    p_view.add_argument('--validate', action='store_true', help='Check data integrity')
 
     p_edit = sub.add_parser('edit', help='Edit party state')
     p_edit.add_argument('game_dir', help='GAME directory')

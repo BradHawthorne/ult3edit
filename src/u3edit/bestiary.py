@@ -131,6 +131,40 @@ class Monster:
             print()
 
 
+def validate_monster(monster: Monster) -> list[str]:
+    """Check a monster for data integrity issues.
+
+    Returns a list of warning strings (empty if valid).
+    """
+    warnings = []
+    if monster.is_empty:
+        return warnings
+
+    # Tile ID should be a valid monster tile
+    if monster.tile1 not in MONSTER_NAMES and (monster.tile1 & 0xFC) not in TILES:
+        warnings.append(f"Unknown tile ID ${monster.tile1:02X}")
+
+    # Tile1 and tile2 should typically match (animation pair)
+    if monster.tile1 != monster.tile2 and monster.tile2 != 0:
+        warnings.append(f"Tile mismatch: tile1=${monster.tile1:02X} tile2=${monster.tile2:02X}")
+
+    # Flags1 bits 2-3 encode mutually exclusive types — check defined bits only
+    # Defined bits in flags1: 0x04 (undead), 0x08 (ranged), 0x0C (magic), 0x80 (boss)
+    defined_flag1_bits = MON_FLAG1_UNDEAD | MON_FLAG1_RANGED | MON_FLAG1_BOSS
+    undefined_flag1 = monster.flags1 & ~(defined_flag1_bits | 0x0C)
+    if undefined_flag1:
+        warnings.append(f"Undefined flag1 bits: ${undefined_flag1:02X}")
+
+    # Ability1 defined bits
+    defined_abil1 = (MON_ABIL1_POISON | MON_ABIL1_SLEEP | MON_ABIL1_NEGATE
+                     | MON_ABIL1_TELEPORT | MON_ABIL1_DIVIDE)
+    undefined_abil1 = monster.ability1 & ~defined_abil1
+    if undefined_abil1:
+        warnings.append(f"Undefined ability1 bits: ${undefined_abil1:02X}")
+
+    return warnings
+
+
 def load_mon_file(path: str, file_letter: str = '') -> list[Monster]:
     """Load a MON file and extract 16 monsters from columnar format."""
     with open(path, 'rb') as f:
@@ -167,6 +201,7 @@ def save_mon_file(path: str, monsters: list[Monster],
 
 def cmd_view(args) -> None:
     game_dir = args.game_dir
+    do_validate = getattr(args, 'validate', False)
 
     mon_files = []
     for letter in MON_LETTERS:
@@ -184,9 +219,17 @@ def cmd_view(args) -> None:
             if args.file and args.file.upper() != f'MON{letter}':
                 continue
             monsters = load_mon_file(path, letter)
+            mon_dicts = []
+            for m in monsters:
+                if m.is_empty:
+                    continue
+                d = m.to_dict()
+                if do_validate:
+                    d['warnings'] = validate_monster(m)
+                mon_dicts.append(d)
             result[f'MON{letter}'] = {
                 'terrain': MON_TERRAIN.get(letter, 'Unknown'),
-                'monsters': [m.to_dict() for m in monsters if not m.is_empty],
+                'monsters': mon_dicts,
             }
         export_json(result, args.output)
         return
@@ -210,6 +253,9 @@ def cmd_view(args) -> None:
         for m in monsters:
             if not m.is_empty:
                 m.display(compact=True)
+                if do_validate:
+                    for w in validate_monster(m):
+                        print(f"      WARNING: {w}", file=sys.stderr)
         print()
 
     if not args.file:
@@ -369,6 +415,7 @@ def cmd_import(args) -> None:
         original_data = f.read()
     monsters = load_mon_file(args.file)
     do_backup = getattr(args, 'backup', False)
+    dry_run = getattr(args, 'dry_run', False)
 
     with open(args.json_file, 'r', encoding='utf-8') as f:
         data = json.load(f)
@@ -386,6 +433,12 @@ def cmd_import(args) -> None:
             if attr in entry:
                 setattr(m, attr, max(0, min(255, entry[attr])))
         count += 1
+
+    print(f"Import: {count} monster(s) to update")
+
+    if dry_run:
+        print("Dry run - no changes written.")
+        return
 
     output = args.output if args.output else args.file
     if do_backup and (not args.output or args.output == args.file):
@@ -446,6 +499,7 @@ def register_parser(subparsers) -> None:
     p_view.add_argument('--file', help='Show only specific MON file (e.g., MONA)')
     p_view.add_argument('--json', action='store_true', help='Output as JSON')
     p_view.add_argument('--output', '-o', help='Output file (for --json)')
+    p_view.add_argument('--validate', action='store_true', help='Check data integrity')
 
     p_dump = sub.add_parser('dump', help='Raw dump of a MON file')
     p_dump.add_argument('file', help='MON file path')
@@ -466,6 +520,7 @@ def register_parser(subparsers) -> None:
     p_import.add_argument('json_file', help='JSON file to import')
     p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_import.add_argument('--dry-run', action='store_true', help='Show changes without writing')
 
 
 def dispatch(args) -> None:
@@ -513,6 +568,7 @@ def main() -> None:
     p_import.add_argument('json_file', help='JSON file to import')
     p_import.add_argument('--output', '-o')
     p_import.add_argument('--backup', action='store_true')
+    p_import.add_argument('--dry-run', action='store_true')
 
     args = parser.parse_args()
     dispatch(args)

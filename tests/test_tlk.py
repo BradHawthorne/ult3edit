@@ -89,6 +89,148 @@ class TestCmdEdit:
         assert records[0] == ['HELLO ADVENTURER']  # Other record preserved
 
 
+class TestCmdFindReplace:
+    """Tests for --find/--replace search-and-replace mode."""
+
+    def test_single_replacement(self, sample_tlk_file, tmp_dir):
+        """Replace a word in one record."""
+        out = os.path.join(tmp_dir, 'TLKA_OUT')
+        args = argparse.Namespace(
+            file=sample_tlk_file, record=None, text=None,
+            find='HELLO', replace='GREETINGS',
+            ignore_case=False, output=out, backup=False, dry_run=False,
+        )
+        cmd_edit(args)
+        records = load_tlk_records(out)
+        assert records[0] == ['GREETINGS ADVENTURER']
+        assert records[1] == ['WELCOME', 'TO MY SHOP']  # Unchanged
+
+    def test_multiple_records(self, tmp_dir):
+        """Replace text that appears in multiple records."""
+        # Build TLK with "THE" in two records
+        rec0 = encode_record(['THE CASTLE'])
+        rec1 = encode_record(['THE DUNGEON'])
+        path = os.path.join(tmp_dir, 'TLK_MULTI')
+        with open(path, 'wb') as f:
+            f.write(rec0 + rec1)
+        out = os.path.join(tmp_dir, 'TLK_MULTI_OUT')
+        args = argparse.Namespace(
+            file=path, record=None, text=None,
+            find='THE', replace='A',
+            ignore_case=False, output=out, backup=False, dry_run=False,
+        )
+        cmd_edit(args)
+        records = load_tlk_records(out)
+        assert records[0] == ['A CASTLE']
+        assert records[1] == ['A DUNGEON']
+
+    def test_no_match(self, sample_tlk_file, tmp_dir):
+        """No matches should leave file unchanged."""
+        with open(sample_tlk_file, 'rb') as f:
+            original = f.read()
+        out = os.path.join(tmp_dir, 'TLKA_OUT')
+        args = argparse.Namespace(
+            file=sample_tlk_file, record=None, text=None,
+            find='ZZZZZ', replace='AAAAA',
+            ignore_case=False, output=out, backup=False, dry_run=False,
+        )
+        cmd_edit(args)
+        # No output written when zero replacements
+        assert not os.path.exists(out)
+
+    def test_dry_run(self, sample_tlk_file):
+        """Dry run should not write changes."""
+        with open(sample_tlk_file, 'rb') as f:
+            original = f.read()
+        args = argparse.Namespace(
+            file=sample_tlk_file, record=None, text=None,
+            find='HELLO', replace='GOODBYE',
+            ignore_case=False, output=None, backup=False, dry_run=True,
+        )
+        cmd_edit(args)
+        with open(sample_tlk_file, 'rb') as f:
+            after = f.read()
+        assert original == after
+
+    def test_case_sensitive_default(self, sample_tlk_file, tmp_dir):
+        """Default is case-sensitive: 'hello' should not match 'HELLO'."""
+        with open(sample_tlk_file, 'rb') as f:
+            original = f.read()
+        out = os.path.join(tmp_dir, 'TLKA_OUT')
+        args = argparse.Namespace(
+            file=sample_tlk_file, record=None, text=None,
+            find='hello', replace='goodbye',
+            ignore_case=False, output=out, backup=False, dry_run=False,
+        )
+        cmd_edit(args)
+        # No match, no output
+        assert not os.path.exists(out)
+
+    def test_ignore_case(self, sample_tlk_file, tmp_dir):
+        """--ignore-case should match regardless of case."""
+        out = os.path.join(tmp_dir, 'TLKA_OUT')
+        args = argparse.Namespace(
+            file=sample_tlk_file, record=None, text=None,
+            find='hello', replace='GOODBYE',
+            ignore_case=True, output=out, backup=False, dry_run=False,
+        )
+        cmd_edit(args)
+        records = load_tlk_records(out)
+        assert records[0] == ['GOODBYE ADVENTURER']
+
+    def test_multiple_occurrences_in_line(self, tmp_dir):
+        """Multiple occurrences in a single line should all be replaced."""
+        rec = encode_record(['GO GO GO'])
+        path = os.path.join(tmp_dir, 'TLK_REPEAT')
+        with open(path, 'wb') as f:
+            f.write(rec)
+        out = os.path.join(tmp_dir, 'TLK_REPEAT_OUT')
+        args = argparse.Namespace(
+            file=path, record=None, text=None,
+            find='GO', replace='STOP',
+            ignore_case=False, output=out, backup=False, dry_run=False,
+        )
+        cmd_edit(args)
+        records = load_tlk_records(out)
+        assert records[0] == ['STOP STOP STOP']
+
+    def test_multiline_record(self, sample_tlk_file, tmp_dir):
+        """Replace in a multi-line record."""
+        out = os.path.join(tmp_dir, 'TLKA_OUT')
+        args = argparse.Namespace(
+            file=sample_tlk_file, record=None, text=None,
+            find='MY', replace='THE',
+            ignore_case=False, output=out, backup=False, dry_run=False,
+        )
+        cmd_edit(args)
+        records = load_tlk_records(out)
+        assert records[1] == ['WELCOME', 'TO THE SHOP']
+
+    def test_backup(self, sample_tlk_file):
+        """--backup should create .bak before overwriting."""
+        args = argparse.Namespace(
+            file=sample_tlk_file, record=None, text=None,
+            find='HELLO', replace='GOODBYE',
+            ignore_case=False, output=None, backup=True, dry_run=False,
+        )
+        cmd_edit(args)
+        assert os.path.exists(sample_tlk_file + '.bak')
+        records = load_tlk_records(sample_tlk_file)
+        assert records[0] == ['GOODBYE ADVENTURER']
+
+    def test_empty_replacement(self, sample_tlk_file, tmp_dir):
+        """Replacing with empty string should delete the matched text."""
+        out = os.path.join(tmp_dir, 'TLKA_OUT')
+        args = argparse.Namespace(
+            file=sample_tlk_file, record=None, text=None,
+            find='HELLO ', replace='',
+            ignore_case=False, output=out, backup=False, dry_run=False,
+        )
+        cmd_edit(args)
+        records = load_tlk_records(out)
+        assert records[0] == ['ADVENTURER']
+
+
 class TestBinaryPreservation:
     """Tests that binary (non-text) records are preserved during editing."""
 
