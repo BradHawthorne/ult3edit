@@ -79,7 +79,8 @@ class TestCLI:
         )
         assert result.returncode == 0
         for cmd in ['roster', 'bestiary', 'map', 'tlk', 'combat',
-                     'save', 'special', 'text', 'spell', 'equip', 'disk', 'edit']:
+                     'save', 'special', 'text', 'spell', 'equip', 'disk',
+                     'shapes', 'sound', 'patch', 'ddrw', 'diff', 'edit']:
             assert cmd in result.stdout, f"Missing subcommand '{cmd}' in help"
 
     def test_edit_missing_image(self):

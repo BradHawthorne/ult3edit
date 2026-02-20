@@ -294,12 +294,12 @@ if [ -f "$ULT3" ]; then
     u3edit patch edit "$ULT3" --region name-table --data "$NAMETABLE_HEX" --backup
 
     # Relocate moongates to form a protective ring around the void
-    # 8 phases with new X coordinates
+    # 8 phases with new X coordinates (decimal 10,20,30,40,50,30,20,10)
     u3edit patch edit "$ULT3" --region moongate-x \
-        --data "10 20 30 40 50 30 20 10"
-    # 8 phases with new Y coordinates
+        --data "0A 14 1E 28 32 1E 14 0A"
+    # 8 phases with new Y coordinates (decimal 10,10,10,30,50,50,50,30)
     u3edit patch edit "$ULT3" --region moongate-y \
-        --data "10 10 10 30 50 50 50 30"
+        --data "0A 0A 0A 1E 32 32 32 1E"
 
     # Increase food depletion rate (harsher survival: $02 = twice as fast)
     u3edit patch edit "$ULT3" --region food-rate --data "02"
