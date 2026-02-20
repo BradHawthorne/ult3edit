@@ -3277,3 +3277,257 @@ class TestRosterCreateExtendedArgs:
         assert '--gold' in result.stdout
         assert '--food' in result.stdout
         assert '--in-party' in result.stdout
+
+
+# =============================================================================
+# Functional tests for cmd_edit_string (shapes) and cmd_search (tlk)
+# =============================================================================
+
+class TestCmdEditStringFunctional:
+    """Functional tests for shapes edit-string on synthesized SHP overlay."""
+
+    def _make_shp_overlay(self):
+        """Create a synthetic SHP overlay with a JSR $46BA inline string."""
+        data = bytearray(256)
+        # Put JSR $46BA at offset 10
+        data[10] = 0x20  # JSR
+        data[11] = 0xBA
+        data[12] = 0x46
+        # Inline high-ASCII string "HELLO" + null terminator at offset 13
+        hello = [0xC8, 0xC5, 0xCC, 0xCC, 0xCF, 0x00]
+        data[13:13 + len(hello)] = hello
+        # Another JSR $46BA at offset 30
+        data[30] = 0x20
+        data[31] = 0xBA
+        data[32] = 0x46
+        # Inline "BYE" + null at offset 33
+        bye = [0xC2, 0xD9, 0xC5, 0x00]
+        data[33:33 + len(bye)] = bye
+        return data
+
+    def test_edit_string_replaces_text(self, tmp_path):
+        from u3edit.shapes import cmd_edit_string
+        data = self._make_shp_overlay()
+        path = str(tmp_path / 'SHP0')
+        with open(path, 'wb') as f:
+            f.write(data)
+
+        args = type('Args', (), {
+            'file': path,
+            'offset': 13,  # text_offset of "HELLO"
+            'text': 'HI',
+            'output': None,
+            'backup': False,
+            'dry_run': False,
+        })()
+        cmd_edit_string(args)
+
+        with open(path, 'rb') as f:
+            result = f.read()
+        # "HI" encoded as high-ASCII: 0xC8 0xC9 + null
+        assert result[13] == 0xC8  # H
+        assert result[14] == 0xC9  # I
+        assert result[15] == 0x00  # null terminator
+        # Remaining bytes null-padded
+        assert result[16] == 0x00
+        assert result[17] == 0x00
+
+    def test_edit_string_dry_run(self, tmp_path):
+        from u3edit.shapes import cmd_edit_string
+        data = self._make_shp_overlay()
+        path = str(tmp_path / 'SHP0')
+        with open(path, 'wb') as f:
+            f.write(data)
+
+        args = type('Args', (), {
+            'file': path,
+            'offset': 13,
+            'text': 'HI',
+            'output': None,
+            'backup': False,
+            'dry_run': True,
+        })()
+        cmd_edit_string(args)
+
+        # File unchanged
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[13] == 0xC8  # Still 'H' from HELLO
+        assert result[14] == 0xC5  # Still 'E' from HELLO
+
+    def test_edit_string_output_file(self, tmp_path):
+        from u3edit.shapes import cmd_edit_string
+        data = self._make_shp_overlay()
+        path = str(tmp_path / 'SHP0')
+        out_path = str(tmp_path / 'SHP0_out')
+        with open(path, 'wb') as f:
+            f.write(data)
+
+        args = type('Args', (), {
+            'file': path,
+            'offset': 33,  # text_offset of "BYE"
+            'text': 'NO',
+            'output': out_path,
+            'backup': False,
+            'dry_run': False,
+        })()
+        cmd_edit_string(args)
+
+        # Original unchanged
+        with open(path, 'rb') as f:
+            assert f.read()[33] == 0xC2  # B
+        # Output has new value
+        with open(out_path, 'rb') as f:
+            result = f.read()
+        assert result[33] == 0xCE  # N
+        assert result[34] == 0xCF  # O
+
+    def test_edit_string_bad_offset_exits(self, tmp_path):
+        from u3edit.shapes import cmd_edit_string
+        data = self._make_shp_overlay()
+        path = str(tmp_path / 'SHP0')
+        with open(path, 'wb') as f:
+            f.write(data)
+
+        args = type('Args', (), {
+            'file': path,
+            'offset': 99,  # No string here
+            'text': 'X',
+            'output': None,
+            'backup': False,
+            'dry_run': False,
+        })()
+        with pytest.raises(SystemExit):
+            cmd_edit_string(args)
+
+
+class TestCmdSearchFunctional:
+    """Functional tests for tlk search command."""
+
+    def test_search_single_file(self, tmp_path, sample_tlk_bytes):
+        from u3edit.tlk import cmd_search
+        path = str(tmp_path / 'TLKA')
+        with open(path, 'wb') as f:
+            f.write(sample_tlk_bytes)
+
+        args = type('Args', (), {
+            'path': path,
+            'pattern': 'NAME',
+            'regex': False,
+            'json': False,
+            'output': None,
+        })()
+        # Should not crash; pattern matching depends on fixture content
+        cmd_search(args)
+
+    def test_search_directory(self, tmp_path, sample_tlk_bytes):
+        from u3edit.tlk import cmd_search
+        # Write multiple TLK files
+        for letter in ['A', 'B']:
+            path = str(tmp_path / f'TLK{letter}')
+            with open(path, 'wb') as f:
+                f.write(sample_tlk_bytes)
+
+        args = type('Args', (), {
+            'path': str(tmp_path),
+            'pattern': 'NAME',
+            'regex': False,
+            'json': False,
+            'output': None,
+        })()
+        cmd_search(args)
+
+    def test_search_json_output(self, tmp_path, sample_tlk_bytes):
+        from u3edit.tlk import cmd_search
+        path = str(tmp_path / 'TLKA')
+        with open(path, 'wb') as f:
+            f.write(sample_tlk_bytes)
+
+        json_path = str(tmp_path / 'results.json')
+        args = type('Args', (), {
+            'path': path,
+            'pattern': 'NAME',
+            'regex': False,
+            'json': True,
+            'output': json_path,
+        })()
+        cmd_search(args)
+
+        # Should produce valid JSON
+        with open(json_path, 'r') as f:
+            results = json.load(f)
+        assert isinstance(results, list)
+
+    def test_search_regex(self, tmp_path, sample_tlk_bytes):
+        from u3edit.tlk import cmd_search
+        path = str(tmp_path / 'TLKA')
+        with open(path, 'wb') as f:
+            f.write(sample_tlk_bytes)
+
+        args = type('Args', (), {
+            'path': path,
+            'pattern': 'N.*E',
+            'regex': True,
+            'json': False,
+            'output': None,
+        })()
+        cmd_search(args)
+
+    def test_search_no_matches(self, tmp_path, sample_tlk_bytes):
+        from u3edit.tlk import cmd_search
+        path = str(tmp_path / 'TLKA')
+        with open(path, 'wb') as f:
+            f.write(sample_tlk_bytes)
+
+        args = type('Args', (), {
+            'path': path,
+            'pattern': 'XYZZY_NONEXISTENT',
+            'regex': False,
+            'json': False,
+            'output': None,
+        })()
+        cmd_search(args)  # Should print "No matches" without crashing
+
+
+class TestSaveEditValidate:
+    """Test --validate on save edit command."""
+
+    def test_validate_warns_on_bad_coords(self, tmp_path):
+        from u3edit.save import cmd_edit
+        # Create PRTY file
+        prty = bytearray(16)
+        prty[0] = 0x00  # transport = foot
+        prty[1] = 1     # party_size
+        prty[2] = 0     # location = sosaria
+        prty[3] = 10    # x
+        prty[4] = 10    # y
+        prty[5] = 0xFF  # sentinel
+        prty[6] = 0     # slot 0
+        prty_path = str(tmp_path / 'PRTY')
+        with open(prty_path, 'wb') as f:
+            f.write(prty)
+
+        args = type('Args', (), {
+            'game_dir': str(tmp_path),
+            'transport': None,
+            'x': 99,  # Out of bounds — should trigger warning
+            'y': None,
+            'party_size': None,
+            'slot_ids': None,
+            'sentinel': None,
+            'location': None,
+            'output': None,
+            'backup': False,
+            'dry_run': True,
+            'validate': True,
+            'plrs_slot': None,
+        })()
+        # Should not crash; validation warning printed
+        cmd_edit(args)
+
+    def test_validate_flag_in_help(self):
+        import subprocess
+        result = subprocess.run(
+            ['python', '-m', 'u3edit.save', 'edit', '--help'],
+            capture_output=True, text=True)
+        assert '--validate' in result.stdout

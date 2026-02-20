@@ -347,11 +347,11 @@ Sound files: SOSA (4096 bytes, speaker patterns), SOSM (256 bytes, sound map), M
 # View patchable regions in ULT3 engine binary
 u3edit patch view ULT3#065000
 
-# View a specific region (e.g., tile name strings)
-u3edit patch view ULT3#065000 --region look-text
+# View a specific region (e.g., name table strings)
+u3edit patch view ULT3#065000 --region name-table
 
 # Patch a data region
-u3edit patch edit ULT3#065000 --region look-text --data "D7C1D4C5D200" --backup
+u3edit patch edit ULT3#065000 --region name-table --data "D7C1D4C5D200" --backup
 
 # Raw hex dump of any offset
 u3edit patch dump ULT3#065000 --offset 0x1566 --length 128
@@ -478,7 +478,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-676 tests covering all modules with synthesized game data (no real game files needed).
+687 tests covering all modules with synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 

@@ -400,6 +400,10 @@ def cmd_edit(args) -> None:
         sys.exit(1)
 
     if prty_modified:
+        do_validate = getattr(args, 'validate', False)
+        if do_validate:
+            for w in validate_party_state(party):
+                print(f"  Warning: {w}")
         if dry_run:
             print("Dry run - no changes written.")
             party.display()
@@ -624,6 +628,7 @@ def register_parser(subparsers) -> None:
     p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_edit.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
     p_edit.add_argument('--dry-run', action='store_true', help='Show changes without writing')
+    p_edit.add_argument('--validate', action='store_true', help='Check data integrity after edit')
     _add_plrs_edit_args(p_edit)
 
     p_import = sub.add_parser('import', help='Import save state from JSON')
@@ -676,6 +681,8 @@ def main() -> None:
                         help='Create .bak backup before overwrite')
     p_edit.add_argument('--dry-run', action='store_true',
                         help='Show changes without writing')
+    p_edit.add_argument('--validate', action='store_true',
+                        help='Check data integrity after edit')
     _add_plrs_edit_args(p_edit)
 
     p_import = sub.add_parser('import', help='Import save state from JSON')
