@@ -42,6 +42,7 @@ u3-shapes = "u3edit.shapes:main"
 u3-sound = "u3edit.sound:main"
 u3-patch = "u3edit.patch:main"
 u3-ddrw = "u3edit.ddrw:main"
+u3-diff = "u3edit.diff:main"
 
 [build-system]
 requires = ["hatchling"]

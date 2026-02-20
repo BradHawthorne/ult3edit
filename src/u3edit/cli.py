@@ -33,6 +33,7 @@ from . import shapes
 from . import sound
 from . import patch
 from . import ddrw
+from . import diff
 
 
 def _cmd_unified_edit(args) -> None:
@@ -87,6 +88,7 @@ def main() -> None:
     sound.register_parser(subparsers)
     patch.register_parser(subparsers)
     ddrw.register_parser(subparsers)
+    diff.register_parser(subparsers)
 
     args = parser.parse_args()
 
@@ -111,6 +113,7 @@ def main() -> None:
         'sound': sound.dispatch,
         'patch': patch.dispatch,
         'ddrw': ddrw.dispatch,
+        'diff': diff.dispatch,
     }
 
     if args.tool == 'edit':

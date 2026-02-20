@@ -11,7 +11,7 @@ u3edit is a data toolkit for Ultima III: Exodus (Apple II, 1983). It provides CL
 ```bash
 pip install -e ".[dev]"              # Install with pytest
 pip install -e ".[tui]"              # Install with prompt_toolkit for TUI editors
-pytest -v                            # Run all 452 tests
+pytest -v                            # Run all 494 tests
 pytest tests/test_roster.py          # Run one test module
 pytest -v tests/test_bcd.py::TestBcdToInt::test_zero  # Run single test
 u3edit roster view path/to/ROST      # CLI usage pattern
@@ -80,6 +80,7 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 - **`map set/fill/replace/find`**: Map CLI editing — set tiles, fill regions, replace tile types, search.
 - **`tlk search`**: Text search across TLK dialog files. Case-insensitive by default, `--regex` for regex patterns.
 - **`roster check-progress`**: Endgame readiness checker — marks, cards, exotic gear, party status.
+- **`diff`**: Compare two game files or directories — text/JSON/summary output, auto-detects file types, supports all data formats (roster, bestiary, combat, save, maps, special, TLK).
 - **`bestiary edit`**: Named flag toggles (`--undead`, `--ranged`, `--magic-user`, `--boss`, `--poison`, `--sleep`, `--negate`, `--teleport`, `--divide`, `--resistant` + `--no-*` counterparts), `--type Name` for monster type by name, `--all` for bulk editing.
 - **`save edit --plrs-slot`**: Edit active characters in PLRS file via save subcommand.
 - **`shapes view/export/edit/import`**: SHPS character set tile graphics — glyph rendering, PNG export (stdlib, no Pillow), HGR color logic, SHP overlay inline string extraction, SHPS embedded code guard at $9F9, TEXT detection as HGR bitmap.
