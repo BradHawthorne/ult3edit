@@ -775,35 +775,42 @@ def main() -> None:
 
     p_view = sub.add_parser('view', help='View tile shapes')
     p_view.add_argument('path', help='SHPS file or GAME directory')
-    p_view.add_argument('--tile', type=int)
-    p_view.add_argument('--json', action='store_true')
-    p_view.add_argument('--output', '-o')
+    p_view.add_argument('--tile', type=int, help='View specific tile ID (hex OK)')
+    p_view.add_argument('--json', action='store_true', help='Output as JSON')
+    p_view.add_argument('--output', '-o', help='Output file (for --json)')
 
     p_export = sub.add_parser('export', help='Export tiles as PNG')
     p_export.add_argument('file', help='SHPS file')
-    p_export.add_argument('--output-dir', default='.')
-    p_export.add_argument('--scale', type=int, default=4)
-    p_export.add_argument('--sheet', action='store_true')
+    p_export.add_argument('--output-dir', default='.', help='Output directory')
+    p_export.add_argument('--scale', type=int, default=4, help='Scale factor')
+    p_export.add_argument('--sheet', action='store_true',
+                          help='Also generate sprite sheet')
 
     p_edit = sub.add_parser('edit', help='Edit a glyph')
     p_edit.add_argument('file', help='SHPS file')
-    p_edit.add_argument('--glyph', type=int, required=True)
-    p_edit.add_argument('--data', required=True)
-    p_edit.add_argument('--output', '-o')
-    p_edit.add_argument('--backup', action='store_true')
-    p_edit.add_argument('--dry-run', action='store_true')
+    p_edit.add_argument('--glyph', type=int, required=True,
+                        help='Glyph index (0-255)')
+    p_edit.add_argument('--data', required=True,
+                        help='New glyph data as hex bytes (8 bytes)')
+    p_edit.add_argument('--output', '-o', help='Output file')
+    p_edit.add_argument('--backup', action='store_true',
+                        help='Create .bak backup before overwrite')
+    p_edit.add_argument('--dry-run', action='store_true',
+                        help='Show changes without writing')
 
     p_import = sub.add_parser('import', help='Import glyphs from JSON')
     p_import.add_argument('file', help='SHPS file')
     p_import.add_argument('json_file', help='JSON file to import')
-    p_import.add_argument('--output', '-o')
-    p_import.add_argument('--backup', action='store_true')
-    p_import.add_argument('--dry-run', action='store_true')
+    p_import.add_argument('--output', '-o', help='Output file')
+    p_import.add_argument('--backup', action='store_true',
+                          help='Create .bak backup before overwrite')
+    p_import.add_argument('--dry-run', action='store_true',
+                          help='Show changes without writing')
 
     p_info = sub.add_parser('info', help='Show file metadata')
     p_info.add_argument('file', help='Shape file')
-    p_info.add_argument('--json', action='store_true')
-    p_info.add_argument('--output', '-o')
+    p_info.add_argument('--json', action='store_true', help='Output as JSON')
+    p_info.add_argument('--output', '-o', help='Output file')
 
     args = parser.parse_args()
     dispatch(args)

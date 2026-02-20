@@ -178,6 +178,118 @@ class TestRosterImport:
             after = f.read()
         assert original == after
 
+    def test_import_equipped_weapon(self, tmp_dir, sample_roster_file):
+        """Import should set equipped weapon by name."""
+        import types
+        roster_json = [{'slot': 0, 'weapon': 'Sword'}]
+        json_path = os.path.join(tmp_dir, 'roster.json')
+        with open(json_path, 'w') as f:
+            json.dump(roster_json, f)
+        args = types.SimpleNamespace(
+            file=sample_roster_file, json_file=json_path,
+            output=None, backup=False, dry_run=False,
+        )
+        cmd_import(args)
+        chars, _ = load_roster(sample_roster_file)
+        assert chars[0].equipped_weapon == 'Sword'
+
+    def test_import_equipped_armor(self, tmp_dir, sample_roster_file):
+        """Import should set equipped armor by name."""
+        import types
+        roster_json = [{'slot': 0, 'armor': 'Chain'}]
+        json_path = os.path.join(tmp_dir, 'roster.json')
+        with open(json_path, 'w') as f:
+            json.dump(roster_json, f)
+        args = types.SimpleNamespace(
+            file=sample_roster_file, json_file=json_path,
+            output=None, backup=False, dry_run=False,
+        )
+        cmd_import(args)
+        chars, _ = load_roster(sample_roster_file)
+        assert chars[0].equipped_armor == 'Chain'
+
+    def test_import_weapon_inventory(self, tmp_dir, sample_roster_file):
+        """Import should set weapon inventory counts by name."""
+        import types
+        roster_json = [{'slot': 0, 'weapons': {'Dagger': 3, 'Sword': 1}}]
+        json_path = os.path.join(tmp_dir, 'roster.json')
+        with open(json_path, 'w') as f:
+            json.dump(roster_json, f)
+        args = types.SimpleNamespace(
+            file=sample_roster_file, json_file=json_path,
+            output=None, backup=False, dry_run=False,
+        )
+        cmd_import(args)
+        chars, _ = load_roster(sample_roster_file)
+        assert chars[0].weapon_inventory.get('Dagger') == 3
+        assert chars[0].weapon_inventory.get('Sword') == 1
+
+    def test_import_armor_inventory(self, tmp_dir, sample_roster_file):
+        """Import should set armor inventory counts by name."""
+        import types
+        roster_json = [{'slot': 0, 'armors': {'Leather': 2, 'Plate': 1}}]
+        json_path = os.path.join(tmp_dir, 'roster.json')
+        with open(json_path, 'w') as f:
+            json.dump(roster_json, f)
+        args = types.SimpleNamespace(
+            file=sample_roster_file, json_file=json_path,
+            output=None, backup=False, dry_run=False,
+        )
+        cmd_import(args)
+        chars, _ = load_roster(sample_roster_file)
+        assert chars[0].armor_inventory.get('Leather') == 2
+        assert chars[0].armor_inventory.get('Plate') == 1
+
+    def test_import_unknown_weapon_skipped(self, tmp_dir, sample_roster_file):
+        """Unknown weapon/armor names should be silently skipped."""
+        import types
+        roster_json = [{'slot': 0, 'weapon': 'Lightsaber', 'armor': 'Mithril'}]
+        json_path = os.path.join(tmp_dir, 'roster.json')
+        with open(json_path, 'w') as f:
+            json.dump(roster_json, f)
+        with open(sample_roster_file, 'rb') as f:
+            original = f.read()
+        args = types.SimpleNamespace(
+            file=sample_roster_file, json_file=json_path,
+            output=None, backup=False, dry_run=False,
+        )
+        cmd_import(args)
+        # File changed (count=1 updates were applied) but weapon/armor unchanged
+        chars, _ = load_roster(sample_roster_file)
+        # Equipped weapon/armor should still be whatever the fixture had
+        assert chars[0].equipped_weapon == 'Hands'  # Default from fixture
+
+    def test_import_equipment_round_trip(self, tmp_dir, sample_roster_file):
+        """Export to_dict → import should preserve equipment data."""
+        import types
+        # First set some equipment
+        chars, original = load_roster(sample_roster_file)
+        chars[0].equipped_weapon = 6  # Sword
+        chars[0].equipped_armor = 3   # Chain
+        chars[0].set_weapon_count(1, 5)  # 5 Daggers
+        chars[0].set_armor_count(2, 3)   # 3 Leather
+        save_roster(sample_roster_file, chars, original)
+        # Export
+        chars, _ = load_roster(sample_roster_file)
+        roster_json = [{'slot': 0, **chars[0].to_dict()}]
+        json_path = os.path.join(tmp_dir, 'roster.json')
+        with open(json_path, 'w') as f:
+            json.dump(roster_json, f)
+        # Import to a copy
+        out_path = os.path.join(tmp_dir, 'ROST_OUT')
+        with open(sample_roster_file, 'rb') as f:
+            open(out_path, 'wb').write(f.read())
+        args = types.SimpleNamespace(
+            file=out_path, json_file=json_path,
+            output=None, backup=False, dry_run=False,
+        )
+        cmd_import(args)
+        chars2, _ = load_roster(out_path)
+        assert chars2[0].equipped_weapon == 'Sword'
+        assert chars2[0].equipped_armor == 'Chain'
+        assert chars2[0].weapon_inventory.get('Dagger') == 5
+        assert chars2[0].armor_inventory.get('Leather') == 3
+
 
 # =============================================================================
 # Bestiary import
@@ -592,6 +704,101 @@ class TestTextImport:
         records2 = load_text_records(path)
         assert records2[0] == 'MODIFIED'
         assert records2[1] == 'TEXT'
+
+
+# =============================================================================
+# Text per-record CLI editing
+# =============================================================================
+
+class TestTextCliEdit:
+    def _write_text(self, tmp_dir, sample_text_bytes):
+        path = os.path.join(tmp_dir, 'TEXT#061000')
+        with open(path, 'wb') as f:
+            f.write(sample_text_bytes)
+        return path
+
+    def test_edit_single_record(self, tmp_dir, sample_text_bytes):
+        """Edit record 0 via CLI."""
+        import types
+        from u3edit.text import cmd_edit
+        path = self._write_text(tmp_dir, sample_text_bytes)
+        out = os.path.join(tmp_dir, 'TEXT_OUT')
+        args = types.SimpleNamespace(
+            file=path, record=0, text='CHANGED',
+            output=out, backup=False, dry_run=False,
+        )
+        cmd_edit(args)
+        records = load_text_records(out)
+        assert records[0] == 'CHANGED'
+        assert records[1] == 'EXODUS'  # Unchanged
+
+    def test_edit_record_out_of_range(self, tmp_dir, sample_text_bytes):
+        """Out-of-range record index should fail."""
+        import types
+        from u3edit.text import cmd_edit
+        path = self._write_text(tmp_dir, sample_text_bytes)
+        args = types.SimpleNamespace(
+            file=path, record=99, text='NOPE',
+            output=None, backup=False, dry_run=False,
+        )
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_edit_dry_run(self, tmp_dir, sample_text_bytes):
+        """Dry run should not write."""
+        import types
+        from u3edit.text import cmd_edit
+        path = self._write_text(tmp_dir, sample_text_bytes)
+        with open(path, 'rb') as f:
+            original = f.read()
+        args = types.SimpleNamespace(
+            file=path, record=0, text='CHANGED',
+            output=None, backup=False, dry_run=True,
+        )
+        cmd_edit(args)
+        with open(path, 'rb') as f:
+            after = f.read()
+        assert original == after
+
+    def test_edit_backup(self, tmp_dir, sample_text_bytes):
+        """Backup should create .bak."""
+        import types
+        from u3edit.text import cmd_edit
+        path = self._write_text(tmp_dir, sample_text_bytes)
+        args = types.SimpleNamespace(
+            file=path, record=0, text='CHANGED',
+            output=None, backup=True, dry_run=False,
+        )
+        cmd_edit(args)
+        assert os.path.exists(path + '.bak')
+
+    def test_edit_output_file(self, tmp_dir, sample_text_bytes):
+        """Output to different file."""
+        import types
+        from u3edit.text import cmd_edit
+        path = self._write_text(tmp_dir, sample_text_bytes)
+        out = os.path.join(tmp_dir, 'TEXT_OUT')
+        args = types.SimpleNamespace(
+            file=path, record=1, text='hello',
+            output=out, backup=False, dry_run=False,
+        )
+        cmd_edit(args)
+        records = load_text_records(out)
+        assert records[1] == 'HELLO'  # Uppercased, fits in 6-char field
+
+    def test_edit_uppercases(self, tmp_dir, sample_text_bytes):
+        """Text should be uppercased to match engine convention."""
+        import types
+        from u3edit.text import cmd_edit
+        path = self._write_text(tmp_dir, sample_text_bytes)
+        out = os.path.join(tmp_dir, 'TEXT_OUT')
+        args = types.SimpleNamespace(
+            file=path, record=0, text='lowercase',
+            output=out, backup=False, dry_run=False,
+        )
+        cmd_edit(args)
+        records = load_text_records(out)
+        assert records[0] == 'LOWERCASE'
 
 
 # =============================================================================
@@ -1052,6 +1259,18 @@ class TestPatch:
         assert info is not None
         assert info['name'] == 'EXOD'
 
+    def test_identify_subs(self):
+        data = bytes(3584)
+        info = identify_binary(data, 'SUBS#064100')
+        assert info is not None
+        assert info['name'] == 'SUBS'
+        assert info['load_addr'] == 0x4100
+
+    def test_subs_no_regions(self):
+        """SUBS is a subroutine library with no patchable data regions."""
+        regions = get_regions('SUBS')
+        assert regions == {}
+
     def test_identify_unknown(self):
         data = bytes(100)
         info = identify_binary(data, 'UNKNOWN')
@@ -1477,3 +1696,202 @@ class TestDiskAudit:
         from u3edit.disk import cmd_audit
         # Just verify it's callable
         assert callable(cmd_audit)
+
+
+# =============================================================================
+# CLI parity tests — main() matches register_parser()
+# =============================================================================
+
+import subprocess
+import sys
+
+
+def _help_output(module: str, subcmd: str) -> str:
+    """Get --help output from a standalone module entry point."""
+    result = subprocess.run(
+        [sys.executable, '-m', f'u3edit.{module}', subcmd, '--help'],
+        capture_output=True, text=True, timeout=10,
+    )
+    return result.stdout + result.stderr
+
+
+class TestCliParity:
+    """Verify standalone main() parsers have full arg parity with register_parser()."""
+
+    def test_roster_main_create_help(self):
+        out = _help_output('roster', 'create')
+        assert '--name' in out
+        assert '--race' in out
+        assert '--force' in out
+        assert 'Overwrite existing' in out
+
+    def test_bestiary_main_validate(self):
+        out = _help_output('bestiary', 'view')
+        assert '--validate' in out
+
+    def test_map_main_set_exists(self):
+        out = _help_output('map', 'set')
+        assert '--tile' in out
+        assert '--x' in out
+        assert '--y' in out
+
+    def test_map_main_import_exists(self):
+        out = _help_output('map', 'import')
+        assert '--backup' in out
+        assert '--dry-run' in out
+
+    def test_map_main_fill_exists(self):
+        out = _help_output('map', 'fill')
+        assert '--x1' in out
+        assert '--tile' in out
+
+    def test_map_main_replace_exists(self):
+        out = _help_output('map', 'replace')
+        assert '--from' in out
+        assert '--to' in out
+
+    def test_map_main_find_exists(self):
+        out = _help_output('map', 'find')
+        assert '--tile' in out
+        assert '--json' in out
+
+    def test_combat_main_edit_exists(self):
+        out = _help_output('combat', 'edit')
+        assert '--tile' in out
+        assert '--monster-pos' in out
+        assert '--pc-pos' in out
+
+    def test_combat_main_import_exists(self):
+        out = _help_output('combat', 'import')
+        assert '--backup' in out
+        assert '--dry-run' in out
+
+    def test_combat_main_validate(self):
+        out = _help_output('combat', 'view')
+        assert '--validate' in out
+
+    def test_special_main_edit_exists(self):
+        out = _help_output('special', 'edit')
+        assert '--tile' in out
+        assert '--backup' in out
+
+    def test_special_main_import_exists(self):
+        out = _help_output('special', 'import')
+        assert '--backup' in out
+        assert '--dry-run' in out
+
+    def test_save_main_validate(self):
+        out = _help_output('save', 'view')
+        assert '--validate' in out
+
+    def test_save_main_import_dryrun(self):
+        out = _help_output('save', 'import')
+        assert '--dry-run' in out
+        assert '--backup' in out
+
+    def test_text_main_import_exists(self):
+        out = _help_output('text', 'import')
+        assert '--backup' in out
+        assert '--dry-run' in out
+
+    def test_tlk_main_edit_help(self):
+        out = _help_output('tlk', 'edit')
+        assert '--find' in out
+        assert '--replace' in out
+        assert '--ignore-case' in out
+
+    def test_spell_main_help(self):
+        out = _help_output('spell', 'view')
+        assert '--wizard-only' in out
+        assert '--cleric-only' in out
+
+    def test_equip_main_help(self):
+        out = _help_output('equip', 'view')
+        assert '--json' in out
+
+    def test_shapes_main_export_help(self):
+        out = _help_output('shapes', 'export')
+        assert '--scale' in out
+        assert '--sheet' in out
+        assert 'Scale factor' in out
+
+    def test_sound_main_import_dryrun(self):
+        out = _help_output('sound', 'import')
+        assert '--dry-run' in out
+        assert '--backup' in out
+
+    def test_patch_main_dump_help(self):
+        out = _help_output('patch', 'dump')
+        assert '--offset' in out
+        assert '--length' in out
+        assert 'Start offset' in out
+
+    def test_ddrw_main_import_dryrun(self):
+        out = _help_output('ddrw', 'import')
+        assert '--dry-run' in out
+        assert '--backup' in out
+
+
+class TestTextImportDryRun:
+    """Behavioral test: text import --dry-run should not write."""
+
+    def test_import_dry_run_no_write(self, tmp_dir):
+        from u3edit.text import cmd_import as text_import
+        import types
+
+        # Build a TEXT file with known content
+        data = bytearray(TEXT_FILE_SIZE)
+        text = 'HELLO'
+        for i, ch in enumerate(text):
+            data[i] = ord(ch) | 0x80
+        data[len(text)] = 0x00
+        text_path = os.path.join(tmp_dir, 'TEXT#061000')
+        with open(text_path, 'wb') as f:
+            f.write(data)
+
+        # Write JSON with different content
+        jdata = [{'text': 'CHANGED'}]
+        json_path = os.path.join(tmp_dir, 'text.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+
+        # Import with dry-run
+        args = types.SimpleNamespace(
+            file=text_path, json_file=json_path,
+            output=None, backup=False, dry_run=True,
+        )
+        text_import(args)
+
+        # Verify file unchanged
+        with open(text_path, 'rb') as f:
+            after = f.read()
+        assert after == bytes(data)
+
+    def test_import_writes_without_dry_run(self, tmp_dir):
+        from u3edit.text import cmd_import as text_import
+        import types
+
+        data = bytearray(TEXT_FILE_SIZE)
+        text = 'HELLO'
+        for i, ch in enumerate(text):
+            data[i] = ord(ch) | 0x80
+        data[len(text)] = 0x00
+        text_path = os.path.join(tmp_dir, 'TEXT#061000')
+        with open(text_path, 'wb') as f:
+            f.write(data)
+
+        jdata = [{'text': 'WORLD'}]
+        json_path = os.path.join(tmp_dir, 'text.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+
+        args = types.SimpleNamespace(
+            file=text_path, json_file=json_path,
+            output=None, backup=False, dry_run=False,
+        )
+        text_import(args)
+
+        with open(text_path, 'rb') as f:
+            after = f.read()
+        # First bytes should now be "WORLD" in high-ASCII
+        assert after[0] == ord('W') | 0x80

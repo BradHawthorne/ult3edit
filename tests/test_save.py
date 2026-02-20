@@ -168,3 +168,132 @@ class TestValidatePartyState:
         party = PartyState(bytes(data))
         warnings = validate_party_state(party)
         assert any('sentinel' in w.lower() for w in warnings)
+
+
+class TestPlrsImport:
+    """Tests for PLRS character import via save cmd_import."""
+
+    def _setup_game_dir(self, tmp_dir, sample_prty_bytes, sample_character_bytes):
+        """Write PRTY and PLRS files to tmp_dir."""
+        from u3edit.constants import CHAR_RECORD_SIZE, PLRS_FILE_SIZE
+        prty_path = os.path.join(tmp_dir, 'PRTY#060000')
+        with open(prty_path, 'wb') as f:
+            f.write(sample_prty_bytes)
+        plrs_data = bytearray(PLRS_FILE_SIZE)
+        for i in range(4):
+            plrs_data[i * CHAR_RECORD_SIZE:(i + 1) * CHAR_RECORD_SIZE] = sample_character_bytes
+        plrs_path = os.path.join(tmp_dir, 'PLRS#060000')
+        with open(plrs_path, 'wb') as f:
+            f.write(plrs_data)
+        return plrs_path
+
+    def test_import_plrs_name(self, tmp_dir, sample_prty_bytes, sample_character_bytes):
+        """Import should update character name in PLRS."""
+        import json, types
+        from u3edit.save import cmd_import as save_import
+        from u3edit.roster import Character
+        from u3edit.constants import CHAR_RECORD_SIZE
+        plrs_path = self._setup_game_dir(tmp_dir, sample_prty_bytes, sample_character_bytes)
+        jdata = {'active_characters': [{'name': 'WIZARD'}]}
+        json_path = os.path.join(tmp_dir, 'save.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = types.SimpleNamespace(
+            game_dir=tmp_dir, json_file=json_path,
+            output=None, backup=False, dry_run=False,
+        )
+        save_import(args)
+        with open(plrs_path, 'rb') as f:
+            result = f.read()
+        char = Character(result[0:CHAR_RECORD_SIZE])
+        assert char.name == 'WIZARD'
+
+    def test_import_plrs_stats(self, tmp_dir, sample_prty_bytes, sample_character_bytes):
+        """Import should update character stats in PLRS."""
+        import json, types
+        from u3edit.save import cmd_import as save_import
+        from u3edit.roster import Character
+        from u3edit.constants import CHAR_RECORD_SIZE
+        plrs_path = self._setup_game_dir(tmp_dir, sample_prty_bytes, sample_character_bytes)
+        jdata = {'active_characters': [{'stats': {'str': 99, 'dex': 75}, 'gold': 5000}]}
+        json_path = os.path.join(tmp_dir, 'save.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = types.SimpleNamespace(
+            game_dir=tmp_dir, json_file=json_path,
+            output=None, backup=False, dry_run=False,
+        )
+        save_import(args)
+        with open(plrs_path, 'rb') as f:
+            result = f.read()
+        char = Character(result[0:CHAR_RECORD_SIZE])
+        assert char.strength == 99
+        assert char.dexterity == 75
+        assert char.gold == 5000
+
+    def test_import_plrs_dry_run(self, tmp_dir, sample_prty_bytes, sample_character_bytes):
+        """Dry run should not write PLRS changes."""
+        import json, types
+        from u3edit.save import cmd_import as save_import
+        plrs_path = self._setup_game_dir(tmp_dir, sample_prty_bytes, sample_character_bytes)
+        with open(plrs_path, 'rb') as f:
+            original = f.read()
+        jdata = {'active_characters': [{'name': 'CHANGED', 'gold': 9999}]}
+        json_path = os.path.join(tmp_dir, 'save.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = types.SimpleNamespace(
+            game_dir=tmp_dir, json_file=json_path,
+            output=None, backup=False, dry_run=True,
+        )
+        save_import(args)
+        with open(plrs_path, 'rb') as f:
+            after = f.read()
+        assert original == after
+
+    def test_import_plrs_missing_file(self, tmp_dir, sample_prty_bytes):
+        """Missing PLRS file should skip gracefully."""
+        import json, types
+        from u3edit.save import cmd_import as save_import
+        # Only write PRTY, no PLRS
+        prty_path = os.path.join(tmp_dir, 'PRTY#060000')
+        with open(prty_path, 'wb') as f:
+            f.write(sample_prty_bytes)
+        jdata = {'active_characters': [{'name': 'WIZARD'}]}
+        json_path = os.path.join(tmp_dir, 'save.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = types.SimpleNamespace(
+            game_dir=tmp_dir, json_file=json_path,
+            output=None, backup=False, dry_run=False,
+        )
+        # Should not raise, just warn
+        save_import(args)
+
+    def test_import_plrs_multiple_slots(self, tmp_dir, sample_prty_bytes, sample_character_bytes):
+        """Import should update multiple PLRS slots."""
+        import json, types
+        from u3edit.save import cmd_import as save_import
+        from u3edit.roster import Character
+        from u3edit.constants import CHAR_RECORD_SIZE
+        plrs_path = self._setup_game_dir(tmp_dir, sample_prty_bytes, sample_character_bytes)
+        jdata = {'active_characters': [
+            {'name': 'ALPHA', 'hp': 100},
+            {'name': 'BETA', 'hp': 200},
+        ]}
+        json_path = os.path.join(tmp_dir, 'save.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = types.SimpleNamespace(
+            game_dir=tmp_dir, json_file=json_path,
+            output=None, backup=False, dry_run=False,
+        )
+        save_import(args)
+        with open(plrs_path, 'rb') as f:
+            result = f.read()
+        char0 = Character(result[0:CHAR_RECORD_SIZE])
+        char1 = Character(result[CHAR_RECORD_SIZE:CHAR_RECORD_SIZE * 2])
+        assert char0.name == 'ALPHA'
+        assert char0.hp == 100
+        assert char1.name == 'BETA'
+        assert char1.hp == 200

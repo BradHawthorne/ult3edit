@@ -505,16 +505,59 @@ def main() -> None:
     p_view = sub.add_parser('view', help='View a map file')
     p_view.add_argument('file', help='MAP file path')
     p_view.add_argument('--crop', help='Crop region: x1,y1,x2,y2')
-    p_view.add_argument('--json', action='store_true')
-    p_view.add_argument('--output', '-o')
+    p_view.add_argument('--json', action='store_true', help='Output as JSON')
+    p_view.add_argument('--output', '-o', help='Output file (for --json)')
 
     p_over = sub.add_parser('overview', help='Overview of all maps')
-    p_over.add_argument('game_dir', help='GAME directory')
-    p_over.add_argument('--preview', action='store_true')
-    p_over.add_argument('--json', action='store_true')
-    p_over.add_argument('--output', '-o')
+    p_over.add_argument('game_dir', help='GAME directory containing MAP* files')
+    p_over.add_argument('--preview', action='store_true', help='Show scaled overworld preview')
+    p_over.add_argument('--json', action='store_true', help='Output as JSON')
+    p_over.add_argument('--output', '-o', help='Output file (for --json)')
 
     sub.add_parser('legend', help='Print tile legend')
+
+    p_edit = sub.add_parser('edit', help='Edit a map (TUI)')
+    p_edit.add_argument('file', help='MAP file path')
+
+    p_set = sub.add_parser('set', help='Set a single tile')
+    p_set.add_argument('file', help='MAP file path')
+    p_set.add_argument('--x', type=int, required=True, help='X coordinate')
+    p_set.add_argument('--y', type=int, required=True, help='Y coordinate')
+    p_set.add_argument('--tile', type=int, required=True, help='Tile byte value')
+    _add_map_write_args(p_set)
+
+    p_fill = sub.add_parser('fill', help='Fill a rectangular region')
+    p_fill.add_argument('file', help='MAP file path')
+    p_fill.add_argument('--x1', type=int, required=True, help='Start X')
+    p_fill.add_argument('--y1', type=int, required=True, help='Start Y')
+    p_fill.add_argument('--x2', type=int, required=True, help='End X')
+    p_fill.add_argument('--y2', type=int, required=True, help='End Y')
+    p_fill.add_argument('--tile', type=int, required=True, help='Tile byte value')
+    _add_map_write_args(p_fill)
+
+    p_replace = sub.add_parser('replace', help='Replace all occurrences of a tile')
+    p_replace.add_argument('file', help='MAP file path')
+    p_replace.add_argument('--from', type=int, required=True, dest='from_tile',
+                           help='Tile to replace')
+    p_replace.add_argument('--to', type=int, required=True, dest='to_tile',
+                           help='Replacement tile')
+    _add_map_write_args(p_replace)
+
+    p_find = sub.add_parser('find', help='Find all locations of a tile type')
+    p_find.add_argument('file', help='MAP file path')
+    p_find.add_argument('--tile', type=int, required=True, help='Tile byte value to find')
+    p_find.add_argument('--level', type=int, help='Dungeon level (0-7)')
+    p_find.add_argument('--json', action='store_true', help='Output as JSON')
+    p_find.add_argument('--output', '-o', help='Output file (for --json)')
+
+    p_import = sub.add_parser('import', help='Import map from JSON')
+    p_import.add_argument('file', help='MAP file path')
+    p_import.add_argument('json_file', help='JSON file to import')
+    p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_import.add_argument('--backup', action='store_true',
+                          help='Create .bak backup before overwrite')
+    p_import.add_argument('--dry-run', action='store_true',
+                          help='Show changes without writing')
 
     args = parser.parse_args()
     dispatch(args)

@@ -11,7 +11,7 @@ u3edit is a data toolkit for Ultima III: Exodus (Apple II, 1983). It provides CL
 ```bash
 pip install -e ".[dev]"              # Install with pytest
 pip install -e ".[tui]"              # Install with prompt_toolkit for TUI editors
-pytest -v                            # Run all 552 tests
+pytest -v                            # Run all 595 tests
 pytest tests/test_roster.py          # Run one test module
 pytest -v tests/test_bcd.py::TestBcdToInt::test_zero  # Run single test
 u3edit roster view path/to/ROST      # CLI usage pattern
@@ -31,7 +31,7 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 - **`cmd_import(args)`**: Import from JSON (`u3edit <module> import <binary> <json>`)
 - **`register_parser(subparsers)`**: Adds CLI subcommands
 - **`dispatch(args)`**: Routes to command handlers
-- **`main()`**: Standalone entry point (also registered as `u3-{module}` console script)
+- **`main()`**: Standalone entry point (also registered as `u3-{module}` console script). Must have full parity with `register_parser()` — same subcommands, args, and help text.
 
 ### CLI dispatcher (`cli.py`)
 
@@ -76,7 +76,7 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 - **`--dry-run`**: Shows changes without writing. Available on all `edit` and `import` commands across all modules.
 - **`--validate`**: Data validation — checks for out-of-range values, invalid codes, rule violations. Available on roster (BCD integrity, race stat caps, class equipment limits), bestiary (tile validity, flag bits), save (transport, party size, coordinates, sentinel), and combat (tile alignment, position bounds, overlapping starts).
 - **`--all`**: Bulk editing — applies edits to all non-empty slots/monsters (roster: `--slot`/`--all`, bestiary: `--monster`/`--all`).
-- **`import`**: Every editable module supports `import <binary_file> <json_file>` to apply JSON data.
+- **`import`**: Every editable module supports `import <binary_file> <json_file>` to apply JSON data. Roster import handles equipment (weapon/armor names) and inventory counts. Save import handles both PRTY party state and PLRS active characters.
 - **`map set/fill/replace/find`**: Map CLI editing — set tiles, fill regions, replace tile types, search.
 - **`combat edit`**: CLI editing — `--tile X Y VALUE`, `--monster-pos INDEX X Y`, `--pc-pos INDEX X Y`. Falls through to TUI when no CLI args provided.
 - **`special edit`**: CLI editing — `--tile X Y VALUE`. Falls through to TUI when no CLI args provided.
@@ -86,6 +86,7 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 - **`diff`**: Compare two game files or directories — text/JSON/summary output, auto-detects file types, supports all data formats (roster, bestiary, combat, save, maps, special, TLK).
 - **`bestiary edit`**: Named flag toggles (`--undead`, `--ranged`, `--magic-user`, `--boss`, `--poison`, `--sleep`, `--negate`, `--teleport`, `--divide`, `--resistant` + `--no-*` counterparts), `--type Name` for monster type by name, `--all` for bulk editing.
 - **`save edit --plrs-slot`**: Edit active characters in PLRS file via save subcommand.
+- **`text edit --record/--text`**: Per-record CLI editing for TEXT game strings (uppercased to match engine). Falls through to TUI when no CLI args provided.
 - **`shapes view/export/edit/import`**: SHPS character set tile graphics — glyph rendering, PNG export (stdlib, no Pillow), HGR color logic, SHP overlay inline string extraction, SHPS embedded code guard at $9F9, TEXT detection as HGR bitmap.
 - **`sound view/edit/import`**: SOSA/SOSM/MBS sound data files — hex dump, AY-3-8910 register parsing and music stream decoding (notes, tempo, loops) for MBS.
 - **`patch view/edit/dump`**: Engine binary patcher for CIDAR-identified offsets in ULT3/EXOD — name table (921 bytes, terrain/monster/weapon/armor/spell names), moongate coordinates, food depletion rate, town/dungeon coords.

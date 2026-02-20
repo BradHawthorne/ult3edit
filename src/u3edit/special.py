@@ -279,8 +279,23 @@ def main() -> None:
 
     p_view = sub.add_parser('view', help='View special locations')
     p_view.add_argument('path', help='Special file or GAME directory')
-    p_view.add_argument('--json', action='store_true')
-    p_view.add_argument('--output', '-o')
+    p_view.add_argument('--json', action='store_true', help='Output as JSON')
+    p_view.add_argument('--output', '-o', help='Output file (for --json)')
+
+    p_edit = sub.add_parser('edit', help='Edit a special location (CLI or TUI)')
+    p_edit.add_argument('file', help='Special location file path')
+    p_edit.add_argument('--tile', type=int, nargs=3, metavar=('X', 'Y', 'VALUE'),
+                        help='Set tile at (X, Y) to VALUE')
+    _add_special_write_args(p_edit)
+
+    p_import = sub.add_parser('import', help='Import special map from JSON')
+    p_import.add_argument('file', help='Special location file path')
+    p_import.add_argument('json_file', help='JSON file to import')
+    p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_import.add_argument('--backup', action='store_true',
+                          help='Create .bak backup before overwrite')
+    p_import.add_argument('--dry-run', action='store_true',
+                          help='Show changes without writing')
 
     args = parser.parse_args()
     dispatch(args)

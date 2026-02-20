@@ -79,9 +79,9 @@ def main() -> None:
         description='Ultima III: Exodus - Equipment Reference')
     sub = parser.add_subparsers(dest='equip_command')
 
-    p_view = sub.add_parser('view', help='View equipment stats')
-    p_view.add_argument('--json', action='store_true')
-    p_view.add_argument('--output', '-o')
+    p_view = sub.add_parser('view', help='View equipment stats and class restrictions')
+    p_view.add_argument('--json', action='store_true', help='Output as JSON')
+    p_view.add_argument('--output', '-o', help='Output file (for --json)')
 
     args = parser.parse_args()
     dispatch(args)

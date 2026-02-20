@@ -477,8 +477,8 @@ def main() -> None:
 
     p_view = sub.add_parser('view', help='View dialog records')
     p_view.add_argument('path', help='TLK file or GAME directory')
-    p_view.add_argument('--json', action='store_true')
-    p_view.add_argument('--output', '-o')
+    p_view.add_argument('--json', action='store_true', help='Output as JSON')
+    p_view.add_argument('--output', '-o', help='Output file (for --json)')
 
     p_extract = sub.add_parser('extract', help='Extract TLK to text')
     p_extract.add_argument('input', help='TLK binary file')
@@ -490,28 +490,34 @@ def main() -> None:
 
     p_edit = sub.add_parser('edit', help='Edit a record in-place')
     p_edit.add_argument('file', help='TLK file')
-    p_edit.add_argument('--record', type=int)
-    p_edit.add_argument('--text')
-    p_edit.add_argument('--find')
-    p_edit.add_argument('--replace')
-    p_edit.add_argument('--ignore-case', action='store_true')
-    p_edit.add_argument('--output', '-o')
-    p_edit.add_argument('--backup', action='store_true')
-    p_edit.add_argument('--dry-run', action='store_true')
+    p_edit.add_argument('--record', type=int, help='Record index (with --text)')
+    p_edit.add_argument('--text', help='New text (use \\n for line breaks, with --record)')
+    p_edit.add_argument('--find', help='Text to find (with --replace)')
+    p_edit.add_argument('--replace', help='Replacement text (with --find)')
+    p_edit.add_argument('--ignore-case', action='store_true',
+                        help='Case-insensitive find/replace')
+    p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_edit.add_argument('--backup', action='store_true',
+                        help='Create .bak backup before overwrite')
+    p_edit.add_argument('--dry-run', action='store_true',
+                        help='Show changes without writing')
 
     p_search = sub.add_parser('search', help='Search dialog text')
     p_search.add_argument('path', help='TLK file or GAME directory')
-    p_search.add_argument('pattern', help='Text to search for')
-    p_search.add_argument('--regex', action='store_true')
-    p_search.add_argument('--json', action='store_true')
-    p_search.add_argument('--output', '-o')
+    p_search.add_argument('pattern', help='Text to search for (case-insensitive)')
+    p_search.add_argument('--regex', action='store_true',
+                          help='Treat pattern as a regular expression')
+    p_search.add_argument('--json', action='store_true', help='Output as JSON')
+    p_search.add_argument('--output', '-o', help='Output file (for --json)')
 
     p_import = sub.add_parser('import', help='Import dialog from JSON')
-    p_import.add_argument('file', help='TLK file path')
+    p_import.add_argument('file', help='TLK file path (output target)')
     p_import.add_argument('json_file', help='JSON file to import')
-    p_import.add_argument('--output', '-o')
-    p_import.add_argument('--backup', action='store_true')
-    p_import.add_argument('--dry-run', action='store_true')
+    p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_import.add_argument('--backup', action='store_true',
+                          help='Create .bak backup before overwrite')
+    p_import.add_argument('--dry-run', action='store_true',
+                          help='Show changes without writing')
 
     args = parser.parse_args()
     dispatch(args)

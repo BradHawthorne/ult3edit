@@ -267,24 +267,29 @@ def main() -> None:
         description='Ultima III: Exodus - Dungeon Drawing Data Editor')
     sub = parser.add_subparsers(dest='ddrw_command')
 
-    p_view = sub.add_parser('view')
-    p_view.add_argument('path')
-    p_view.add_argument('--json', action='store_true')
-    p_view.add_argument('--output', '-o')
+    p_view = sub.add_parser('view', help='View dungeon drawing data')
+    p_view.add_argument('path', help='DDRW file or GAME directory')
+    p_view.add_argument('--json', action='store_true', help='Output as JSON')
+    p_view.add_argument('--output', '-o', help='Output file (for --json)')
 
-    p_edit = sub.add_parser('edit')
-    p_edit.add_argument('file')
-    p_edit.add_argument('--offset', type=int, required=True)
-    p_edit.add_argument('--data', required=True)
-    p_edit.add_argument('--output', '-o')
-    p_edit.add_argument('--backup', action='store_true')
-    p_edit.add_argument('--dry-run', action='store_true')
+    p_edit = sub.add_parser('edit', help='Patch bytes')
+    p_edit.add_argument('file', help='DDRW file')
+    p_edit.add_argument('--offset', type=int, required=True, help='Byte offset')
+    p_edit.add_argument('--data', required=True, help='New data as hex bytes')
+    p_edit.add_argument('--output', '-o', help='Output file')
+    p_edit.add_argument('--backup', action='store_true',
+                        help='Create .bak backup before overwrite')
+    p_edit.add_argument('--dry-run', action='store_true',
+                        help='Show changes without writing')
 
-    p_import = sub.add_parser('import')
-    p_import.add_argument('file')
-    p_import.add_argument('json_file')
-    p_import.add_argument('--output', '-o')
-    p_import.add_argument('--backup', action='store_true')
+    p_import = sub.add_parser('import', help='Import from JSON')
+    p_import.add_argument('file', help='DDRW file path')
+    p_import.add_argument('json_file', help='JSON file to import')
+    p_import.add_argument('--output', '-o', help='Output file')
+    p_import.add_argument('--backup', action='store_true',
+                          help='Create .bak backup before overwrite')
+    p_import.add_argument('--dry-run', action='store_true',
+                          help='Show changes without writing')
 
     args = parser.parse_args()
     dispatch(args)

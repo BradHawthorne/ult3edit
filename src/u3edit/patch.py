@@ -24,6 +24,8 @@ from .json_export import export_json
 ENGINE_BINARIES = {
     'ULT3': {'size': 17408, 'load_addr': 0x5000},
     'EXOD': {'size': 26208, 'load_addr': 0x2000},
+    # SUBS is a shared subroutine library (BCD math, string routines, etc.).
+    # No known data regions — all executable code. Listed for identification only.
     'SUBS': {'size': 3584, 'load_addr': 0x4100},
 }
 
@@ -393,24 +395,26 @@ def main() -> None:
         description='Ultima III: Exodus - Engine Binary Patcher')
     sub = parser.add_subparsers(dest='patch_command')
 
-    p_view = sub.add_parser('view')
-    p_view.add_argument('file')
-    p_view.add_argument('--region')
-    p_view.add_argument('--json', action='store_true')
-    p_view.add_argument('--output', '-o')
+    p_view = sub.add_parser('view', help='Show patchable regions')
+    p_view.add_argument('file', help='Engine binary (ULT3, EXOD, SUBS)')
+    p_view.add_argument('--region', help='Show specific region only')
+    p_view.add_argument('--json', action='store_true', help='Output as JSON')
+    p_view.add_argument('--output', '-o', help='Output file (for --json)')
 
-    p_edit = sub.add_parser('edit')
-    p_edit.add_argument('file')
-    p_edit.add_argument('--region', required=True)
-    p_edit.add_argument('--data', required=True)
-    p_edit.add_argument('--output', '-o')
-    p_edit.add_argument('--backup', action='store_true')
-    p_edit.add_argument('--dry-run', action='store_true')
+    p_edit = sub.add_parser('edit', help='Patch a data region')
+    p_edit.add_argument('file', help='Engine binary')
+    p_edit.add_argument('--region', required=True, help='Region name')
+    p_edit.add_argument('--data', required=True, help='New data as hex')
+    p_edit.add_argument('--output', '-o', help='Output file')
+    p_edit.add_argument('--backup', action='store_true',
+                        help='Create .bak backup before overwrite')
+    p_edit.add_argument('--dry-run', action='store_true',
+                        help='Show changes without writing')
 
-    p_dump = sub.add_parser('dump')
-    p_dump.add_argument('file')
-    p_dump.add_argument('--offset', type=int, default=0)
-    p_dump.add_argument('--length', type=int, default=256)
+    p_dump = sub.add_parser('dump', help='Hex dump of any offset')
+    p_dump.add_argument('file', help='Engine binary')
+    p_dump.add_argument('--offset', type=int, default=0, help='Start offset')
+    p_dump.add_argument('--length', type=int, default=256, help='Bytes to show')
 
     args = parser.parse_args()
     dispatch(args)

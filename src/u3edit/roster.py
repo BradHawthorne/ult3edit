@@ -729,6 +729,28 @@ def cmd_import(args) -> None:
             char.marks = entry['marks']
         if 'cards' in entry:
             char.cards = entry['cards']
+        if 'weapon' in entry:
+            try:
+                char.equipped_weapon = WEAPONS.index(entry['weapon'])
+            except ValueError:
+                pass
+        if 'armor' in entry:
+            try:
+                char.equipped_armor = ARMORS.index(entry['armor'])
+            except ValueError:
+                pass
+        if 'weapons' in entry:
+            for wname, wcount in entry['weapons'].items():
+                try:
+                    char.set_weapon_count(WEAPONS.index(wname), wcount)
+                except ValueError:
+                    pass
+        if 'armors' in entry:
+            for aname, acount in entry['armors'].items():
+                try:
+                    char.set_armor_count(ARMORS.index(aname), acount)
+                except ValueError:
+                    pass
         count += 1
 
     print(f"Import: {count} character(s) to update")
@@ -974,39 +996,39 @@ def main() -> None:
     slot_group = p_edit.add_mutually_exclusive_group(required=True)
     slot_group.add_argument('--slot', type=int, help='Slot number (0-19)')
     slot_group.add_argument('--all', action='store_true', help='Edit all non-empty slots')
-    p_edit.add_argument('--output', '-o')
-    p_edit.add_argument('--backup', action='store_true')
-    p_edit.add_argument('--dry-run', action='store_true')
-    p_edit.add_argument('--validate', action='store_true')
+    p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_edit.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_edit.add_argument('--dry-run', action='store_true', help='Show changes without writing')
+    p_edit.add_argument('--validate', action='store_true', help='Check game-rule violations')
     _add_edit_args(p_edit)
 
     p_create = sub.add_parser('create', help='Create a new character')
-    p_create.add_argument('file')
-    p_create.add_argument('--slot', type=int, required=True)
-    p_create.add_argument('--output', '-o')
-    p_create.add_argument('--backup', action='store_true')
-    p_create.add_argument('--dry-run', action='store_true')
-    p_create.add_argument('--name')
-    p_create.add_argument('--race')
-    p_create.add_argument('--class', dest='class_')
-    p_create.add_argument('--gender')
-    p_create.add_argument('--str', type=int)
-    p_create.add_argument('--dex', type=int)
-    p_create.add_argument('--int', type=int, dest='int_')
-    p_create.add_argument('--wis', type=int)
-    p_create.add_argument('--force', action='store_true')
+    p_create.add_argument('file', help='ROST file path')
+    p_create.add_argument('--slot', type=int, required=True, help='Slot number (0-19)')
+    p_create.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_create.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_create.add_argument('--dry-run', action='store_true', help='Show changes without writing')
+    p_create.add_argument('--name', help='Character name (default: HERO)')
+    p_create.add_argument('--race', help='Race: H(uman) E(lf) D(warf) B(obbit) F(uzzy)')
+    p_create.add_argument('--class', dest='class_', help='Class: F C W T L I D A R P B')
+    p_create.add_argument('--gender', help='Gender: M(ale) F(emale) O(ther)')
+    p_create.add_argument('--str', type=int, help='Strength')
+    p_create.add_argument('--dex', type=int, help='Dexterity')
+    p_create.add_argument('--int', type=int, dest='int_', help='Intelligence')
+    p_create.add_argument('--wis', type=int, help='Wisdom')
+    p_create.add_argument('--force', action='store_true', help='Overwrite existing')
 
     p_import = sub.add_parser('import', help='Import characters from JSON')
     p_import.add_argument('file', help='ROST file path')
     p_import.add_argument('json_file', help='JSON file to import')
-    p_import.add_argument('--output', '-o')
-    p_import.add_argument('--backup', action='store_true')
-    p_import.add_argument('--dry-run', action='store_true')
+    p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_import.add_argument('--dry-run', action='store_true', help='Show changes without writing')
 
     p_progress = sub.add_parser('check-progress', help='Check endgame readiness')
     p_progress.add_argument('file', help='ROST file path')
-    p_progress.add_argument('--json', action='store_true')
-    p_progress.add_argument('--output', '-o')
+    p_progress.add_argument('--json', action='store_true', help='Output as JSON')
+    p_progress.add_argument('--output', '-o', help='Output file (for --json)')
 
     args = parser.parse_args()
     dispatch(args)

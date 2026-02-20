@@ -67,10 +67,10 @@ def main() -> None:
     sub = parser.add_subparsers(dest='spell_command')
 
     p_view = sub.add_parser('view', help='View spell lists')
-    p_view.add_argument('--wizard-only', action='store_true')
-    p_view.add_argument('--cleric-only', action='store_true')
-    p_view.add_argument('--json', action='store_true')
-    p_view.add_argument('--output', '-o')
+    p_view.add_argument('--wizard-only', action='store_true', help='Show only wizard spells')
+    p_view.add_argument('--cleric-only', action='store_true', help='Show only cleric spells')
+    p_view.add_argument('--json', action='store_true', help='Output as JSON')
+    p_view.add_argument('--output', '-o', help='Output file (for --json)')
 
     args = parser.parse_args()
     dispatch(args)

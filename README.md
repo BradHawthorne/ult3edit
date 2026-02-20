@@ -198,6 +198,16 @@ u3edit tlk edit TLKA#060000 --find "exodus" --replace "DARKNESS" --ignore-case
 u3edit tlk edit TLKA#060000 --find "EXODUS" --replace "DARKNESS" --dry-run
 ```
 
+## Editing Game Text
+
+```bash
+# Edit a text record by index
+u3edit text edit TEXT#061000 --record 0 --text "NEW TITLE"
+
+# Preview without writing
+u3edit text edit TEXT#061000 --record 0 --text "NEW TITLE" --dry-run
+```
+
 ## Editing Save State
 
 ```bash
@@ -383,7 +393,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-552 tests covering all modules with synthesized game data (no real game files needed).
+595 tests covering all modules with synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 

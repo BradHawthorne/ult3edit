@@ -329,6 +329,7 @@ def cmd_import(args) -> None:
     """Import save state from JSON."""
     game_dir = args.game_dir
     do_backup = getattr(args, 'backup', False)
+    dry_run = getattr(args, 'dry_run', False)
 
     with open(args.json_file, 'r', encoding='utf-8') as f:
         jdata = json.load(f)
@@ -354,12 +355,68 @@ def cmd_import(args) -> None:
         if 'slot_ids' in party_data:
             party.slot_ids = party_data['slot_ids']
 
-        output = args.output if args.output else prty_path
-        if do_backup and (not args.output or args.output == prty_path):
-            backup_file(prty_path)
-        with open(output, 'wb') as f:
-            f.write(bytes(party.raw) + data[PRTY_FILE_SIZE:])
-        print(f"Imported party state to {output}")
+        print(f"Import: party state ({len(party_data)} field(s))")
+        if not dry_run:
+            output = args.output if args.output else prty_path
+            if do_backup and (not args.output or args.output == prty_path):
+                backup_file(prty_path)
+            with open(output, 'wb') as f:
+                f.write(bytes(party.raw) + data[PRTY_FILE_SIZE:])
+            print(f"Imported party state to {output}")
+
+    # PLRS character import
+    chars_data = jdata.get('active_characters', [])
+    if chars_data:
+        plrs_path = resolve_single_file(game_dir, 'PLRS')
+        if not plrs_path:
+            print("Warning: PLRS file not found, skipping character import",
+                  file=sys.stderr)
+        else:
+            with open(plrs_path, 'rb') as f:
+                plrs_raw = bytearray(f.read())
+            count = 0
+            for i, entry in enumerate(chars_data):
+                if i >= min(4, len(plrs_raw) // CHAR_RECORD_SIZE):
+                    break
+                offset = i * CHAR_RECORD_SIZE
+                char = Character(plrs_raw[offset:offset + CHAR_RECORD_SIZE])
+                if 'name' in entry:
+                    char.name = entry['name']
+                stats = entry.get('stats', {})
+                if 'str' in stats:
+                    char.strength = stats['str']
+                if 'dex' in stats:
+                    char.dexterity = stats['dex']
+                if 'int' in stats:
+                    char.intelligence = stats['int']
+                if 'wis' in stats:
+                    char.wisdom = stats['wis']
+                if 'hp' in entry:
+                    char.hp = entry['hp']
+                if 'max_hp' in entry:
+                    char.max_hp = entry['max_hp']
+                if 'mp' in entry:
+                    char.mp = entry['mp']
+                if 'exp' in entry:
+                    char.exp = entry['exp']
+                if 'gold' in entry:
+                    char.gold = entry['gold']
+                if 'food' in entry:
+                    char.food = entry['food']
+                plrs_raw[offset:offset + CHAR_RECORD_SIZE] = char.raw
+                count += 1
+
+            print(f"Import: {count} active character(s)")
+            if not dry_run:
+                plrs_output = args.output if args.output else plrs_path
+                if do_backup and (not args.output or args.output == plrs_path):
+                    backup_file(plrs_path)
+                with open(plrs_output, 'wb') as f:
+                    f.write(plrs_raw)
+                print(f"Imported {count} character(s) to {plrs_output}")
+
+    if dry_run:
+        print("Dry run - no changes written.")
 
 
 def _add_plrs_edit_args(p) -> None:
@@ -406,6 +463,7 @@ def register_parser(subparsers) -> None:
     p_import.add_argument('json_file', help='JSON file to import')
     p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_import.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
+    p_import.add_argument('--dry-run', action='store_true', help='Show changes without writing')
 
 
 def dispatch(args) -> None:
@@ -427,27 +485,34 @@ def main() -> None:
 
     p_view = sub.add_parser('view', help='View save state')
     p_view.add_argument('game_dir', help='GAME directory')
-    p_view.add_argument('--brief', action='store_true')
-    p_view.add_argument('--json', action='store_true')
-    p_view.add_argument('--output', '-o')
+    p_view.add_argument('--brief', action='store_true', help='Skip overworld map')
+    p_view.add_argument('--json', action='store_true', help='Output as JSON')
+    p_view.add_argument('--output', '-o', help='Output file (for --json)')
+    p_view.add_argument('--validate', action='store_true', help='Check data integrity')
 
     p_edit = sub.add_parser('edit', help='Edit party state')
     p_edit.add_argument('game_dir', help='GAME directory')
-    p_edit.add_argument('--transport')
-    p_edit.add_argument('--x', type=int)
-    p_edit.add_argument('--y', type=int)
-    p_edit.add_argument('--party-size', type=int)
-    p_edit.add_argument('--slot-ids', type=int, nargs='+')
-    p_edit.add_argument('--output', '-o')
-    p_edit.add_argument('--backup', action='store_true')
-    p_edit.add_argument('--dry-run', action='store_true')
+    p_edit.add_argument('--transport', help='Transport: horse, ship, foot')
+    p_edit.add_argument('--x', type=int, help='X coordinate (0-63)')
+    p_edit.add_argument('--y', type=int, help='Y coordinate (0-63)')
+    p_edit.add_argument('--party-size', type=int, help='Party size (0-4)')
+    p_edit.add_argument('--slot-ids', type=int, nargs='+',
+                        help='Roster slot IDs (e.g., 0 1 2 3)')
+    p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_edit.add_argument('--backup', action='store_true',
+                        help='Create .bak backup before overwrite')
+    p_edit.add_argument('--dry-run', action='store_true',
+                        help='Show changes without writing')
     _add_plrs_edit_args(p_edit)
 
     p_import = sub.add_parser('import', help='Import save state from JSON')
     p_import.add_argument('game_dir', help='GAME directory')
     p_import.add_argument('json_file', help='JSON file to import')
-    p_import.add_argument('--output', '-o')
-    p_import.add_argument('--backup', action='store_true')
+    p_import.add_argument('--output', '-o', help='Output file (default: overwrite)')
+    p_import.add_argument('--backup', action='store_true',
+                          help='Create .bak backup before overwrite')
+    p_import.add_argument('--dry-run', action='store_true',
+                          help='Show changes without writing')
 
     args = parser.parse_args()
     dispatch(args)
