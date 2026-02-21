@@ -469,6 +469,26 @@ if [ -d "$SOURCES_DIR" ]; then
         u3edit ddrw import "$DDRW_FILE" "$DDRW_JSON" 2>/dev/null || true
         echo "  Imported dungeon drawing data"
     fi
+
+    # Apply engine inline string patches
+    # Two-tier: source-level (no length limits) if asmiigs available, else binary
+    ENGINE_DIR="${SCRIPT_DIR}/../../engine"
+    ENGINE_TOOLS="${ENGINE_DIR}/tools"
+    FULL_PATCHES="${SOURCES_DIR}/engine_strings_full.json"
+    BIN_PATCHES="${SOURCES_DIR}/engine_strings.json"
+    ULT3=$(find_file "ULT3")
+
+    if [ -f "$FULL_PATCHES" ] && [ -f "${ENGINE_DIR}/scenario_build.sh" ]; then
+        echo "  Applying engine string patches (source-level build)..."
+        bash "${ENGINE_DIR}/scenario_build.sh" "${SCRIPT_DIR}" \
+            --apply-to "$GAME_DIR" 2>/dev/null || true
+        echo "  Applied engine inline string patches via reassembly"
+    elif [ -f "$BIN_PATCHES" ] && [ -f "$ULT3" ] && [ -f "${ENGINE_TOOLS}/string_patcher.py" ]; then
+        echo "  Applying engine string patches (binary, in-place)..."
+        python3 "${ENGINE_TOOLS}/string_patcher.py" "$ULT3" "$BIN_PATCHES" \
+            --backup 2>/dev/null || true
+        echo "  Applied engine inline string patches via binary patcher"
+    fi
 fi
 
 # =============================================================================
@@ -508,6 +528,9 @@ echo "  tile_compiler.py      - Text-art tile definitions -> SHPS binary (256 ti
 echo "  map_compiler.py       - Text-art maps -> MAP binary (20 maps)"
 echo "  name_compiler.py      - Text names -> engine name-table patch (921 bytes)"
 echo "  shop_apply.py         - Text-matching shop overlay string replacer (8 shops)"
+echo "  source_patcher.py     - Source-level ASC directive patcher (no length limits)"
+echo "  string_patcher.py     - Binary-level inline string patcher (in-place fallback)"
+echo "  scenario_build.sh     - Source patch + asmiigs reassembly pipeline"
 echo "  verify.py             - Asset coverage verification"
 echo ""
 echo "All commands support --backup and --dry-run for safety."
