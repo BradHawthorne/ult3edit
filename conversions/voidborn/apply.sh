@@ -291,9 +291,8 @@ echo "--- Phase 9: Patching engine binary ---"
 
 ULT3=$(find_file "ULT3")
 if [ -f "$ULT3" ]; then
-    # Generate and apply the name-table (all terrain/monster/weapon/armor/spell names)
-    NAMETABLE_HEX=$(python3 "${SCRIPT_DIR}/encode_nametable.py" "$ULT3")
-    u3edit patch edit "$ULT3" --region name-table --data "$NAMETABLE_HEX" --backup
+    # Name-table is applied via name_compiler in Phase 11 (source-based pipeline).
+    # This phase handles moongates and food rate only.
 
     # Relocate moongates to form a protective ring around the void
     # 8 phases with new X coordinates (decimal 10,20,30,40,50,30,20,10)
@@ -306,7 +305,6 @@ if [ -f "$ULT3" ]; then
     # Increase food depletion rate (harsher survival: $02 = twice as fast)
     u3edit patch edit "$ULT3" --region food-rate --data "02"
 
-    echo "  Patched name-table (${#NAMETABLE_HEX} hex chars)"
     echo "  Relocated moongates to void ring pattern"
     echo "  Doubled food depletion rate"
 fi
@@ -316,14 +314,14 @@ fi
 # =============================================================================
 echo "--- Phase 10: Editing shop overlay text ---"
 
-# SHP0 = Weapons shop
-SHP0=$(find_file "SHP0")
-if [ -f "$SHP0" ]; then
-    # List available string offsets first:
-    # u3edit shapes view "$SHP0" --strings
-    # Then edit specific strings by offset (offsets vary per file)
-    echo "  (Shop overlay strings require file-specific offsets — see shapes view --strings)"
-fi
+# Shop overlay strings are applied via shop_apply.py in Phase 11 (source-based
+# pipeline). The tool discovers inline string offsets at runtime by scanning for
+# JSR $46BA patterns, then matches by vanilla text — no hardcoded offsets needed.
+#
+# For manual editing of individual strings:
+#   u3edit shapes view SHP0 --strings          # List discovered strings
+#   u3edit shapes edit-string SHP0 --offset N --text "NEW TEXT"
+echo "  (Handled by shop_apply.py in Phase 11)"
 
 # =============================================================================
 # Phase 11: SOURCE-BASED IMPORTS (when sources/ directory exists)

@@ -5946,3 +5946,274 @@ class TestShopStringsSource:
             for entry in shops[key]['strings']:
                 assert 'vanilla' in entry
                 assert 'voidborn' in entry
+
+
+# =============================================================================
+# Name compiler edge cases
+# =============================================================================
+
+class TestNameCompilerEdgeCases:
+    """Edge case tests for name_compiler.py."""
+
+    def _get_mod(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__),
+                                         '..', 'conversions', 'tools'))
+        import name_compiler
+        return name_compiler
+
+    def test_decompile_produces_parseable_output(self):
+        """Compile → embed in fake ULT3 → decompile → parse round-trip."""
+        mod = self._get_mod()
+        names = ['GRASS', 'FOREST', '', 'SWORD', 'SHIELD']
+        binary = mod.compile_names(names)
+        # Embed at NAME_TABLE_OFFSET in a fake ULT3
+        ult3 = bytearray(mod.NAME_TABLE_OFFSET + mod.NAME_TABLE_SIZE)
+        ult3[mod.NAME_TABLE_OFFSET:mod.NAME_TABLE_OFFSET + len(binary)] = binary
+        # Decompile returns .names text, parse it back
+        text = mod.decompile_names(bytes(ult3))
+        parsed = mod.parse_names_file(text)
+        assert parsed[:5] == names
+
+    def test_compile_special_characters(self):
+        """Names with spaces and punctuation encode correctly."""
+        mod = self._get_mod()
+        names = ['ICE AXE', "PIRATE'S"]
+        binary = mod.compile_names(names)
+        # Embed and round-trip
+        ult3 = bytearray(mod.NAME_TABLE_OFFSET + mod.NAME_TABLE_SIZE)
+        ult3[mod.NAME_TABLE_OFFSET:mod.NAME_TABLE_OFFSET + len(binary)] = binary
+        text = mod.decompile_names(bytes(ult3))
+        parsed = mod.parse_names_file(text)
+        assert parsed[0] == 'ICE AXE'
+        assert parsed[1] == "PIRATE'S"
+
+    def test_names_file_round_trip(self, tmp_path):
+        """Write .names file → read back → compile → decompile matches."""
+        mod = self._get_mod()
+        original_names = ['GRASS', 'FOREST', 'MOUNTAIN']
+        # Write .names format
+        content = '# Terrain\n' + '\n'.join(original_names) + '\n'
+        names_path = str(tmp_path / 'test.names')
+        with open(names_path, 'w') as f:
+            f.write(content)
+        # Parse
+        with open(names_path, 'r') as f:
+            parsed = mod.parse_names_file(f.read())
+        assert parsed == original_names
+        # Compile → embed → decompile → parse
+        binary = mod.compile_names(parsed)
+        ult3 = bytearray(mod.NAME_TABLE_OFFSET + mod.NAME_TABLE_SIZE)
+        ult3[mod.NAME_TABLE_OFFSET:mod.NAME_TABLE_OFFSET + len(binary)] = binary
+        text = mod.decompile_names(bytes(ult3))
+        reparsed = mod.parse_names_file(text)
+        assert reparsed[:3] == original_names
+
+
+# =============================================================================
+# Map compiler edge cases
+# =============================================================================
+
+class TestMapCompilerEdgeCases:
+    """Edge case tests for map_compiler.py."""
+
+    TOOLS_DIR = os.path.join(os.path.dirname(__file__),
+                              '..', 'conversions', 'tools')
+
+    def _get_mod(self):
+        mod_path = os.path.join(self.TOOLS_DIR, 'map_compiler.py')
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('map_compiler', mod_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_overworld_invalid_tile_char_defaults_to_zero(self):
+        """Invalid tile character in overworld map defaults to tile 0."""
+        mod = self._get_mod()
+        rows = ['.' * 64 for _ in range(64)]
+        rows[0] = 'Z' + '.' * 63  # 'Z' is not in TILE_CHARS_REVERSE
+        text = '\n'.join(rows) + '\n'
+        grid = mod.parse_map_file(text, is_dungeon=False)
+        assert grid[0][0] == 0  # Unknown char → tile 0
+
+    def test_dungeon_short_input_pads_to_8_levels(self):
+        """Dungeon with fewer than 8 levels pads to 8."""
+        mod = self._get_mod()
+        parts = []
+        for i in range(3):
+            parts.append(f'# Level {i}')
+            for _ in range(16):
+                parts.append('#' * 16)
+        text = '\n'.join(parts) + '\n'
+        grid = mod.parse_map_file(text, is_dungeon=True)
+        assert len(grid) == 8  # Padded to 8 levels
+
+    def test_overworld_short_input_pads_to_64_rows(self):
+        """Overworld with fewer than 64 rows pads to 64."""
+        mod = self._get_mod()
+        rows = ['.' * 64 for _ in range(32)]  # Only 32 rows
+        text = '\n'.join(rows) + '\n'
+        grid = mod.parse_map_file(text, is_dungeon=False)
+        assert len(grid) == 64  # Padded to 64 rows
+
+
+# =============================================================================
+# Shop apply edge cases
+# =============================================================================
+
+class TestShopApplyEdgeCases:
+    """Additional edge case tests for shop_apply.py."""
+
+    TOOLS_DIR = os.path.join(os.path.dirname(__file__),
+                              '..', 'conversions', 'tools')
+
+    def _get_shop_apply(self):
+        mod_path = os.path.join(self.TOOLS_DIR, 'shop_apply.py')
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('shop_apply', mod_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def _build_shp_with_string(self, text):
+        from u3edit.shapes import encode_overlay_string
+        jsr = bytes([0x20, 0xBA, 0x46])
+        encoded = encode_overlay_string(text)
+        return bytearray(b'\x60' * 16 + jsr + encoded + b'\x60' * 16)
+
+    def test_shop_apply_case_insensitive_match(self, tmp_path):
+        """Vanilla text matching is case-insensitive."""
+        shop_apply = self._get_shop_apply()
+
+        shp_data = self._build_shp_with_string('WEAPONS')
+        shp_path = str(tmp_path / 'SHP0')
+        with open(shp_path, 'wb') as f:
+            f.write(shp_data)
+
+        source = {
+            "shops": {
+                "SHP0": {
+                    "name": "Weapons",
+                    "strings": [
+                        {"vanilla": "weapons", "voidborn": "ARMS"}
+                    ]
+                }
+            }
+        }
+        json_path = str(tmp_path / 'shop_strings.json')
+        with open(json_path, 'w') as f:
+            json.dump(source, f)
+
+        replaced, skipped = shop_apply.apply_shop_strings(
+            json_path, str(tmp_path))
+        assert replaced == 1
+
+    def test_shop_apply_missing_shp_file(self, tmp_path):
+        """Missing SHP file is skipped gracefully."""
+        shop_apply = self._get_shop_apply()
+
+        source = {
+            "shops": {
+                "SHP0": {
+                    "name": "Weapons",
+                    "strings": [
+                        {"vanilla": "WEAPONS", "voidborn": "ARMS"}
+                    ]
+                }
+            }
+        }
+        json_path = str(tmp_path / 'shop_strings.json')
+        with open(json_path, 'w') as f:
+            json.dump(source, f)
+
+        # No SHP0 file in tmp_path
+        replaced, skipped = shop_apply.apply_shop_strings(
+            json_path, str(tmp_path))
+        assert replaced == 0
+        assert skipped == 0
+
+    def test_shop_apply_backup_creates_bak(self, tmp_path):
+        """Backup flag creates .bak file."""
+        shop_apply = self._get_shop_apply()
+
+        shp_data = self._build_shp_with_string('WEAPONS')
+        shp_path = str(tmp_path / 'SHP0')
+        with open(shp_path, 'wb') as f:
+            f.write(shp_data)
+        original = bytes(shp_data)
+
+        source = {
+            "shops": {
+                "SHP0": {
+                    "name": "Weapons",
+                    "strings": [
+                        {"vanilla": "WEAPONS", "voidborn": "ARMS"}
+                    ]
+                }
+            }
+        }
+        json_path = str(tmp_path / 'shop_strings.json')
+        with open(json_path, 'w') as f:
+            json.dump(source, f)
+
+        shop_apply.apply_shop_strings(
+            json_path, str(tmp_path), backup=True)
+
+        bak_path = shp_path + '.bak'
+        assert os.path.exists(bak_path)
+        with open(bak_path, 'rb') as f:
+            assert f.read() == original
+
+
+# =============================================================================
+# Tile compiler edge cases
+# =============================================================================
+
+class TestTileCompilerEdgeCases:
+    """Edge case tests for tile_compiler.py."""
+
+    TOOLS_DIR = os.path.join(os.path.dirname(__file__),
+                              '..', 'conversions', 'tools')
+
+    def _get_mod(self):
+        mod_path = os.path.join(self.TOOLS_DIR, 'tile_compiler.py')
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('tile_compiler', mod_path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_parse_tile_dimensions(self):
+        """Tile parser requires exactly 8 rows of 7 columns per glyph."""
+        mod = self._get_mod()
+        # Build a minimal .tiles source for one glyph
+        lines = ['# Tile 0x00: Test']
+        for _ in range(8):
+            lines.append('#' * 7)
+        text = '\n'.join(lines) + '\n'
+        tiles = mod.parse_tiles_file(text)
+        assert len(tiles) >= 1
+        # parse_tiles_file returns list of (index, bytes) tuples
+        assert tiles[0][0] == 0  # index
+        assert len(tiles[0][1]) == 8  # 8 bytes per glyph
+
+    def test_decompile_then_compile_matches(self):
+        """Decompile binary → compile back produces identical bytes."""
+        mod = self._get_mod()
+        # Create a 2048-byte SHPS with one known glyph at index 0
+        shps = bytearray(2048)
+        original = bytes([0b1010101, 0b0101010, 0b1111111, 0b0000000,
+                          0b1100110, 0b0011001, 0b1111000, 0b0001111])
+        shps[0:8] = original
+        # Decompile to text
+        text = mod.decompile_shps(bytes(shps))
+        # Parse the text back
+        tiles = mod.parse_tiles_file(text)
+        # Find tile index 0
+        glyph_bytes = None
+        for idx, data in tiles:
+            if idx == 0:
+                glyph_bytes = data
+                break
+        assert glyph_bytes is not None
+        assert glyph_bytes == original
