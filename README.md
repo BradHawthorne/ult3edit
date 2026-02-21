@@ -367,6 +367,71 @@ ULT3 regions: `name-table` (921 bytes — terrain, monster, weapon, armor, spell
 
 EXOD regions: `town-coords`, `dungeon-coords` (entrance XY pairs), `moongate-coords` (phase positions).
 
+### Inline String Editing (245 strings in ULT3)
+
+```bash
+# List all inline JSR $46BA strings
+u3edit patch strings ULT3#065000
+
+# Search for specific strings
+u3edit patch strings ULT3#065000 --search "CARD"
+
+# Export full catalog as JSON
+u3edit patch strings ULT3#065000 --json -o catalog.json
+
+# Edit a single string (by vanilla text match)
+u3edit patch strings-edit ULT3#065000 --vanilla "CARD OF DEATH" --text "SHARD OF VOID" --backup
+
+# Edit by index (from strings catalog)
+u3edit patch strings-edit ULT3#065000 --index 142 --text "SHARD OF VOID"
+
+# Edit by engine address
+u3edit patch strings-edit ULT3#065000 --address 0x6C48 --text "SHARD OF VOID"
+
+# Bulk import from JSON patch file
+u3edit patch strings-import ULT3#065000 patches.json --backup
+```
+
+The ULT3 engine binary contains 245 inline text strings displayed via `JSR $46BA`. These cover quest items, combat messages, movement prompts, magic, equipment, shops, and UI text. In-place binary patching replaces strings within their original byte allocation.
+
+For replacements that exceed the original length, use the source-level pipeline (see Engine SDK below).
+
+## Engine SDK
+
+The engine SDK provides byte-identical reassembly of all three engine binaries from CIDAR disassembly source, enabling source-level modifications with no length constraints.
+
+```bash
+# Verify byte-identical round-trip assembly
+bash engine/build.sh
+
+# Build a scenario with custom strings (source-level, no length limits)
+bash engine/scenario_build.sh conversions/voidborn/
+
+# Apply scenario to game directory
+bash engine/scenario_build.sh conversions/voidborn/ --apply-to /path/to/GAME/
+```
+
+### Two-Tier String Patching
+
+| Approach | Tool | Constraints | Requires |
+|----------|------|-------------|----------|
+| Binary (in-place) | `u3edit patch strings-edit` | Must fit original space | Python only |
+| Source (reassembly) | `source_patcher.py` + `asmiigs` | No length limits | asmiigs assembler |
+
+The `scenario_build.sh` script automatically selects source-level patching when `asmiigs` is available, falling back to binary patching otherwise.
+
+### Engine Binaries
+
+| Binary | Size | Origin | Content |
+|--------|------|--------|---------|
+| ULT3 | 17,408 bytes | $5000 | Main engine (68% code, 245 inline strings) |
+| EXOD | 26,208 bytes | $2000 | Boot loader (87% data, character sets, tiles) |
+| SUBS | 3,584 bytes | $4100 | Shared library (string printer, HGR, math) |
+
+### Scenario Template
+
+See `engine/SCENARIO_TEMPLATE.md` for the complete scenario author guide, including directory layout, patch file format, and tool reference.
+
 ## Comparing Game Data
 
 ```bash
@@ -478,7 +543,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-900 tests covering all modules with synthesized game data (no real game files needed).
+909 tests covering all modules with synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 

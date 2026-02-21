@@ -342,6 +342,7 @@ Purge, Follow, Sleep, Bless, Guide, Banish, Cleanse, Veil, Restore
 | Shop Overlays | 1 file | JSON (text-matching) | `sources/shop_strings.json` |
 | Sound | 3 files | JSON (raw byte arrays) | `sources/sosa/sosm/mbs.json` |
 | Dungeon Drawing | 1 file | JSON (raw byte array) | `sources/ddrw.json` |
+| Engine Strings | 2 files | JSON (vanilla text match) | `sources/engine_strings*.json` |
 
 ## How to Apply
 
@@ -379,6 +380,13 @@ done
 # 5. Compile and apply name table
 python ../tools/name_compiler.py compile sources/names.names | \
     xargs u3edit patch edit ULT3 --region name-table --data
+
+# 6. Apply engine inline string patches
+# Option A: Binary (in-place, length constrained)
+u3edit patch strings-import ULT3 sources/engine_strings.json --backup
+
+# Option B: Source-level (no length limits, requires asmiigs)
+bash ../../engine/scenario_build.sh . --apply-to /path/to/GAME/
 ```
 
 Requires a directory of extracted Ultima III ProDOS files.
@@ -387,6 +395,9 @@ Requires a directory of extracted Ultima III ProDOS files.
 
 ## Limitations
 
+- **Inline string length**: Binary patching (`strings-edit`) requires replacement text
+  to fit within original byte allocation. For longer strings, use source-level
+  patching via `scenario_build.sh` (requires `asmiigs` assembler).
 - **Data-only**: Cannot change game logic, spell effects, or combat mechanics
 - **Same tile dimensions**: Tiles are 7x8 pixels — no higher resolution possible
 - **Name-table budget**: All names must fit within 921 bytes total (891 usable)
