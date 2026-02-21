@@ -11,7 +11,7 @@ u3edit is a data toolkit for Ultima III: Exodus (Apple II, 1983). It provides CL
 ```bash
 pip install -e ".[dev]"              # Install with pytest
 pip install -e ".[tui]"              # Install with prompt_toolkit for TUI editors
-pytest -v                            # Run all 844 tests
+pytest -v                            # Run all 853 tests
 pytest tests/test_roster.py          # Run one test module
 pytest -v tests/test_bcd.py::TestBcdToInt::test_zero  # Run single test
 u3edit roster view path/to/ROST      # CLI usage pattern
@@ -119,6 +119,19 @@ Reusable framework for building full game replacements:
 - **`conversions/tools/verify.py`**: Post-conversion verification — checks file presence, sizes, and optionally compares hashes against vanilla to confirm all assets were replaced.
 - **`conversions/tools/MUSIC_FORMAT.md`**: MBS (AY-3-8910) byte format reference for sound editing.
 - **`conversions/voidborn/`**: Complete reference total conversion ("Voidborn") with full narrative (`VOIDBORN.md`), `apply.sh` (full pipeline), and text-first source files in `sources/`: 13 bestiary JSON, 9 combat JSON, 4 special JSON, 19 dialog TXT, 20 map text-art (13 surface + 7 dungeon), 256-tile pixel art, name table `.names`, title text JSON, shop overlay strings JSON, 3 sound JSONs (SOSA/SOSM/MBS), DDRW JSON.
+
+## Engine SDK (`engine/`)
+
+Buildable engine source tree using the Rosetta toolchain (asmiigs/deasmiigs). All three engine binaries reassemble byte-identical from CIDAR disassembly:
+
+- **`engine/subs/subs.s`**: SUBS shared library (3,584 bytes at $4100) — string printer, math, display
+- **`engine/ult3/ult3.s`**: Main engine (17,408 bytes at $5000) — game logic, combat, file I/O
+- **`engine/exod/exod.s`**: Boot loader (26,208 bytes at $2000) — world map, location entrances
+- **`engine/originals/`**: Original binaries for byte-identical verification
+- **`engine/build.sh`**: Build script — assembles all 3 binaries, verifies byte-identical output
+- **`engine/verify.py`**: Python verification script for CI/programmatic use
+
+Build pipeline: `asmiigs --cpu 6502 source.s -o output.omf` → OMF has 60-byte header + code + 1-byte trailer. Code at offset 60 matches original binary exactly.
 
 ## Data integrity rules
 

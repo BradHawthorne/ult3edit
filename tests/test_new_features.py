@@ -6566,3 +6566,105 @@ class TestTextImportOverflow:
         out = capsys.readouterr()
         assert 'Import: 2 text record(s)' in out.out
         assert 'Warning' not in out.err
+
+
+# =============================================================================
+# Engine SDK: Round-trip assembly verification
+# =============================================================================
+
+class TestEngineRoundTrip:
+    """Verify engine binaries reassemble byte-identical from CIDAR disassembly.
+
+    These tests prove the SDK build pipeline works:
+    CIDAR disassembly (.s) → asmiigs assembler → OMF → byte-identical binary.
+
+    Requires engine/originals/*.bin and engine/build/*.omf to exist.
+    Run `bash engine/build.sh` first to populate build output.
+    """
+
+    ENGINE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'engine')
+    OMF_HEADER_SIZE = 60  # asmiigs OMF v2.1 segment header
+    OMF_TRAILER_SIZE = 1  # End-of-segment marker ($00)
+
+    BINARIES = {
+        'SUBS': {'size': 3584, 'org': 0x4100},
+        'ULT3': {'size': 17408, 'org': 0x5000},
+        'EXOD': {'size': 26208, 'org': 0x2000},
+    }
+
+    def _verify(self, name):
+        info = self.BINARIES[name]
+        omf_path = os.path.join(self.ENGINE_DIR, 'build', f'{name}.omf')
+        orig_path = os.path.join(self.ENGINE_DIR, 'originals', f'{name}.bin')
+
+        if not os.path.exists(omf_path):
+            pytest.skip(f"Build output not found: {omf_path} (run engine/build.sh)")
+        if not os.path.exists(orig_path):
+            pytest.skip(f"Original binary not found: {orig_path}")
+
+        with open(omf_path, 'rb') as f:
+            omf_data = f.read()
+        with open(orig_path, 'rb') as f:
+            orig_data = f.read()
+
+        assert len(orig_data) == info['size'], \
+            f"Original {name} size: expected {info['size']}, got {len(orig_data)}"
+
+        code = omf_data[self.OMF_HEADER_SIZE:self.OMF_HEADER_SIZE + len(orig_data)]
+        assert len(code) == len(orig_data), \
+            f"OMF code section: expected {len(orig_data)}, got {len(code)}"
+        assert code == orig_data, \
+            f"{name} not byte-identical after reassembly"
+
+    def test_subs_byte_identical(self):
+        """SUBS (3,584 bytes at $4100) reassembles byte-identical."""
+        self._verify('SUBS')
+
+    def test_ult3_byte_identical(self):
+        """ULT3 (17,408 bytes at $5000) reassembles byte-identical."""
+        self._verify('ULT3')
+
+    def test_exod_byte_identical(self):
+        """EXOD (26,208 bytes at $2000) reassembles byte-identical."""
+        self._verify('EXOD')
+
+    def test_all_source_files_exist(self):
+        """All three CIDAR disassembly source files exist."""
+        for name, subdir in [('subs.s', 'subs'), ('ult3.s', 'ult3'), ('exod.s', 'exod')]:
+            path = os.path.join(self.ENGINE_DIR, subdir, name)
+            assert os.path.exists(path), f"Source not found: {path}"
+
+    def test_all_original_binaries_exist(self):
+        """All three original binaries exist for verification."""
+        for name in self.BINARIES:
+            path = os.path.join(self.ENGINE_DIR, 'originals', f'{name}.bin')
+            assert os.path.exists(path), f"Original not found: {path}"
+
+    def test_original_binary_sizes(self):
+        """Original binaries have correct documented sizes."""
+        for name, info in self.BINARIES.items():
+            path = os.path.join(self.ENGINE_DIR, 'originals', f'{name}.bin')
+            if not os.path.exists(path):
+                pytest.skip(f"Original not found: {path}")
+            size = os.path.getsize(path)
+            assert size == info['size'], \
+                f"{name}: expected {info['size']} bytes, got {size}"
+
+    def test_omf_header_size(self):
+        """OMF files have the expected 60-byte header."""
+        for name, info in self.BINARIES.items():
+            omf_path = os.path.join(self.ENGINE_DIR, 'build', f'{name}.omf')
+            if not os.path.exists(omf_path):
+                pytest.skip(f"Build output not found (run engine/build.sh)")
+            omf_size = os.path.getsize(omf_path)
+            expected = info['size'] + self.OMF_HEADER_SIZE + self.OMF_TRAILER_SIZE
+            assert omf_size == expected, \
+                f"{name}.omf: expected {expected} bytes, got {omf_size}"
+
+    def test_build_script_exists(self):
+        """Build script exists."""
+        assert os.path.exists(os.path.join(self.ENGINE_DIR, 'build.sh'))
+
+    def test_verify_script_exists(self):
+        """Verification script exists."""
+        assert os.path.exists(os.path.join(self.ENGINE_DIR, 'verify.py'))
