@@ -6807,3 +6807,219 @@ class TestStringCatalog:
         assert strings[1]['text'] == 'BYE'
         assert strings[0]['file_offset'] == 10
         assert strings[1]['file_offset'] == 30
+
+
+# =============================================================================
+# String patcher tests
+# =============================================================================
+
+def _make_inline_binary(*texts):
+    """Build a synthetic binary with JSR $46BA inline strings.
+
+    Returns (bytearray, list_of_string_info_dicts).
+    Each text is high-ASCII encoded after the JSR pattern.
+    """
+    parts = bytearray()
+    # pad with NOPs at start
+    parts.extend(b'\xEA' * 4)
+    for text in texts:
+        # JSR $46BA
+        parts.extend(b'\x20\xBA\x46')
+        for ch in text:
+            if ch == '\n':
+                parts.append(0xFF)
+            else:
+                parts.append(ord(ch.upper()) | 0x80)
+        parts.append(0x00)  # null terminator
+        parts.extend(b'\xEA' * 2)  # pad between strings
+    # Extract string info using the catalog tool
+    import importlib
+    tools_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'engine', 'tools')
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    from string_catalog import extract_inline_strings
+    strings = extract_inline_strings(bytes(parts))
+    return parts, strings
+
+
+class TestStringPatcher:
+    """Test the engine inline string patcher tool."""
+
+    ENGINE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'engine')
+
+    def _get_patcher(self):
+        tools_dir = os.path.join(self.ENGINE_DIR, 'tools')
+        if tools_dir not in sys.path:
+            sys.path.insert(0, tools_dir)
+        from string_patcher import encode_high_ascii, patch_string, resolve_patches
+        return encode_high_ascii, patch_string, resolve_patches
+
+    def test_patcher_tool_exists(self):
+        path = os.path.join(self.ENGINE_DIR, 'tools', 'string_patcher.py')
+        assert os.path.exists(path)
+
+    def test_encode_high_ascii_simple(self):
+        encode_high_ascii, _, _ = self._get_patcher()
+        result = encode_high_ascii('HI')
+        assert result == bytearray([0xC8, 0xC9])
+
+    def test_encode_high_ascii_newline(self):
+        encode_high_ascii, _, _ = self._get_patcher()
+        result = encode_high_ascii('A\nB')
+        assert result == bytearray([0xC1, 0xFF, 0xC2])
+
+    def test_patch_string_fits(self):
+        """Patch that fits in available space succeeds."""
+        _, patch_string, _ = self._get_patcher()
+        data, strings = _make_inline_binary('HELLO WORLD')
+        ok, msg = patch_string(data, strings[0], 'GOODBYE')
+        assert ok
+        assert 'Patched' in msg
+        # Verify the patched bytes
+        offset = strings[0]['text_offset']
+        assert data[offset] == 0xC7  # G
+        assert data[offset + 6] == 0xC5  # E (last char of GOODBYE)
+        assert data[offset + 7] == 0x00  # null fill
+
+    def test_patch_string_exact_fit(self):
+        """Patch that exactly matches original length succeeds."""
+        _, patch_string, _ = self._get_patcher()
+        data, strings = _make_inline_binary('ABC')
+        ok, msg = patch_string(data, strings[0], 'XYZ')
+        assert ok
+        offset = strings[0]['text_offset']
+        assert data[offset] == 0xD8  # X
+        assert data[offset + 1] == 0xD9  # Y
+        assert data[offset + 2] == 0xDA  # Z
+
+    def test_patch_string_too_long(self):
+        """Patch longer than available space fails gracefully."""
+        _, patch_string, _ = self._get_patcher()
+        data, strings = _make_inline_binary('HI')
+        ok, msg = patch_string(data, strings[0], 'THIS IS WAY TOO LONG')
+        assert not ok
+        assert 'too long' in msg.lower()
+
+    def test_patch_null_fills_remainder(self):
+        """Shorter replacement null-fills remaining bytes."""
+        _, patch_string, _ = self._get_patcher()
+        data, strings = _make_inline_binary('ABCDEF')
+        ok, msg = patch_string(data, strings[0], 'XY')
+        assert ok
+        offset = strings[0]['text_offset']
+        assert data[offset] == 0xD8  # X
+        assert data[offset + 1] == 0xD9  # Y
+        # Remaining bytes should be null-filled
+        for i in range(2, 7):  # 6 original + null
+            assert data[offset + i] == 0x00
+
+    def test_resolve_by_index(self):
+        """Resolve patches by string index."""
+        _, _, resolve_patches = self._get_patcher()
+        data, strings = _make_inline_binary('FIRST', 'SECOND')
+        patches = [{'index': 1, 'text': 'REPLACEMENT'}]
+        resolved = resolve_patches(strings, patches)
+        assert len(resolved) == 1
+        assert resolved[0][0]['index'] == 1
+        assert resolved[0][1] == 'REPLACEMENT'
+
+    def test_resolve_by_vanilla_text(self):
+        """Resolve patches by vanilla text matching."""
+        _, _, resolve_patches = self._get_patcher()
+        data, strings = _make_inline_binary('CARD OF DEATH', 'HELLO')
+        patches = [{'vanilla': 'CARD OF DEATH', 'text': 'SHARD OF VOID'}]
+        resolved = resolve_patches(strings, patches)
+        assert len(resolved) == 1
+        assert 'CARD OF DEATH' in resolved[0][0]['text']
+
+    def test_resolve_by_vanilla_case_insensitive(self):
+        """Vanilla text matching is case-insensitive."""
+        _, _, resolve_patches = self._get_patcher()
+        data, strings = _make_inline_binary('HELLO WORLD')
+        patches = [{'vanilla': 'hello world', 'text': 'GOODBYE'}]
+        resolved = resolve_patches(strings, patches)
+        assert len(resolved) == 1
+
+    def test_resolve_by_address(self):
+        """Resolve patches by address."""
+        _, _, resolve_patches = self._get_patcher()
+        data, strings = _make_inline_binary('TEST')
+        addr = strings[0]['address']
+        patches = [{'address': addr, 'text': 'NEW'}]
+        resolved = resolve_patches(strings, patches)
+        assert len(resolved) == 1
+
+    def test_resolve_missing_index_warns(self, capsys):
+        """Missing index produces warning, not crash."""
+        _, _, resolve_patches = self._get_patcher()
+        data, strings = _make_inline_binary('ONLY')
+        patches = [{'index': 999, 'text': 'MISSING'}]
+        resolved = resolve_patches(strings, patches)
+        assert len(resolved) == 0
+
+    def test_resolve_missing_vanilla_warns(self, capsys):
+        """Missing vanilla text produces warning, not crash."""
+        _, _, resolve_patches = self._get_patcher()
+        data, strings = _make_inline_binary('ACTUAL')
+        patches = [{'vanilla': 'NONEXISTENT', 'text': 'MISSING'}]
+        resolved = resolve_patches(strings, patches)
+        assert len(resolved) == 0
+
+    def test_full_patch_roundtrip(self):
+        """Full pipeline: resolve + patch multiple strings."""
+        _, patch_string, resolve_patches = self._get_patcher()
+        data, strings = _make_inline_binary(
+            'CARD OF DEATH', 'MARK OF KINGS', 'HELLO'
+        )
+        patches = [
+            {'vanilla': 'CARD OF DEATH', 'text': 'SHARD OF VOID'},
+            {'vanilla': 'MARK OF KINGS', 'text': 'SIGIL: KINGS'},
+        ]
+        resolved = resolve_patches(strings, patches)
+        assert len(resolved) == 2
+        for string_info, new_text in resolved:
+            ok, msg = patch_string(data, string_info, new_text)
+            assert ok
+        # Verify HELLO is untouched
+        hello_offset = strings[2]['text_offset']
+        assert data[hello_offset] == 0xC8  # H still there
+
+    def test_voidborn_engine_strings_valid(self):
+        """Voidborn engine_strings.json has valid structure."""
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            'conversions', 'voidborn', 'sources', 'engine_strings.json')
+        if not os.path.exists(path):
+            pytest.skip("engine_strings.json not found")
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        assert 'patches' in data
+        assert len(data['patches']) >= 10
+        for patch in data['patches']:
+            assert 'text' in patch
+            assert 'index' in patch or 'vanilla' in patch or 'address' in patch
+
+    def test_voidborn_patches_fit_in_place(self):
+        """All Voidborn engine string patches fit in original space."""
+        ult3_path = os.path.join(self.ENGINE_DIR, 'originals', 'ULT3.bin')
+        if not os.path.exists(ult3_path):
+            pytest.skip("ULT3.bin not found")
+        patches_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                                    'conversions', 'voidborn', 'sources',
+                                    'engine_strings.json')
+        if not os.path.exists(patches_path):
+            pytest.skip("engine_strings.json not found")
+        tools_dir = os.path.join(self.ENGINE_DIR, 'tools')
+        if tools_dir not in sys.path:
+            sys.path.insert(0, tools_dir)
+        from string_catalog import extract_inline_strings
+        from string_patcher import patch_string, resolve_patches
+        with open(ult3_path, 'rb') as f:
+            data = bytearray(f.read())
+        with open(patches_path, 'r', encoding='utf-8') as f:
+            patch_data = json.load(f)
+        strings = extract_inline_strings(bytes(data), 0x5000)
+        resolved = resolve_patches(strings, patch_data['patches'])
+        assert len(resolved) >= 10, f"Only {len(resolved)} patches resolved"
+        for string_info, new_text in resolved:
+            ok, msg = patch_string(data, string_info, new_text)
+            assert ok, f"Patch failed: {msg}"

@@ -1,0 +1,19 @@
+{
+  "description": "Voidborn inline string patches for ULT3 engine binary",
+  "note": "In-place patches (must fit original byte count). See engine_strings_full.json for reassembly-based patches with no length constraints.",
+  "patches": [
+    {"vanilla": "\nCARD OF DEATH",  "text": "\nSHARD OF VOID"},
+    {"vanilla": "\nCARD OF SOL",    "text": "\nVOID FLUX"},
+    {"vanilla": "\nCARD OF LOVE",   "text": "\nVOID GLOOM"},
+    {"vanilla": "\nCARD OF MOONS",  "text": "\nSHARD O'WARP"},
+    {"vanilla": "\nMARK OF FORCE",  "text": "\nSIGIL: FORCE"},
+    {"vanilla": "\nMARK OF FIRE",   "text": "\nSIGIL: FIRE"},
+    {"vanilla": "\nMARK OF SNAKE",  "text": "\nSIGIL: VENOM"},
+    {"vanilla": "\nMARK OF KINGS",  "text": "\nSIGIL: KINGS"},
+    {"index": 244, "text": "SIGIL BRANDED!\n"},
+    {"index": 94,  "text": "\nYELL 'INVOKE'\n\n"},
+    {"index": 115, "text": "SEEK YE, THE\nSIGIL: KINGS!\n"},
+    {"index": 231, "text": "YOU SEE A VISION\nOF THE TIME LORD\n  HE TELLS YOU\n THE ONE WAY IS\n GLOOM, FLUX,\n WARP & VOID,\n ALL ELSE FAILS."},
+    {"index": 90,  "text": "A SHARD, WITH\nSTRANGE MARKS!"}
+  ]
+}
