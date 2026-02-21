@@ -11,7 +11,7 @@ u3edit is a data toolkit for Ultima III: Exodus (Apple II, 1983). It provides CL
 ```bash
 pip install -e ".[dev]"              # Install with pytest
 pip install -e ".[tui]"              # Install with prompt_toolkit for TUI editors
-pytest -v                            # Run all 853 tests
+pytest -v                            # Run all 865 tests
 pytest tests/test_roster.py          # Run one test module
 pytest -v tests/test_bcd.py::TestBcdToInt::test_zero  # Run single test
 u3edit roster view path/to/ROST      # CLI usage pattern
@@ -132,6 +132,11 @@ Buildable engine source tree using the Rosetta toolchain (asmiigs/deasmiigs). Al
 - **`engine/verify.py`**: Python verification script for CI/programmatic use
 
 Build pipeline: `asmiigs --cpu 6502 source.s -o output.omf` → OMF has 60-byte header + code + 1-byte trailer. Code at offset 60 matches original binary exactly.
+
+### Inline string catalog (`engine/tools/`)
+
+- **`string_catalog.py`**: Extracts all JSR $46BA inline strings from engine binaries. Auto-detects origin address from filename. Outputs text or JSON catalog with categories.
+- **`ult3_strings.json`**: Pre-built catalog of 245 inline strings in ULT3 (3,714 bytes total). Categories: quest-item, combat, movement, magic, equipment, location, trap, fountain, shop, status, story, ui-prompt, death, other.
 
 ## Data integrity rules
 

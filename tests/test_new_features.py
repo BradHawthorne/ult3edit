@@ -6668,3 +6668,142 @@ class TestEngineRoundTrip:
     def test_verify_script_exists(self):
         """Verification script exists."""
         assert os.path.exists(os.path.join(self.ENGINE_DIR, 'verify.py'))
+
+
+class TestStringCatalog:
+    """Test the engine inline string catalog tool."""
+
+    ENGINE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'engine')
+
+    def _load_ult3(self):
+        path = os.path.join(self.ENGINE_DIR, 'originals', 'ULT3.bin')
+        if not os.path.exists(path):
+            pytest.skip("ULT3.bin not found")
+        with open(path, 'rb') as f:
+            return f.read()
+
+    def test_catalog_tool_exists(self):
+        path = os.path.join(self.ENGINE_DIR, 'tools', 'string_catalog.py')
+        assert os.path.exists(path)
+
+    def test_extract_finds_strings(self):
+        """ULT3 contains 200+ inline strings."""
+        sys.path.insert(0, os.path.join(self.ENGINE_DIR, 'tools'))
+        from string_catalog import extract_inline_strings
+        data = self._load_ult3()
+        strings = extract_inline_strings(data, 0x5000)
+        assert len(strings) >= 200, f"Expected 200+ strings, got {len(strings)}"
+
+    def test_extract_card_of_death(self):
+        """Can find 'CARD OF DEATH' inline string."""
+        sys.path.insert(0, os.path.join(self.ENGINE_DIR, 'tools'))
+        from string_catalog import extract_inline_strings
+        data = self._load_ult3()
+        strings = extract_inline_strings(data, 0x5000)
+        texts = [s['text'] for s in strings]
+        assert any('CARD OF DEATH' in t for t in texts)
+
+    def test_extract_mark_of_kings(self):
+        """Can find 'MARK OF KINGS' inline string."""
+        sys.path.insert(0, os.path.join(self.ENGINE_DIR, 'tools'))
+        from string_catalog import extract_inline_strings
+        data = self._load_ult3()
+        strings = extract_inline_strings(data, 0x5000)
+        texts = [s['text'] for s in strings]
+        assert any('MARK OF KINGS' in t for t in texts)
+
+    def test_extract_evocare(self):
+        """Can find 'EVOCARE' inline string."""
+        sys.path.insert(0, os.path.join(self.ENGINE_DIR, 'tools'))
+        from string_catalog import extract_inline_strings
+        data = self._load_ult3()
+        strings = extract_inline_strings(data, 0x5000)
+        texts = [s['text'] for s in strings]
+        assert any('EVOCARE' in t for t in texts)
+
+    def test_total_bytes_reasonable(self):
+        """Total inline string bytes should be 3000-5000."""
+        sys.path.insert(0, os.path.join(self.ENGINE_DIR, 'tools'))
+        from string_catalog import extract_inline_strings
+        data = self._load_ult3()
+        strings = extract_inline_strings(data, 0x5000)
+        total = sum(s['jsr_plus_text'] for s in strings)
+        assert 3000 <= total <= 5000, f"Total bytes: {total}"
+
+    def test_no_strings_in_exod(self):
+        """EXOD should have zero JSR $46BA strings."""
+        path = os.path.join(self.ENGINE_DIR, 'originals', 'EXOD.bin')
+        if not os.path.exists(path):
+            pytest.skip("EXOD.bin not found")
+        sys.path.insert(0, os.path.join(self.ENGINE_DIR, 'tools'))
+        from string_catalog import extract_inline_strings
+        with open(path, 'rb') as f:
+            data = f.read()
+        strings = extract_inline_strings(data, 0x2000)
+        assert len(strings) == 0
+
+    def test_no_strings_in_subs(self):
+        """SUBS should have zero JSR $46BA strings (it IS the printer)."""
+        path = os.path.join(self.ENGINE_DIR, 'originals', 'SUBS.bin')
+        if not os.path.exists(path):
+            pytest.skip("SUBS.bin not found")
+        sys.path.insert(0, os.path.join(self.ENGINE_DIR, 'tools'))
+        from string_catalog import extract_inline_strings
+        with open(path, 'rb') as f:
+            data = f.read()
+        strings = extract_inline_strings(data, 0x4100)
+        assert len(strings) == 0
+
+    def test_json_catalog_exists(self):
+        """Pre-built JSON catalog exists."""
+        path = os.path.join(self.ENGINE_DIR, 'tools', 'ult3_strings.json')
+        if not os.path.exists(path):
+            pytest.skip("JSON catalog not built yet")
+        with open(path) as f:
+            catalog = json.load(f)
+        assert catalog['total_strings'] >= 200
+        assert 'strings' in catalog
+
+    def test_categorize_quest_items(self):
+        """Categorizer identifies quest item strings correctly."""
+        sys.path.insert(0, os.path.join(self.ENGINE_DIR, 'tools'))
+        from string_catalog import categorize_string
+        assert categorize_string('CARD OF DEATH') == 'quest-item'
+        assert categorize_string('MARK OF KINGS') == 'quest-item'
+
+    def test_categorize_combat(self):
+        """Categorizer identifies combat strings correctly."""
+        sys.path.insert(0, os.path.join(self.ENGINE_DIR, 'tools'))
+        from string_catalog import categorize_string
+        assert categorize_string('KILLED! EXP.-') == 'combat'
+        assert categorize_string('MISSED!') == 'combat'
+
+    def test_synthesized_binary_scan(self):
+        """String extraction works on synthesized data with known strings."""
+        sys.path.insert(0, os.path.join(self.ENGINE_DIR, 'tools'))
+        from string_catalog import extract_inline_strings
+        # Build a small binary with two inline strings
+        data = bytearray(100)
+        # JSR $46BA at offset 10
+        data[10] = 0x20
+        data[11] = 0xBA
+        data[12] = 0x46
+        # "HI" in high-ASCII + null
+        data[13] = 0xC8  # H
+        data[14] = 0xC9  # I
+        data[15] = 0x00  # null
+        # JSR $46BA at offset 30
+        data[30] = 0x20
+        data[31] = 0xBA
+        data[32] = 0x46
+        # "BYE" in high-ASCII + null
+        data[33] = 0xC2  # B
+        data[34] = 0xD9  # Y
+        data[35] = 0xC5  # E
+        data[36] = 0x00  # null
+        strings = extract_inline_strings(bytes(data))
+        assert len(strings) == 2
+        assert strings[0]['text'] == 'HI'
+        assert strings[1]['text'] == 'BYE'
+        assert strings[0]['file_offset'] == 10
+        assert strings[1]['file_offset'] == 30
