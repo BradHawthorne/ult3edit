@@ -7023,3 +7023,180 @@ class TestStringPatcher:
         for string_info, new_text in resolved:
             ok, msg = patch_string(data, string_info, new_text)
             assert ok, f"Patch failed: {msg}"
+
+
+# =============================================================================
+# Source-level string patcher tests
+# =============================================================================
+
+def _make_asm_source(*inline_texts):
+    """Build synthetic .s source lines with ASC inline strings.
+
+    Returns list of source lines simulating CIDAR disassembly output.
+    """
+    lines = []
+    lines.append('            ORG     $5000\n')
+    lines.append('; --- Code ---\n')
+    for text in inline_texts:
+        lines.append('            DB      $20,$BA,$46,$FF\n')
+        lines.append(f'            ASC     "{text}"\n')
+        lines.append('            DB      $00 ; null terminator\n')
+        lines.append('            DB      $60  ; RTS\n')
+    return lines
+
+
+class TestSourcePatcher:
+    """Test the source-level inline string patcher tool."""
+
+    ENGINE_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'engine')
+
+    def _get_source_patcher(self):
+        tools_dir = os.path.join(self.ENGINE_DIR, 'tools')
+        if tools_dir not in sys.path:
+            sys.path.insert(0, tools_dir)
+        from source_patcher import (
+            extract_asc_strings, is_inline_string,
+            resolve_source_patches, apply_source_patches,
+        )
+        return extract_asc_strings, is_inline_string, resolve_source_patches, apply_source_patches
+
+    def test_source_patcher_exists(self):
+        path = os.path.join(self.ENGINE_DIR, 'tools', 'source_patcher.py')
+        assert os.path.exists(path)
+
+    def test_extract_asc_strings(self):
+        """Can find ASC directives in synthesized source."""
+        extract, _, _, _ = self._get_source_patcher()
+        lines = _make_asm_source('HELLO WORLD', 'GOODBYE')
+        strings = extract(lines)
+        assert len(strings) == 2
+        assert strings[0]['text'] == 'HELLO WORLD'
+        assert strings[1]['text'] == 'GOODBYE'
+
+    def test_is_inline_string(self):
+        """Correctly identifies JSR $46BA inline strings."""
+        extract, is_inline, _, _ = self._get_source_patcher()
+        lines = _make_asm_source('CARD OF DEATH')
+        strings = extract(lines)
+        assert len(strings) == 1
+        assert is_inline(lines, strings[0])
+
+    def test_is_not_inline_string(self):
+        """Non-inline ASC directives are not flagged."""
+        extract, is_inline, _, _ = self._get_source_patcher()
+        lines = [
+            '            ASC     "JUST DATA"\n',
+            '            DB      $00\n',
+        ]
+        strings = extract(lines)
+        assert len(strings) == 1
+        assert not is_inline(lines, strings[0])
+
+    def test_resolve_by_vanilla(self):
+        """Resolve source patches by vanilla text."""
+        extract, _, resolve, _ = self._get_source_patcher()
+        lines = _make_asm_source('CARD OF DEATH', 'HELLO')
+        strings = extract(lines)
+        patches = [{'vanilla': 'CARD OF DEATH', 'text': 'SHARD OF VOID'}]
+        resolved = resolve(strings, patches)
+        assert len(resolved) == 1
+        assert resolved[0][1] == 'SHARD OF VOID'
+
+    def test_resolve_case_insensitive(self):
+        """Vanilla text matching is case-insensitive."""
+        extract, _, resolve, _ = self._get_source_patcher()
+        lines = _make_asm_source('HELLO WORLD')
+        strings = extract(lines)
+        patches = [{'vanilla': 'hello world', 'text': 'GOODBYE'}]
+        resolved = resolve(strings, patches)
+        assert len(resolved) == 1
+
+    def test_resolve_by_index(self):
+        """Resolve source patches by ASC index."""
+        extract, _, resolve, _ = self._get_source_patcher()
+        lines = _make_asm_source('FIRST', 'SECOND', 'THIRD')
+        strings = extract(lines)
+        patches = [{'index': 1, 'text': 'REPLACEMENT'}]
+        resolved = resolve(strings, patches)
+        assert len(resolved) == 1
+        assert resolved[0][0]['text'] == 'SECOND'
+
+    def test_apply_replaces_text(self):
+        """Applying patches replaces ASC directive text."""
+        extract, _, resolve, apply_patches = self._get_source_patcher()
+        lines = _make_asm_source('CARD OF DEATH', 'MARK OF KINGS')
+        strings = extract(lines)
+        patches = [
+            {'vanilla': 'CARD OF DEATH', 'text': 'SHARD OF THE ETERNAL VOID'},
+            {'vanilla': 'MARK OF KINGS', 'text': 'SIGIL OF KINGS'},
+        ]
+        resolved = resolve(strings, patches)
+        modified, count = apply_patches(lines, resolved)
+        assert count == 2
+        # Check that modified lines contain new text
+        combined = ''.join(modified)
+        assert 'SHARD OF THE ETERNAL VOID' in combined
+        assert 'SIGIL OF KINGS' in combined
+        # Originals should be gone
+        assert 'CARD OF DEATH' not in combined
+        assert 'MARK OF KINGS' not in combined
+
+    def test_apply_no_length_constraint(self):
+        """Source-level patches have no length constraints."""
+        extract, _, resolve, apply_patches = self._get_source_patcher()
+        lines = _make_asm_source('HI')
+        strings = extract(lines)
+        # Replace 2-char string with 50-char string -- would fail in binary patcher
+        long_text = 'THIS IS A VERY LONG REPLACEMENT STRING WITH NO LIMIT'
+        patches = [{'vanilla': 'HI', 'text': long_text}]
+        resolved = resolve(strings, patches)
+        modified, count = apply_patches(lines, resolved)
+        assert count == 1
+        assert long_text in ''.join(modified)
+
+    def test_apply_preserves_untouched(self):
+        """Unmatched ASC directives are preserved."""
+        extract, _, resolve, apply_patches = self._get_source_patcher()
+        lines = _make_asm_source('CHANGE ME', 'KEEP ME')
+        strings = extract(lines)
+        patches = [{'vanilla': 'CHANGE ME', 'text': 'CHANGED'}]
+        resolved = resolve(strings, patches)
+        modified, count = apply_patches(lines, resolved)
+        assert count == 1
+        combined = ''.join(modified)
+        assert 'KEEP ME' in combined
+        assert 'CHANGED' in combined
+
+    def test_voidborn_full_patches_valid(self):
+        """Voidborn engine_strings_full.json has valid structure."""
+        path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                            'conversions', 'voidborn', 'sources',
+                            'engine_strings_full.json')
+        if not os.path.exists(path):
+            pytest.skip("engine_strings_full.json not found")
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        assert 'patches' in data
+        assert len(data['patches']) >= 8
+        for patch in data['patches']:
+            assert 'text' in patch
+            assert 'vanilla' in patch or 'index' in patch
+
+    def test_voidborn_full_patches_resolve_against_source(self):
+        """All Voidborn full patches resolve against ULT3 source."""
+        source_path = os.path.join(self.ENGINE_DIR, 'ult3', 'ult3.s')
+        if not os.path.exists(source_path):
+            pytest.skip("ult3.s not found")
+        patches_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                                    'conversions', 'voidborn', 'sources',
+                                    'engine_strings_full.json')
+        if not os.path.exists(patches_path):
+            pytest.skip("engine_strings_full.json not found")
+        extract, _, resolve, _ = self._get_source_patcher()
+        with open(source_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        with open(patches_path, 'r', encoding='utf-8') as f:
+            patch_data = json.load(f)
+        strings = extract(lines)
+        resolved = resolve(strings, patch_data['patches'])
+        assert len(resolved) >= 8, f"Only {len(resolved)} patches resolved"

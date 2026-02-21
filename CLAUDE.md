@@ -11,7 +11,7 @@ u3edit is a data toolkit for Ultima III: Exodus (Apple II, 1983). It provides CL
 ```bash
 pip install -e ".[dev]"              # Install with pytest
 pip install -e ".[tui]"              # Install with prompt_toolkit for TUI editors
-pytest -v                            # Run all 881 tests
+pytest -v                            # Run all 893 tests
 pytest tests/test_roster.py          # Run one test module
 pytest -v tests/test_bcd.py::TestBcdToInt::test_zero  # Run single test
 u3edit roster view path/to/ROST      # CLI usage pattern
@@ -133,10 +133,22 @@ Buildable engine source tree using the Rosetta toolchain (asmiigs/deasmiigs). Al
 
 Build pipeline: `asmiigs --cpu 6502 source.s -o output.omf` → OMF has 60-byte header + code + 1-byte trailer. Code at offset 60 matches original binary exactly.
 
-### Inline string catalog (`engine/tools/`)
+### Inline string tools (`engine/tools/`)
 
 - **`string_catalog.py`**: Extracts all JSR $46BA inline strings from engine binaries. Auto-detects origin address from filename. Outputs text or JSON catalog with categories.
 - **`ult3_strings.json`**: Pre-built catalog of 245 inline strings in ULT3 (3,714 bytes total). Categories: quest-item, combat, movement, magic, equipment, location, trap, fountain, shop, status, story, ui-prompt, death, other.
+- **`string_patcher.py`**: Binary-level in-place string patcher. Matches by index, vanilla text, or address. Constraint: replacement must fit in original byte allocation.
+- **`source_patcher.py`**: Source-level ASC directive patcher. Modifies `.s` assembly files — **no length constraints**. Requires asmiigs reassembly after patching.
+
+### Scenario build pipeline (`engine/scenario_build.sh`)
+
+Two-tier build system for scenario/conversion authors:
+1. **Source-level** (preferred): `source_patcher.py` modifies `.s` files → `asmiigs` reassembles → no string length limits
+2. **Binary-level** (fallback): `string_patcher.py` patches binary in-place → no assembler needed, but strings must fit original space
+
+Scenario patch files:
+- `engine_strings_full.json`: Source-level patches (used when asmiigs is available)
+- `engine_strings.json`: Binary-level patches (fallback, length-constrained)
 
 ## Data integrity rules
 

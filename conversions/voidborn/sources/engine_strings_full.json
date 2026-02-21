@@ -1,0 +1,14 @@
+{
+  "description": "Voidborn source-level string patches for ULT3 engine (no length constraints)",
+  "note": "Used with source_patcher.py + asmiigs reassembly. Replaces ASC directives in ult3.s.",
+  "patches": [
+    {"vanilla": "CARD OF DEATH",  "text": "SHARD OF VOID"},
+    {"vanilla": "CARD OF SOL",    "text": "SHARD OF FLUX"},
+    {"vanilla": "CARD OF LOVE",   "text": "SHARD OF GLOOM"},
+    {"vanilla": "CARD OF MOONS",  "text": "SHARD OF WARP"},
+    {"vanilla": "MARK OF FORCE",  "text": "SIGIL OF FORCE"},
+    {"vanilla": "MARK OF FIRE",   "text": "SIGIL OF FIRE"},
+    {"vanilla": "MARK OF SNAKE",  "text": "SIGIL OF VENOM"},
+    {"vanilla": "MARK OF KINGS",  "text": "SIGIL OF KINGS"}
+  ]
+}
