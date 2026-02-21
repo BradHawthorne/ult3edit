@@ -377,6 +377,13 @@ def cmd_import(args) -> None:
 
     data = bytes(raw)
 
+    # Warn if size doesn't match any known sound file format
+    known_sizes = {info['size']: name for name, info in SOUND_FILES.items()}
+    if len(data) not in known_sizes:
+        print(f"  Warning: {len(data)} bytes doesn't match any known sound file "
+              f"(SOSA={SOSA_FILE_SIZE}, SOSM={SOSM_FILE_SIZE}, MBS={MBS_FILE_SIZE})",
+              file=sys.stderr)
+
     print(f"Import: {len(data)} bytes")
 
     if dry_run:

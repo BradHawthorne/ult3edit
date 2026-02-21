@@ -118,6 +118,32 @@ class TestCharacterEnums:
         for bit in CARDS_BITS:
             assert bit <= 3
 
+    def test_card_bits_match_engine(self):
+        """Engine-verified: AND masks from ULT3 $6C28-$6C90 inventory display.
+
+        $6C28: AND #$08 -> CARD OF DEATH  (bit 3)
+        $6C3C: AND #$02 -> CARD OF SOL    (bit 1)
+        $6C50: AND #$01 -> CARD OF LOVE   (bit 0)
+        $6C64: AND #$04 -> CARD OF MOONS  (bit 2)
+        """
+        assert CARDS_BITS[0] == 'Love'
+        assert CARDS_BITS[1] == 'Sol'
+        assert CARDS_BITS[2] == 'Moons'
+        assert CARDS_BITS[3] == 'Death'
+
+    def test_mark_bits_match_engine(self):
+        """Engine-verified: AND masks from ULT3 $6C78-$6CE0 inventory display.
+
+        $6C78: AND #$10 -> MARK OF FORCE  (bit 4)
+        $6C8C: AND #$20 -> MARK OF FIRE   (bit 5)
+        $6CA0: AND #$40 -> MARK OF SNAKE  (bit 6)
+        $6CB4: AND #$80 -> MARK OF KINGS  (bit 7)
+        """
+        assert MARKS_BITS[4] == 'Force'
+        assert MARKS_BITS[5] == 'Fire'
+        assert MARKS_BITS[6] == 'Snake'
+        assert MARKS_BITS[7] == 'Kings'
+
 
 class TestMonsterNames:
     def test_known_creatures(self):

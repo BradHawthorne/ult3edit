@@ -202,6 +202,10 @@ def cmd_import(args) -> None:
 
     data = bytes(raw)
 
+    if len(data) != DDRW_FILE_SIZE:
+        print(f"  Warning: expected {DDRW_FILE_SIZE} bytes, got {len(data)}",
+              file=sys.stderr)
+
     print(f"Import: {len(data)} bytes")
 
     if dry_run:

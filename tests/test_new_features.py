@@ -6455,3 +6455,72 @@ class TestPrtySlotIdsPartialWrite:
         party = PartyState(raw)
         party.slot_ids = [1, 3, 7, 15]
         assert party.slot_ids == [1, 3, 7, 15]
+
+
+class TestDdrwImportSizeValidation:
+    """DDRW import should warn on wrong file size."""
+
+    def test_correct_size_no_warning(self, tmp_path, capsys):
+        """Importing 1792 bytes should produce no warning."""
+        from u3edit.ddrw import cmd_import, DDRW_FILE_SIZE
+        json_file = tmp_path / 'ddrw.json'
+        json_file.write_text(json.dumps({'raw': [0] * DDRW_FILE_SIZE}))
+        out_file = tmp_path / 'DDRW'
+        out_file.write_bytes(b'\x00' * DDRW_FILE_SIZE)
+        args = type('A', (), {
+            'file': str(out_file), 'json_file': str(json_file),
+            'output': None, 'backup': False, 'dry_run': False,
+        })()
+        cmd_import(args)
+        assert 'Warning' not in capsys.readouterr().err
+
+    def test_wrong_size_warns(self, tmp_path, capsys):
+        """Importing wrong size should produce a warning."""
+        from u3edit.ddrw import cmd_import, DDRW_FILE_SIZE
+        json_file = tmp_path / 'ddrw.json'
+        json_file.write_text(json.dumps({'raw': [0] * 100}))
+        out_file = tmp_path / 'DDRW'
+        out_file.write_bytes(b'\x00' * DDRW_FILE_SIZE)
+        args = type('A', (), {
+            'file': str(out_file), 'json_file': str(json_file),
+            'output': None, 'backup': False, 'dry_run': False,
+        })()
+        cmd_import(args)
+        err = capsys.readouterr().err
+        assert 'Warning' in err
+        assert '1792' in err
+
+
+class TestSoundImportSizeValidation:
+    """Sound import should warn on unknown file sizes."""
+
+    def test_known_size_no_warning(self, tmp_path, capsys):
+        """Importing 4096 bytes (SOSA) should produce no warning."""
+        from u3edit.sound import cmd_import
+        from u3edit.constants import SOSA_FILE_SIZE
+        json_file = tmp_path / 'sosa.json'
+        json_file.write_text(json.dumps({'raw': [0] * SOSA_FILE_SIZE}))
+        out_file = tmp_path / 'SOSA'
+        out_file.write_bytes(b'\x00' * SOSA_FILE_SIZE)
+        args = type('A', (), {
+            'file': str(out_file), 'json_file': str(json_file),
+            'output': None, 'backup': False, 'dry_run': False,
+        })()
+        cmd_import(args)
+        assert 'Warning' not in capsys.readouterr().err
+
+    def test_unknown_size_warns(self, tmp_path, capsys):
+        """Importing unknown size should produce a warning."""
+        from u3edit.sound import cmd_import
+        json_file = tmp_path / 'sound.json'
+        json_file.write_text(json.dumps({'raw': [0] * 999}))
+        out_file = tmp_path / 'SND'
+        out_file.write_bytes(b'\x00' * 999)
+        args = type('A', (), {
+            'file': str(out_file), 'json_file': str(json_file),
+            'output': None, 'backup': False, 'dry_run': False,
+        })()
+        cmd_import(args)
+        err = capsys.readouterr().err
+        assert 'Warning' in err
+        assert '999' in err
