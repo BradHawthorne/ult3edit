@@ -476,6 +476,102 @@ def cmd_import(args) -> None:
 
 
 # ============================================================================
+# Inline string catalog
+# ============================================================================
+
+# JSR $46BA = $20 $BA $46
+_JSR_46BA = bytes([0x20, 0xBA, 0x46])
+
+
+def _extract_inline_strings(data: bytes, org: int = 0):
+    """Extract JSR $46BA inline strings from binary data.
+
+    Embedded implementation — same algorithm as engine/tools/string_catalog.py
+    but integrated into the u3edit package (no external dependency).
+    """
+    strings = []
+    i = 0
+    idx = 0
+    while i < len(data) - 3:
+        if data[i:i + 3] == _JSR_46BA:
+            text_start = i + 3
+            chars = []
+            j = text_start
+            while j < len(data) and data[j] != 0x00:
+                b = data[j]
+                if b == 0xFF:
+                    chars.append('\n')
+                else:
+                    ch = b & 0x7F
+                    if 0x20 <= ch < 0x7F:
+                        chars.append(chr(ch))
+                j += 1
+            if chars:
+                text = ''.join(chars)
+                byte_count = j - text_start + 1  # including null
+                strings.append({
+                    'index': idx,
+                    'address': org + i,
+                    'text': text,
+                    'byte_count': byte_count,
+                })
+                idx += 1
+            i = j + 1
+        else:
+            i += 1
+    return strings
+
+
+def cmd_strings(args) -> None:
+    """List all JSR $46BA inline strings in an engine binary."""
+    with open(args.file, 'rb') as f:
+        data = f.read()
+
+    info = identify_binary(data, args.file)
+    if not info:
+        print(f"Warning: Unknown binary ({len(data)} bytes)", file=sys.stderr)
+        org = 0
+    else:
+        org = info['load_addr']
+
+    strings = _extract_inline_strings(data, org)
+
+    if not strings:
+        print(f"No inline strings found in {os.path.basename(args.file)}")
+        return
+
+    if getattr(args, 'json', False):
+        result = {
+            'binary': os.path.basename(args.file),
+            'org': f'${org:04X}',
+            'total_strings': len(strings),
+            'total_bytes': sum(s['byte_count'] for s in strings),
+            'strings': strings,
+        }
+        export_json(result, args.output)
+    else:
+        filename = os.path.basename(args.file)
+        total = sum(s['byte_count'] for s in strings)
+        print(f"\n=== Inline Strings: {filename} ===")
+        print(f"Total: {len(strings)} strings, {total:,} bytes")
+        print(f"Origin: ${org:04X}\n")
+
+        # Filter by search text if specified
+        search = getattr(args, 'search', None)
+        display = strings
+        if search:
+            search_upper = search.upper()
+            display = [s for s in strings if search_upper in s['text'].upper()]
+            print(f"Filter: '{search}' ({len(display)} matches)\n")
+
+        for s in display:
+            text = s['text'].replace('\n', '\\n')
+            print(f"  [{s['index']:3d}] ${s['address']:04X}  "
+                  f"{s['byte_count']:3d}B  {text}")
+        print()
+
+
+# ============================================================================
 # Parser registration
 # ============================================================================
 
@@ -515,6 +611,13 @@ def register_parser(subparsers) -> None:
     p_import.add_argument('--dry-run', action='store_true',
                           help='Show changes without writing')
 
+    p_strings = sub.add_parser('strings',
+                               help='List inline JSR $46BA strings')
+    p_strings.add_argument('file', help='Engine binary (ULT3)')
+    p_strings.add_argument('--search', help='Filter by text (case-insensitive)')
+    p_strings.add_argument('--json', action='store_true', help='Output as JSON')
+    p_strings.add_argument('--output', '-o', help='Output file (for --json)')
+
 
 def dispatch(args) -> None:
     """Dispatch patch subcommand."""
@@ -527,8 +630,10 @@ def dispatch(args) -> None:
         cmd_dump(args)
     elif cmd == 'import':
         cmd_import(args)
+    elif cmd == 'strings':
+        cmd_strings(args)
     else:
-        print("Usage: u3edit patch {view|edit|dump|import} ...",
+        print("Usage: u3edit patch {view|edit|dump|import|strings} ...",
               file=sys.stderr)
 
 
@@ -568,6 +673,13 @@ def main() -> None:
                           help='Create .bak backup before overwrite')
     p_import.add_argument('--dry-run', action='store_true',
                           help='Show changes without writing')
+
+    p_strings = sub.add_parser('strings',
+                               help='List inline JSR $46BA strings')
+    p_strings.add_argument('file', help='Engine binary (ULT3)')
+    p_strings.add_argument('--search', help='Filter by text (case-insensitive)')
+    p_strings.add_argument('--json', action='store_true', help='Output as JSON')
+    p_strings.add_argument('--output', '-o', help='Output file (for --json)')
 
     args = parser.parse_args()
     dispatch(args)

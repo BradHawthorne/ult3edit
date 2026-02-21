@@ -1,0 +1,14 @@
+{
+  "description": "Scenario engine string patches — edit this file for your custom scenario",
+  "note": "Used with source_patcher.py (no length limits) or string_patcher.py (in-place). Match by vanilla text or index. See engine/tools/ult3_strings.json for the full 245-string catalog.",
+  "patches": [
+    {"vanilla": "CARD OF DEATH",  "text": "CARD OF DEATH",  "_comment": "Quest item 1"},
+    {"vanilla": "CARD OF SOL",    "text": "CARD OF SOL",    "_comment": "Quest item 2"},
+    {"vanilla": "CARD OF LOVE",   "text": "CARD OF LOVE",   "_comment": "Quest item 3"},
+    {"vanilla": "CARD OF MOONS",  "text": "CARD OF MOONS",  "_comment": "Quest item 4"},
+    {"vanilla": "MARK OF FORCE",  "text": "MARK OF FORCE",  "_comment": "Quest mark 1"},
+    {"vanilla": "MARK OF FIRE",   "text": "MARK OF FIRE",   "_comment": "Quest mark 2"},
+    {"vanilla": "MARK OF SNAKE",  "text": "MARK OF SNAKE",  "_comment": "Quest mark 3"},
+    {"vanilla": "MARK OF KINGS",  "text": "MARK OF KINGS",  "_comment": "Quest mark 4"}
+  ]
+}

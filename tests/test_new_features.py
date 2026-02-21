@@ -1,5 +1,6 @@
 """Tests for Grok audit improvements: backup, dry-run, validate, search, import, etc."""
 
+import argparse
 import json
 import os
 import shutil
@@ -7200,3 +7201,102 @@ class TestSourcePatcher:
         strings = extract(lines)
         resolved = resolve(strings, patch_data['patches'])
         assert len(resolved) >= 8, f"Only {len(resolved)} patches resolved"
+
+
+# =============================================================================
+# Integrated inline string catalog (patch.py cmd_strings)
+# =============================================================================
+
+class TestPatchStrings:
+    """Test the u3edit patch strings CLI integration."""
+
+    def _make_binary_with_strings(self, *texts):
+        """Build binary with JSR $46BA inline strings."""
+        data = bytearray()
+        data.extend(b'\xEA' * 4)  # NOP padding
+        for text in texts:
+            data.extend(b'\x20\xBA\x46')  # JSR $46BA
+            for ch in text:
+                if ch == '\n':
+                    data.append(0xFF)
+                else:
+                    data.append(ord(ch.upper()) | 0x80)
+            data.append(0x00)  # null terminator
+            data.extend(b'\xEA' * 2)
+        return bytes(data)
+
+    def test_extract_inline_strings(self):
+        """Integrated _extract_inline_strings finds strings."""
+        from u3edit.patch import _extract_inline_strings
+        data = self._make_binary_with_strings('HELLO', 'WORLD')
+        strings = _extract_inline_strings(data)
+        assert len(strings) == 2
+        assert strings[0]['text'] == 'HELLO'
+        assert strings[1]['text'] == 'WORLD'
+
+    def test_extract_with_newlines(self):
+        """Strings with embedded newlines ($FF) decoded correctly."""
+        from u3edit.patch import _extract_inline_strings
+        data = self._make_binary_with_strings('LINE1\nLINE2')
+        strings = _extract_inline_strings(data)
+        assert len(strings) == 1
+        assert strings[0]['text'] == 'LINE1\nLINE2'
+
+    def test_extract_with_org(self):
+        """Origin address added to reported addresses."""
+        from u3edit.patch import _extract_inline_strings
+        data = self._make_binary_with_strings('TEST')
+        strings = _extract_inline_strings(data, org=0x5000)
+        assert strings[0]['address'] >= 0x5000
+
+    def test_extract_empty_binary(self):
+        """Empty or no-string binary returns empty list."""
+        from u3edit.patch import _extract_inline_strings
+        data = bytes(100)
+        strings = _extract_inline_strings(data)
+        assert len(strings) == 0
+
+    def test_cmd_strings_on_ult3(self, capsys):
+        """cmd_strings produces output on ULT3 binary."""
+        ult3_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                                 'engine', 'originals', 'ULT3.bin')
+        if not os.path.exists(ult3_path):
+            pytest.skip("ULT3.bin not found")
+        from u3edit.patch import cmd_strings
+        args = argparse.Namespace(file=ult3_path, json=False, search=None,
+                                  output=None)
+        cmd_strings(args)
+        captured = capsys.readouterr()
+        assert '245 strings' in captured.out
+        assert 'CARD OF DEATH' in captured.out
+
+    def test_cmd_strings_search(self, capsys):
+        """cmd_strings search filter works."""
+        ult3_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                                 'engine', 'originals', 'ULT3.bin')
+        if not os.path.exists(ult3_path):
+            pytest.skip("ULT3.bin not found")
+        from u3edit.patch import cmd_strings
+        args = argparse.Namespace(file=ult3_path, json=False,
+                                  search='MARK', output=None)
+        cmd_strings(args)
+        captured = capsys.readouterr()
+        assert 'MARK OF KINGS' in captured.out
+        # Should NOT show unrelated strings
+        assert 'SPELL TYPE' not in captured.out
+
+    def test_cmd_strings_json(self, capsys, tmp_dir):
+        """cmd_strings JSON output is valid."""
+        ult3_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),
+                                 'engine', 'originals', 'ULT3.bin')
+        if not os.path.exists(ult3_path):
+            pytest.skip("ULT3.bin not found")
+        out_path = os.path.join(tmp_dir, 'strings.json')
+        from u3edit.patch import cmd_strings
+        args = argparse.Namespace(file=ult3_path, json=True, search=None,
+                                  output=out_path)
+        cmd_strings(args)
+        with open(out_path) as f:
+            data = json.load(f)
+        assert data['total_strings'] >= 200
+        assert 'strings' in data
