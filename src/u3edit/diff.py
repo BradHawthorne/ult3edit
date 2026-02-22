@@ -2,7 +2,8 @@
 
 Compare two game files or directories and report differences.
 Supports all data types: roster, bestiary, combat maps, save state,
-overworld/dungeon maps, special locations, and TLK dialog.
+overworld/dungeon maps, special locations, TLK dialog, sound (SOSA/SOSM/MBS),
+shapes (SHPS), dungeon drawing (DDRW), and text (TEXT).
 
 Usage:
     u3edit diff file1 file2              # Compare two files of the same type
@@ -22,7 +23,8 @@ from .constants import (
     CON_FILE_SIZE, CON_NAMES, CON_LETTERS,
     SPECIAL_FILE_SIZE, SPECIAL_NAMES,
     PRTY_FILE_SIZE, PLRS_FILE_SIZE,
-    SOSA_FILE_SIZE, SOSM_FILE_SIZE,
+    SOSA_FILE_SIZE, SOSM_FILE_SIZE, MBS_FILE_SIZE,
+    TEXT_FILE_SIZE, DDRW_FILE_SIZE, SHPS_FILE_SIZE,
     MAP_OVERWORLD_SIZE, MAP_DUNGEON_SIZE, MAP_LETTERS,
     TLK_LETTERS,
 )
@@ -312,6 +314,25 @@ def diff_tlk(path1: str, path2: str, letter: str) -> FileDiff:
     return fd
 
 
+def diff_binary(path1: str, path2: str, name: str) -> FileDiff:
+    """Compare two binary files byte-by-byte."""
+    with open(path1, 'rb') as f:
+        data1 = f.read()
+    with open(path2, 'rb') as f:
+        data2 = f.read()
+    fd = FileDiff(name, name)
+    ed = EntityDiff('binary', name)
+    if len(data1) != len(data2):
+        ed.fields.append(FieldDiff('size', len(data1), len(data2)))
+    min_len = min(len(data1), len(data2))
+    changed_bytes = sum(1 for i in range(min_len) if data1[i] != data2[i])
+    changed_bytes += abs(len(data1) - len(data2))
+    if changed_bytes:
+        ed.fields.append(FieldDiff('changed_bytes', 0, changed_bytes))
+    fd.entities.append(ed)
+    return fd
+
+
 def diff_save(dir1: str, dir2: str) -> list[FileDiff]:
     """Compare save state files (PRTY, PLRS) between two directories."""
     results = []
@@ -348,6 +369,14 @@ def detect_file_type(path: str) -> str | None:
         return 'SOSA'
     if basename == 'SOSM' and size == SOSM_FILE_SIZE:
         return 'SOSM'
+    if basename == 'MBS' and size == MBS_FILE_SIZE:
+        return 'MBS'
+    if basename == 'TEXT' and size == TEXT_FILE_SIZE:
+        return 'TEXT'
+    if basename == 'DDRW' and size == DDRW_FILE_SIZE:
+        return 'DDRW'
+    if basename == 'SHPS' and size == SHPS_FILE_SIZE:
+        return 'SHPS'
     if basename.startswith('MON') and len(basename) == 4 and size == MON_FILE_SIZE:
         return basename
     if basename.startswith('CON') and len(basename) == 4 and size == CON_FILE_SIZE:
@@ -390,10 +419,8 @@ def diff_file(path1: str, path2: str) -> FileDiff | None:
         return _diff_prty(path1, path2)
     if ftype == 'PLRS':
         return _diff_plrs(path1, path2)
-    if ftype == 'SOSA':
-        return diff_map(path1, path2, 'SOSA')
-    if ftype == 'SOSM':
-        return diff_map(path1, path2, 'SOSM')
+    if ftype in ('SOSA', 'SOSM', 'MBS', 'TEXT', 'DDRW', 'SHPS'):
+        return diff_binary(path1, path2, ftype)
     return None
 
 
@@ -433,11 +460,19 @@ def diff_directories(dir1: str, dir2: str) -> GameDiff:
     for fd in diff_save(dir1, dir2):
         gd.files.append(fd)
 
-    # SOSA (overworld save state)
-    s1 = resolve_single_file(dir1, 'SOSA')
-    s2 = resolve_single_file(dir2, 'SOSA')
-    if s1 and s2:
-        gd.files.append(diff_map(s1, s2, 'SOSA'))
+    # Sound files (SOSA, SOSM, MBS)
+    for snd in ('SOSA', 'SOSM', 'MBS'):
+        s1 = resolve_single_file(dir1, snd)
+        s2 = resolve_single_file(dir2, snd)
+        if s1 and s2:
+            gd.files.append(diff_binary(s1, s2, snd))
+
+    # Binary data files (TEXT, DDRW, SHPS)
+    for binfile in ('TEXT', 'DDRW', 'SHPS'):
+        b1 = resolve_single_file(dir1, binfile)
+        b2 = resolve_single_file(dir2, binfile)
+        if b1 and b2:
+            gd.files.append(diff_binary(b1, b2, binfile))
 
     # Special locations
     for prefix in SPECIAL_NAMES:

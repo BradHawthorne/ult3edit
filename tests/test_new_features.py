@@ -8523,3 +8523,112 @@ class TestDiffCommands:
         out = capsys.readouterr().out
         # Should show roster differences
         assert len(out) > 0
+
+
+class TestDiffNewFileTypes:
+    """Tests for diff support of MBS, DDRW, SHPS, TEXT."""
+
+    def _make_pair(self, tmp_path, name, size, change_offset=0):
+        """Helper: create two files in subdirs, second differs at offset."""
+        da = tmp_path / 'a'
+        db = tmp_path / 'b'
+        da.mkdir(exist_ok=True)
+        db.mkdir(exist_ok=True)
+        d1 = bytearray(size)
+        d2 = bytearray(size)
+        d2[change_offset] = 0xFF
+        (da / name).write_bytes(bytes(d1))
+        (db / name).write_bytes(bytes(d2))
+        return da / name, db / name
+
+    def test_diff_mbs_files(self, tmp_path, capsys):
+        """Diff detects changes in MBS sound files."""
+        from u3edit.diff import cmd_diff
+        from u3edit.constants import MBS_FILE_SIZE
+        p1, p2 = self._make_pair(tmp_path, 'MBS', MBS_FILE_SIZE)
+        args = argparse.Namespace(
+            path1=str(p1), path2=str(p2),
+            json=False, summary=False, output=None)
+        cmd_diff(args)
+        out = capsys.readouterr().out
+        assert 'MBS' in out
+
+    def test_diff_ddrw_files(self, tmp_path, capsys):
+        """Diff detects changes in DDRW files."""
+        from u3edit.diff import cmd_diff
+        from u3edit.constants import DDRW_FILE_SIZE
+        p1, p2 = self._make_pair(tmp_path, 'DDRW', DDRW_FILE_SIZE)
+        args = argparse.Namespace(
+            path1=str(p1), path2=str(p2),
+            json=False, summary=False, output=None)
+        cmd_diff(args)
+        out = capsys.readouterr().out
+        assert 'DDRW' in out
+
+    def test_diff_shps_files(self, tmp_path, capsys):
+        """Diff detects changes in SHPS files."""
+        from u3edit.diff import cmd_diff
+        from u3edit.constants import SHPS_FILE_SIZE
+        p1, p2 = self._make_pair(tmp_path, 'SHPS', SHPS_FILE_SIZE)
+        args = argparse.Namespace(
+            path1=str(p1), path2=str(p2),
+            json=False, summary=False, output=None)
+        cmd_diff(args)
+        out = capsys.readouterr().out
+        assert 'SHPS' in out
+
+    def test_diff_text_files(self, tmp_path, capsys):
+        """Diff detects changes in TEXT files."""
+        from u3edit.diff import cmd_diff
+        from u3edit.constants import TEXT_FILE_SIZE
+        p1, p2 = self._make_pair(tmp_path, 'TEXT', TEXT_FILE_SIZE)
+        args = argparse.Namespace(
+            path1=str(p1), path2=str(p2),
+            json=False, summary=False, output=None)
+        cmd_diff(args)
+        out = capsys.readouterr().out
+        assert 'TEXT' in out
+
+    def test_diff_binary_identical(self, tmp_path, capsys):
+        """Identical binary files show no byte changes."""
+        from u3edit.diff import diff_binary
+        from u3edit.constants import DDRW_FILE_SIZE
+        da = tmp_path / 'a'
+        db = tmp_path / 'b'
+        da.mkdir()
+        db.mkdir()
+        data = bytes(DDRW_FILE_SIZE)
+        (da / 'DDRW').write_bytes(data)
+        (db / 'DDRW').write_bytes(data)
+        fd = diff_binary(str(da / 'DDRW'), str(db / 'DDRW'), 'DDRW')
+        # No changed_bytes field if identical
+        changed = [f for f in fd.entities[0].fields
+                   if f.path == 'changed_bytes']
+        assert not changed or changed[0].new == 0
+
+    def test_diff_directories_includes_new_types(self, tmp_path):
+        """Directory diff scans for MBS, DDRW, SHPS, TEXT."""
+        from u3edit.diff import cmd_diff
+        from u3edit.constants import (
+            DDRW_FILE_SIZE, MBS_FILE_SIZE, SHPS_FILE_SIZE, TEXT_FILE_SIZE)
+        d1 = tmp_path / 'game1'
+        d2 = tmp_path / 'game2'
+        d1.mkdir()
+        d2.mkdir()
+        for name, size in [('DDRW', DDRW_FILE_SIZE), ('MBS', MBS_FILE_SIZE),
+                           ('SHPS', SHPS_FILE_SIZE), ('TEXT', TEXT_FILE_SIZE)]:
+            data1 = bytearray(size)
+            data2 = bytearray(size)
+            data2[0] = 0xAA
+            (d1 / name).write_bytes(bytes(data1))
+            (d2 / name).write_bytes(bytes(data2))
+        args = argparse.Namespace(
+            path1=str(d1), path2=str(d2),
+            json=True, summary=False, output=str(tmp_path / 'diff.json'))
+        cmd_diff(args)
+        result = json.loads((tmp_path / 'diff.json').read_text())
+        file_types = {f['type'] for f in result['files']}
+        assert 'DDRW' in file_types
+        assert 'MBS' in file_types
+        assert 'SHPS' in file_types
+        assert 'TEXT' in file_types
