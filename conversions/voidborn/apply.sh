@@ -28,6 +28,14 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DATA_DIR="${SCRIPT_DIR}/data"
 SOURCES_DIR="${SCRIPT_DIR}/sources"
 TOOLS_DIR="${SCRIPT_DIR}/../tools"
+if [ -z "${PYTHON:-}" ]; then
+    if python3 --version &>/dev/null 2>&1; then PYTHON=python3
+    elif python --version &>/dev/null 2>&1; then PYTHON=python
+    else echo "ERROR: Python not found."; exit 1; fi
+fi
+
+# Convert path to native format (handles Git bash /d/ -> D:/ on Windows)
+native_path() { command -v cygpath &>/dev/null && cygpath -m "$1" || echo "$1"; }
 
 echo "=== Exodus: Voidborn Total Conversion ==="
 echo "Target: ${GAME_DIR}"
@@ -378,8 +386,9 @@ if [ -d "$SOURCES_DIR" ]; then
     TEXT=$(find_file "TEXT")
     if [ -f "$TITLE_JSON" ] && [ -f "$TEXT" ]; then
         # Read title records from JSON and apply via text edit
-        TITLE0=$(python3 -c "import json; d=json.load(open('${TITLE_JSON}')); print(d['records'][0]['text'])")
-        TITLE1=$(python3 -c "import json; d=json.load(open('${TITLE_JSON}')); print(d['records'][1]['text'])")
+        TITLE_JSON_NATIVE=$(native_path "$TITLE_JSON")
+        TITLE0=$($PYTHON -c "import json; d=json.load(open('${TITLE_JSON_NATIVE}')); print(d['records'][0]['text'])")
+        TITLE1=$($PYTHON -c "import json; d=json.load(open('${TITLE_JSON_NATIVE}')); print(d['records'][1]['text'])")
         ult3edit text edit "$TEXT" --record 0 --text "$TITLE0" 2>/dev/null || true
         ult3edit text edit "$TEXT" --record 1 --text "$TITLE1" 2>/dev/null || true
         echo "  Applied title screen text"
@@ -440,7 +449,7 @@ if [ -d "$SOURCES_DIR" ]; then
     # Apply shop overlay string replacements (text-matching, no hardcoded offsets)
     SHOP_JSON="${SOURCES_DIR}/shop_strings.json"
     if [ -f "$SHOP_JSON" ] && [ -f "${TOOLS_DIR}/shop_apply.py" ]; then
-        python3 "${TOOLS_DIR}/shop_apply.py" "$SHOP_JSON" "$GAME_DIR" 2>/dev/null || true
+        $PYTHON "${TOOLS_DIR}/shop_apply.py" "$SHOP_JSON" "$GAME_DIR" 2>/dev/null || true
         echo "  Applied shop overlay string replacements"
     fi
 
@@ -490,7 +499,7 @@ fi
 if [ "${VERIFY:-}" = "1" ] && [ -f "${TOOLS_DIR}/verify.py" ]; then
     echo ""
     echo "--- Running verification ---"
-    python3 "${TOOLS_DIR}/verify.py" "$GAME_DIR"
+    $PYTHON "${TOOLS_DIR}/verify.py" "$GAME_DIR"
 fi
 
 # =============================================================================
