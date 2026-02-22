@@ -14737,3 +14737,270 @@ class TestCliDispatch:
             pass  # Expected
         finally:
             sys.argv = sys_argv_backup
+
+
+# =============================================================================
+# Batch 7: Final gaps — combat edit, dispatch fallbacks, directory errors
+# =============================================================================
+
+class TestCombatCmdEditGaps:
+    """Test combat cmd_edit CLI error paths."""
+
+    def test_tile_out_of_bounds(self, tmp_path):
+        """cmd_edit --tile with coords out of bounds exits."""
+        from u3edit.combat import cmd_edit
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, tile=(99, 99, 0x10),
+            monster_pos=None, pc_pos=None,
+            dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_monster_pos_index_out_of_range(self, tmp_path):
+        """cmd_edit --monster-pos with bad index exits."""
+        from u3edit.combat import cmd_edit
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, tile=None,
+            monster_pos=(99, 0, 0), pc_pos=None,
+            dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_pc_pos_index_out_of_range(self, tmp_path):
+        """cmd_edit --pc-pos with bad index exits."""
+        from u3edit.combat import cmd_edit
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, tile=None,
+            monster_pos=None, pc_pos=(99, 0, 0),
+            dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_tile_value_out_of_range(self, tmp_path):
+        """cmd_edit --tile with value > 255 exits."""
+        from u3edit.combat import cmd_edit
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, tile=(0, 0, 999),
+            monster_pos=None, pc_pos=None,
+            dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_monster_pos_coords_out_of_bounds(self, tmp_path):
+        """cmd_edit --monster-pos with position out of map bounds exits."""
+        from u3edit.combat import cmd_edit
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, tile=None,
+            monster_pos=(0, 99, 99), pc_pos=None,
+            dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+
+class TestCombatCmdViewGaps:
+    """Test combat cmd_view directory error."""
+
+    def test_no_con_files_in_dir(self, tmp_path):
+        """cmd_view on directory with no CON files exits."""
+        from u3edit.combat import cmd_view
+        args = argparse.Namespace(
+            path=str(tmp_path), json=False, output=None, validate=False)
+        with pytest.raises(SystemExit):
+            cmd_view(args)
+
+
+class TestBestiaryCmdViewGaps:
+    """Test bestiary cmd_view directory error."""
+
+    def test_no_mon_files_in_dir(self, tmp_path):
+        """cmd_view on directory with no MON files exits."""
+        from u3edit.bestiary import cmd_view
+        args = argparse.Namespace(
+            game_dir=str(tmp_path), json=False, output=None,
+            validate=False, file=None)
+        with pytest.raises(SystemExit):
+            cmd_view(args)
+
+
+class TestMapCmdViewGaps:
+    """Test map cmd_view and cmd_overview directory errors."""
+
+    def test_overview_no_map_files(self, tmp_path):
+        """cmd_overview on directory with no MAP files exits."""
+        from u3edit.map import cmd_overview
+        args = argparse.Namespace(
+            game_dir=str(tmp_path), json=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_overview(args)
+
+    def test_view_invalid_crop_non_int(self, tmp_path):
+        """cmd_view with non-integer crop values exits."""
+        from u3edit.map import cmd_view
+        data = bytearray(MAP_OVERWORLD_SIZE)
+        path = os.path.join(str(tmp_path), 'MAPA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, crop='a,b,c,d', json=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_view(args)
+
+    def test_set_coords_out_of_bounds(self, tmp_path):
+        """cmd_set with out-of-bounds coords exits."""
+        data = bytearray(MAP_OVERWORLD_SIZE)
+        path = os.path.join(str(tmp_path), 'MAPA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, x=999, y=999, tile=0x10, level=None,
+            dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_set(args)
+
+
+class TestDispatchFallbacks:
+    """Test dispatch() fallback for unrecognized subcommands."""
+
+    def test_combat_dispatch_unknown(self, capsys):
+        """Combat dispatch with unknown command prints usage."""
+        from u3edit.combat import dispatch
+        args = argparse.Namespace(combat_command='bogus')
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err or 'usage' in captured.err.lower()
+
+    def test_bestiary_dispatch_unknown(self, capsys):
+        """Bestiary dispatch with unknown command prints usage."""
+        from u3edit.bestiary import dispatch
+        args = argparse.Namespace(bestiary_command='bogus')
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err or 'usage' in captured.err.lower()
+
+    def test_map_dispatch_unknown(self, capsys):
+        """Map dispatch with unknown command prints usage."""
+        from u3edit.map import dispatch
+        args = argparse.Namespace(map_command='bogus')
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err or 'usage' in captured.err.lower()
+
+    def test_tlk_dispatch_unknown(self, capsys):
+        """TLK dispatch with unknown command prints usage."""
+        from u3edit.tlk import dispatch
+        args = argparse.Namespace(tlk_command='bogus')
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err or 'usage' in captured.err.lower()
+
+    def test_save_dispatch_unknown(self, capsys):
+        """Save dispatch with unknown command prints usage."""
+        from u3edit.save import dispatch
+        args = argparse.Namespace(save_command='bogus')
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err or 'usage' in captured.err.lower()
+
+    def test_special_dispatch_unknown(self, capsys):
+        """Special dispatch with unknown command prints usage."""
+        from u3edit.special import dispatch
+        args = argparse.Namespace(special_command='bogus')
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err or 'usage' in captured.err.lower()
+
+    def test_text_dispatch_unknown(self, capsys):
+        """Text dispatch with unknown command prints usage."""
+        from u3edit.text import dispatch
+        args = argparse.Namespace(text_command='bogus')
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err or 'usage' in captured.err.lower()
+
+    def test_ddrw_dispatch_unknown(self, capsys):
+        """DDRW dispatch with unknown command prints usage."""
+        from u3edit.ddrw import dispatch
+        args = argparse.Namespace(ddrw_command='bogus')
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err or 'usage' in captured.err.lower()
+
+    def test_patch_dispatch_unknown(self, capsys):
+        """Patch dispatch with unknown command prints usage."""
+        from u3edit.patch import dispatch
+        args = argparse.Namespace(patch_command='bogus')
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err or 'usage' in captured.err.lower()
+
+    def test_roster_dispatch_unknown(self, capsys):
+        """Roster dispatch with unknown command prints usage."""
+        from u3edit.roster import dispatch
+        args = argparse.Namespace(roster_command='bogus')
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err or 'usage' in captured.err.lower()
+
+    def test_sound_dispatch_unknown(self, capsys):
+        """Sound dispatch with unknown command prints usage."""
+        from u3edit.sound import dispatch
+        args = argparse.Namespace(sound_command='bogus')
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err or 'usage' in captured.err.lower()
+
+    def test_shapes_dispatch_unknown(self, capsys):
+        """Shapes dispatch with unknown command prints usage."""
+        from u3edit.shapes import dispatch
+        args = argparse.Namespace(shapes_command='bogus')
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err or 'usage' in captured.err.lower()
+
+    def test_equip_dispatch_unknown(self, capsys):
+        """Equip dispatch with unknown command prints usage."""
+        from u3edit.equip import dispatch
+        args = argparse.Namespace(equip_command='bogus')
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err or 'usage' in captured.err.lower()
+
+    def test_spell_dispatch_unknown(self, capsys):
+        """Spell dispatch with unknown command prints usage."""
+        from u3edit.spell import dispatch
+        args = argparse.Namespace(spell_command='bogus')
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err or 'usage' in captured.err.lower()
+
+
+class TestSaveCmdViewGaps:
+    """Test save cmd_view error paths."""
+
+    def test_no_prty_in_dir(self, tmp_path):
+        """cmd_view on directory with no PRTY file exits."""
+        from u3edit.save import cmd_view
+        args = argparse.Namespace(
+            game_dir=str(tmp_path), json=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_view(args)
