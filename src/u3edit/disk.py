@@ -155,8 +155,14 @@ class DiskContext:
 
     def __enter__(self):
         self._tmpdir = tempfile.mkdtemp(prefix='u3edit_')
-        # Extract all files to cache directory
-        disk_extract_all(self.image_path, self._tmpdir, self.diskiigs_path)
+        try:
+            # Extract all files to cache directory
+            disk_extract_all(self.image_path, self._tmpdir, self.diskiigs_path)
+        except Exception:
+            # Clean up temp dir if extraction fails (e.g. diskiigs not found)
+            shutil.rmtree(self._tmpdir, ignore_errors=True)
+            self._tmpdir = None
+            raise
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

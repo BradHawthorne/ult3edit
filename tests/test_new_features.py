@@ -9918,3 +9918,109 @@ class TestTlkFindReplaceError:
             cmd_edit(args)
         err = capsys.readouterr().err
         assert 'must be used together' in err
+
+
+# =============================================================================
+# Special truncated file, DiskContext leak, TUI fixes
+# =============================================================================
+
+class TestSpecialTruncatedFile:
+    """Tests for special.py handling truncated files in JSON export."""
+
+    def test_truncated_file_json_no_crash(self, tmp_path):
+        """Truncated special file doesn't crash in single-file JSON export."""
+        from u3edit.special import cmd_view
+        path = tmp_path / 'BRND'
+        path.write_bytes(bytes(50))  # 50 < 128 (SPECIAL_FILE_SIZE)
+        outfile = tmp_path / 'special.json'
+        args = argparse.Namespace(
+            path=str(path), json=True, output=str(outfile))
+        cmd_view(args)
+        result = json.loads(outfile.read_text())
+        assert 'tiles' in result
+        # Should not crash — inner bounds check prevents IndexError
+
+    def test_full_file_json_complete(self, tmp_path):
+        """Full-size special file produces complete 11x11 grid."""
+        from u3edit.special import cmd_view
+        path = tmp_path / 'BRND'
+        path.write_bytes(bytes(SPECIAL_FILE_SIZE))
+        outfile = tmp_path / 'special.json'
+        args = argparse.Namespace(
+            path=str(path), json=True, output=str(outfile))
+        cmd_view(args)
+        result = json.loads(outfile.read_text())
+        assert len(result['tiles']) == 11
+        assert len(result['tiles'][0]) == 11
+
+
+class TestDiskContextLeakGuard:
+    """Tests for DiskContext temp directory cleanup on __enter__ failure."""
+
+    def test_enter_failure_cleans_tmpdir(self, tmp_path):
+        """DiskContext cleans up temp dir when disk extraction raises."""
+        from u3edit.disk import DiskContext
+        # Use a non-existent image path and non-existent tool
+        fake_image = str(tmp_path / 'nonexistent.po')
+        ctx = DiskContext(fake_image, diskiigs_path='/nonexistent/tool')
+        with pytest.raises(Exception):
+            ctx.__enter__()
+        # After failure, _tmpdir should be cleaned up (set to None)
+        assert ctx._tmpdir is None
+
+
+class TestMapEditorDungeonPadding:
+    """Tests for MapEditor padding short dungeon files."""
+
+    def test_short_dungeon_file_pads(self):
+        """Short dungeon data is padded to at least 256 bytes."""
+        from u3edit.tui.map_editor import MapEditor
+        # 100-byte file (less than one dungeon level)
+        data = bytes(100)
+        editor = MapEditor('test', data, is_dungeon=True)
+        assert len(editor.full_data) >= 256
+        # Should be able to access all 16x16 tiles without IndexError
+        for y in range(16):
+            for x in range(16):
+                _ = editor.state.tile_at(x, y)
+
+
+class TestDialogEditorEmptyRecord:
+    """Tests for DialogEditor save with empty records."""
+
+    def test_encode_empty_lines_produces_nonzero(self):
+        """encode_record(['']) produces at least 1 byte before stripping."""
+        from u3edit.tlk import encode_record
+        from u3edit.constants import TLK_RECORD_END
+        result = encode_record([''])
+        # Empty line should produce just TLK_RECORD_END (0x00)
+        assert len(result) >= 1
+        # After stripping (encoded[:-1]), should not be empty
+        # The dialog editor now guards against this
+        stripped = result[:-1] if len(result) > 1 else result
+        assert len(stripped) >= 1
+
+    def test_dialog_editor_save_preserves_records(self):
+        """DialogEditor save doesn't collapse null separators."""
+        from u3edit.tui.dialog_editor import DialogEditor
+        from u3edit.tlk import encode_record
+        from u3edit.constants import TLK_RECORD_END
+        # Build a TLK-like blob with 3 records
+        records = [
+            encode_record(['HELLO'])[:-1],  # strip trailing null
+            encode_record(['WORLD'])[:-1],
+            encode_record(['END'])[:-1],
+        ]
+        data = bytes([TLK_RECORD_END]).join(records)
+        saved_data = []
+        editor = DialogEditor('test', data, save_callback=lambda d: saved_data.append(d))
+        assert len(editor.records) == 3
+        # Mark record 0 as modified and save
+        editor._modified_records.add(0)
+        editor.dirty = True
+        editor._save()
+        # Should still produce valid data with 3 records
+        assert len(saved_data) == 1
+        # Re-parse should yield 3 records
+        reloaded = DialogEditor('test', saved_data[0])
+        assert len(reloaded.records) == 3

@@ -44,7 +44,10 @@ class DialogEditor:
         for text_idx in self._modified_records:
             raw_idx = self._text_part_indices[text_idx]
             encoded = encode_record(self.records[text_idx])
-            parts[raw_idx] = encoded[:-1]  # strip trailing TLK_RECORD_END
+            # Strip trailing TLK_RECORD_END, but ensure at least 1 byte
+            # so the null-join doesn't collapse separators
+            stripped = encoded[:-1] if len(encoded) > 1 else encoded
+            parts[raw_idx] = stripped
         data = bytes([TLK_RECORD_END]).join(parts)
         if self.save_callback:
             self.save_callback(data)

@@ -92,6 +92,7 @@ class DrillDownTab:
         self.session = session
         self.selected_index = 0
         self.active_editor = None  # None = selector mode
+        self._editor_version = 0
 
     @property
     def name(self):
@@ -206,13 +207,13 @@ class DrillDownTab:
         # Sub-editor keybindings: dynamically forwarded via _DynamicEditorBindings
         class _DynamicEditorBindings:
             """Proxy that delegates to the current sub-editor's keybindings."""
+
             def _update_cache(self):
                 pass
 
             @property
             def _version(self):
-                kb = tab._editor_kb
-                return id(kb) if kb else 0
+                return tab._editor_version
 
             @property
             def bindings(self):
@@ -244,3 +245,4 @@ class DrillDownTab:
         container, kb = self.active_editor.build_ui()
         self._editor_container = container
         self._editor_kb = kb
+        self._editor_version += 1

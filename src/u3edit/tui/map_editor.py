@@ -19,7 +19,10 @@ class MapEditor(BaseTileEditor):
         self.num_levels = len(data) // 256 if is_dungeon else 1
 
         if is_dungeon:
-            level_data = bytearray(data[:256])
+            # Pad to at least one full level if file is short
+            if len(self.full_data) < 256:
+                self.full_data.extend(bytes(256 - len(self.full_data)))
+            level_data = bytearray(self.full_data[:256])
             state = EditorState(
                 data=level_data, width=16, height=16, is_dungeon=True,
             )

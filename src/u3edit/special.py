@@ -116,7 +116,8 @@ def cmd_view(args) -> None:
             result = {
                 'file': filename, 'name': name,
                 'tiles': [[tile_char(data[y * SPECIAL_MAP_WIDTH + x])
-                            for x in range(SPECIAL_MAP_WIDTH)]
+                            for x in range(SPECIAL_MAP_WIDTH)
+                            if y * SPECIAL_MAP_WIDTH + x < len(data)]
                            for y in range(SPECIAL_MAP_HEIGHT)
                            if y * SPECIAL_MAP_WIDTH < len(data)],
                 'trailing_bytes': get_trailing_bytes(data),
