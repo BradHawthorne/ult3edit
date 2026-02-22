@@ -16,7 +16,7 @@ symbolicated engine sources (`engine/ult3/ult3.s`, `engine/exod/exod.s`,
 | Offset | Size | Field | Encoding | Notes |
 |--------|------|-------|----------|-------|
 | 0x00 | 14 | Name | High-ASCII, null-terminated | Max 13 chars (BOOT.s CPY #$0D), byte 0x0D = guaranteed null |
-| 0x0E | 1 | Marks/Cards | Bitmask | High nibble=Marks (7:Kings 6:Snake 5:Fire 4:Force), Low=Cards (3:Death 2:Sol 1:Love 0:Moons) |
+| 0x0E | 1 | Marks/Cards | Bitmask | High nibble=Marks (7:Kings 6:Snake 5:Fire 4:Force), Low=Cards (3:Death 2:Moons 1:Sol 0:Love) |
 | 0x0F | 1 | Torches | Binary | Count of torch items |
 | 0x10 | 1 | In-Party | Binary | $FF = in active party, $00 = not |
 | 0x11 | 1 | Status | ASCII | G=Good, P=Poisoned, D=Dead, A=Ashes |
@@ -38,7 +38,7 @@ symbolicated engine sources (`engine/ult3/ult3.s`, `engine/exod/exod.s`,
 | 0x26 | 1 | Keys | BCD | Key count (0-99) |
 | 0x27 | 1 | Powders | BCD | Powder count (0-99) |
 | 0x28 | 1 | Worn Armor | Index | Currently equipped armor (0-7) |
-| 0x29 | 7 | Armor Inv | Binary[7] | Count of each armor type (Cloth..Exotic) |
+| 0x29 | 7 | Armor Inv | Binary[7] | Count of each armor type (Skin..Exotic) |
 | 0x30 | 1 | Readied Weapon | Index | Currently equipped weapon (0-15) |
 | 0x31 | 15 | Weapon Inv | Binary[15] | Count of each weapon type (Dagger..Exotic) |
 
@@ -268,6 +268,20 @@ for wall drawing and tile display records.
 
 ### Key Routines (symbolicated label names)
 
+ULT3-defined routines ($5000+):
+
+| Address | Label | Purpose |
+|---------|-------|---------|
+| $58E9 | `char_decrypt_records` | Character record decryption |
+| $65B0 | `game_main_loop` | Central state machine / game loop |
+| $7107 | `combat_add_hp` | Combat HP management |
+| $7181 | `combat_apply_damage` | Apply damage and status effects |
+| $75AE | `magic_cast_spell` | Spell casting handler |
+| $7E18 | `combat_tile_at_xy` | Combat tile lookup (`offset = Y*11 + X`) |
+| $93DE | `calc_hgr_scanline` | HGR scanline address computation |
+
+SUBS routines called by ULT3 (defined in SUBS at $4100+):
+
 | Address | Label | Purpose |
 |---------|-------|---------|
 | $4732 | `print_inline_str` | Inline string printer (JSR $46BA + text + $00) |
@@ -276,13 +290,6 @@ for wall drawing and tile display records.
 | $4BCA | `setup_char_ptr` | Character pointer ($FE/$FF = $4000 + slot*64) |
 | $4CE8 | `play_sfx` | Sound effect dispatcher |
 | $4E40 | `get_random` | Pseudo-random number generator |
-| $58E9 | `char_decrypt_records` | Character record decryption |
-| $65B0 | `game_main_loop` | Central state machine / game loop |
-| $7107 | `combat_add_hp` | Combat HP management |
-| $7181 | `combat_apply_damage` | Apply damage and status effects |
-| $75AE | `magic_cast_spell` | Spell casting handler |
-| $7E18 | `combat_tile_at_xy` | Combat tile lookup (`offset = Y*11 + X`) |
-| $93DE | `calc_hgr_scanline` | HGR scanline address computation |
 
 ---
 
@@ -321,12 +328,16 @@ animation frame data (`anim_data_*` labels).
 |---------|-------|---------|
 | $4732 | `print_inline_str` | Print text embedded after JSR $46BA |
 | $4767 | `scroll_text_up` | Scroll text window, redraw border |
+| $4855 | `draw_hgr_stripe` | Draw colored vertical stripe on HGR |
 | $487B | `clear_hgr_page` | Zero-fill HGR page 1 ($2000-$3FFF) |
 | $4893 | `plot_char_glyph` | Plot 7x8 character glyph to HGR |
+| $48D9 | `swap_tile_frames` | Swap tile animation frames in memory |
+| $48FF | `advance_ptr_128` | Add $80 to pointer $FE/$FF |
 | $490D | `print_digit` | Print single ASCII digit |
 | $4935 | `calc_roster_ptr` | Compute roster slot address ($9500+N*64) |
 | $4955 | `copy_roster_to_plrs` | Copy roster records to active PLRS |
 | $496B | `copy_plrs_to_roster` | Copy active PLRS back to roster |
+| $49FF | `modulo` | A mod $F3 (modular arithmetic) |
 | $4A13 | `update_viewport` | Full viewport display refresh |
 | $4BCA | `setup_char_ptr` | Set $FE/$FF = $4000 + slot*64 |
 | $4BE4 | `print_char_name` | Print character name centered |

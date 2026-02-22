@@ -42,7 +42,7 @@ Copy this file into your conversion directory and track progress.
 
 ## 3. Bestiary (Monster Stats)
 
-8 encounter files (MON A-H+), 16 monsters each.
+13 encounter files (MON A-L, Z), 16 monsters each.
 
 | Item | u3edit Command | Notes |
 |------|----------------|-------|

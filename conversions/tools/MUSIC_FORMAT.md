@@ -129,8 +129,8 @@ The driver maps pitch indices ($01-$3F) to note names across 4+ octaves:
 
 ### Viewing current music data
 ```bash
-u3edit sound view MBS              # Full hex dump + stream analysis
-u3edit sound view MBS --stream     # Decoded note/opcode stream
+u3edit sound view MBS              # Hex dump + auto music stream analysis
+u3edit sound view MBS --json -o mbs.json   # Export as JSON
 ```
 
 ### Patching individual bytes

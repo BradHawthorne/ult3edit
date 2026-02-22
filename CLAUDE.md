@@ -22,7 +22,7 @@ u3edit edit game.po                  # Unified TUI editor (requires prompt_toolk
 
 ### Module-per-data-type pattern
 
-Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tlk, combat, save, special, text, spell, equip, shapes, sound, patch, ddrw, diff, disk). Every module follows the same contract:
+Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tlk, combat, save, special, text, spell, equip, shapes, sound, patch, ddrw, diff, disk). Most modules follow the standard contract:
 
 - **Data class** (e.g., `Character`, `Monster`): wraps `bytearray` with `@property` accessors
 - **`load_*(path)` / `save_*(path, obj)`**: File I/O
@@ -32,6 +32,8 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 - **`register_parser(subparsers)`**: Adds CLI subcommands
 - **`dispatch(args)`**: Routes to command handlers
 - **`main()`**: Standalone entry point (also registered as `u3-{module}` console script). Must have full parity with `register_parser()` — same subcommands, args, and help text.
+
+Exceptions: `equip` and `spell` are view-only (no `cmd_edit`/`cmd_import`). `diff` has `cmd_diff` only. `disk` has `cmd_info`/`cmd_list`/`cmd_extract`/`cmd_audit`.
 
 ### CLI dispatcher (`cli.py`)
 

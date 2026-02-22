@@ -669,6 +669,9 @@ bash conversions/voidborn/apply.sh path/to/game.po
 - **256 tile** pixel art definitions
 - **Name table** with all custom terrain/monster/weapon/armor/spell names
 - **4 special** location JSON files (shrines, fountains)
+- **3 sound** JSON files (SOSA, SOSM, MBS)
+- **Shop overlay** strings JSON (weapon/armor/item shop text)
+- **DDRW** dungeon drawing data JSON
 - **Title** screen text
 
 ## License
