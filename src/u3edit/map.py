@@ -457,7 +457,7 @@ def cmd_compile(args) -> None:
         for ch in stripped:
             if ch not in char_map:
                 unknown_chars.add(ch)
-            row.append(char_map.get(ch, 0))
+            row.append(char_map.get(ch, 0 if is_dungeon else 0x04))
 
         width = 16 if is_dungeon else 64
         if len(row) < width:
@@ -468,7 +468,8 @@ def cmd_compile(args) -> None:
         current_level.append(row)
 
     if unknown_chars:
-        print(f"  Warning: unknown tile chars mapped to 0x00: "
+        default_hex = '0x00' if is_dungeon else '0x04'
+        print(f"  Warning: unknown tile chars mapped to {default_hex}: "
               f"{sorted(unknown_chars)}", file=sys.stderr)
 
     if is_dungeon:
