@@ -8632,3 +8632,162 @@ class TestDiffNewFileTypes:
         assert 'MBS' in file_types
         assert 'SHPS' in file_types
         assert 'TEXT' in file_types
+
+
+# ============================================================================
+# Additional view-only command tests
+# ============================================================================
+
+class TestViewOnlyCommands:
+    """Tests for view-only commands (equip, spell, shapes export)."""
+
+    def test_equip_view(self, capsys):
+        """equip view produces equipment stats table."""
+        from u3edit.equip import cmd_view
+        args = argparse.Namespace(json=False, output=None)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert 'Dagger' in out or 'Leather' in out
+
+    def test_equip_view_json(self, tmp_path):
+        """equip view --json produces valid JSON."""
+        from u3edit.equip import cmd_view
+        outfile = tmp_path / 'equip.json'
+        args = argparse.Namespace(json=True, output=str(outfile))
+        cmd_view(args)
+        result = json.loads(outfile.read_text())
+        assert 'weapons' in result or 'armors' in result
+
+    def test_spell_view(self, capsys):
+        """spell view produces spell reference table."""
+        from u3edit.spell import cmd_view
+        args = argparse.Namespace(
+            json=False, output=None,
+            cleric_only=False, wizard_only=False)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert len(out) > 50
+
+    def test_spell_view_json(self, tmp_path):
+        """spell view --json produces valid JSON."""
+        from u3edit.spell import cmd_view
+        outfile = tmp_path / 'spells.json'
+        args = argparse.Namespace(
+            json=True, output=str(outfile),
+            cleric_only=False, wizard_only=False)
+        cmd_view(args)
+        result = json.loads(outfile.read_text())
+        assert isinstance(result, dict) or isinstance(result, list)
+
+    def test_shapes_export_png(self, tmp_path):
+        """shapes export creates PNG files from SHPS data."""
+        from u3edit.shapes import cmd_export
+        from u3edit.constants import SHPS_FILE_SIZE
+        shps = tmp_path / 'SHPS'
+        shps.write_bytes(bytes(SHPS_FILE_SIZE))
+        out_dir = tmp_path / 'pngs'
+        args = argparse.Namespace(
+            file=str(shps), output_dir=str(out_dir),
+            scale=1, sheet=False)
+        cmd_export(args)
+        assert out_dir.exists()
+        pngs = list(out_dir.glob('*.png'))
+        assert len(pngs) == 256  # 256 glyphs
+
+    def test_shapes_export_with_sheet(self, tmp_path):
+        """shapes export --sheet creates sprite sheet PNG."""
+        from u3edit.shapes import cmd_export
+        from u3edit.constants import SHPS_FILE_SIZE
+        shps = tmp_path / 'SHPS'
+        shps.write_bytes(bytes(SHPS_FILE_SIZE))
+        out_dir = tmp_path / 'pngs'
+        args = argparse.Namespace(
+            file=str(shps), output_dir=str(out_dir),
+            scale=1, sheet=True)
+        cmd_export(args)
+        sheet_file = out_dir / 'glyph_sheet.png'
+        assert sheet_file.exists()
+
+    def test_shapes_info(self, tmp_path, capsys):
+        """shapes info shows metadata."""
+        from u3edit.shapes import cmd_info
+        from u3edit.constants import SHPS_FILE_SIZE
+        shps = tmp_path / 'SHPS'
+        shps.write_bytes(bytes(SHPS_FILE_SIZE))
+        args = argparse.Namespace(
+            file=str(shps), json=False, output=None)
+        cmd_info(args)
+        out = capsys.readouterr().out
+        assert '256' in out or 'charset' in out.lower()
+
+    def test_shapes_info_json(self, tmp_path):
+        """shapes info --json produces valid JSON."""
+        from u3edit.shapes import cmd_info
+        from u3edit.constants import SHPS_FILE_SIZE
+        shps = tmp_path / 'SHPS'
+        shps.write_bytes(bytes(SHPS_FILE_SIZE))
+        outfile = tmp_path / 'info.json'
+        args = argparse.Namespace(
+            file=str(shps), json=True, output=str(outfile))
+        cmd_info(args)
+        result = json.loads(outfile.read_text())
+        assert result['format']['type'] == 'charset'
+
+    def test_roster_view(self, tmp_path, capsys):
+        """roster view displays character roster."""
+        from u3edit.roster import cmd_view
+        from u3edit.constants import ROSTER_FILE_SIZE
+        rost = tmp_path / 'ROST'
+        data = bytearray(ROSTER_FILE_SIZE)
+        # Set a name in slot 0
+        for i, ch in enumerate('HERO'):
+            data[i] = ord(ch) | 0x80
+        data[0x0D] = 0x00
+        rost.write_bytes(bytes(data))
+        args = argparse.Namespace(
+            file=str(rost), json=False, output=None,
+            slot=None, validate=False)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert 'HERO' in out
+
+    def test_bestiary_view(self, tmp_path, capsys):
+        """bestiary view displays monster data."""
+        from u3edit.bestiary import cmd_view
+        from u3edit.constants import MON_FILE_SIZE
+        monfile = tmp_path / 'MONA'
+        monfile.write_bytes(bytes(MON_FILE_SIZE))
+        args = argparse.Namespace(
+            game_dir=str(tmp_path), json=False, output=None,
+            validate=False, file=None)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert len(out) > 0
+
+    def test_save_view(self, tmp_path, capsys):
+        """save view displays party state."""
+        from u3edit.save import cmd_view
+        from u3edit.constants import PRTY_FILE_SIZE
+        prty = tmp_path / 'PRTY'
+        data = bytearray(PRTY_FILE_SIZE)
+        data[5] = 0xFF  # sentinel
+        prty.write_bytes(bytes(data))
+        args = argparse.Namespace(
+            game_dir=str(tmp_path), json=False, output=None,
+            validate=False)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert len(out) > 0
+
+    def test_combat_view(self, tmp_path, capsys):
+        """combat view displays battlefield data."""
+        from u3edit.combat import cmd_view
+        from u3edit.constants import CON_FILE_SIZE
+        con = tmp_path / 'CONA'
+        con.write_bytes(bytes(CON_FILE_SIZE))
+        args = argparse.Namespace(
+            path=str(con), json=False, output=None,
+            validate=False)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert len(out) > 0
