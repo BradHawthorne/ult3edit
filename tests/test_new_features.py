@@ -13302,3 +13302,417 @@ class TestDiffEntityProperties:
         assert not gd.changed
         fd.tile_changes = 1
         assert gd.changed
+
+
+# =============================================================================
+# Map cmd_import (overworld and dungeon)
+# =============================================================================
+
+class TestMapCmdImport:
+    """Test map.py cmd_import for overworld and dungeon maps."""
+
+    def test_import_overworld_tiles(self, tmp_path):
+        """Import overworld tiles from JSON char grid."""
+        from u3edit.map import cmd_import as map_import
+        data = bytearray(MAP_OVERWORLD_SIZE)
+        path = os.path.join(str(tmp_path), 'MAPA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        # Build a 64x64 tile grid
+        tiles = [['.' for _ in range(64)] for _ in range(64)]
+        tiles[0][0] = '~'  # water at (0,0)
+        jdata = {'tiles': tiles}
+        json_path = os.path.join(str(tmp_path), 'map.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=False)
+        map_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[0] == TILE_CHARS_REVERSE['~']
+        assert result[1] == TILE_CHARS_REVERSE['.']
+
+    def test_import_dungeon_levels(self, tmp_path):
+        """Import dungeon map from JSON levels format."""
+        from u3edit.map import cmd_import as map_import
+        data = bytearray(MAP_DUNGEON_SIZE)
+        path = os.path.join(str(tmp_path), 'MAPB')
+        with open(path, 'wb') as f:
+            f.write(data)
+        level_tiles = [['#' for _ in range(16)] for _ in range(16)]
+        level_tiles[0][0] = '.'  # open at (0,0)
+        jdata = {'levels': [{'level': 1, 'tiles': level_tiles}]}
+        json_path = os.path.join(str(tmp_path), 'map.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=False)
+        map_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[0] == DUNGEON_TILE_CHARS_REVERSE['.']
+        assert result[1] == DUNGEON_TILE_CHARS_REVERSE['#']
+
+    def test_import_dry_run(self, tmp_path):
+        """Import with dry-run doesn't write."""
+        from u3edit.map import cmd_import as map_import
+        data = bytearray(MAP_OVERWORLD_SIZE)
+        path = os.path.join(str(tmp_path), 'MAPA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        tiles = [['~' for _ in range(64)] for _ in range(64)]
+        jdata = {'tiles': tiles}
+        json_path = os.path.join(str(tmp_path), 'map.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=True)
+        map_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result == bytes(MAP_OVERWORLD_SIZE)  # unchanged
+
+
+# =============================================================================
+# Map cmd_compile
+# =============================================================================
+
+class TestMapCmdCompile:
+    """Test map.py cmd_compile text-art to binary."""
+
+    def test_compile_overworld(self, tmp_path):
+        """Compile overworld text-art to binary."""
+        from u3edit.map import cmd_compile
+        source = os.path.join(str(tmp_path), 'map.map')
+        # 64 rows of 64 '.' chars
+        with open(source, 'w') as f:
+            for _ in range(64):
+                f.write('.' * 64 + '\n')
+        output = os.path.join(str(tmp_path), 'MAPA')
+        args = argparse.Namespace(
+            source=source, output=output, dungeon=False)
+        cmd_compile(args)
+        with open(output, 'rb') as f:
+            data = f.read()
+        assert len(data) == MAP_OVERWORLD_SIZE
+        assert data[0] == TILE_CHARS_REVERSE['.']
+
+    def test_compile_dungeon(self, tmp_path):
+        """Compile dungeon text-art to binary."""
+        from u3edit.map import cmd_compile
+        source = os.path.join(str(tmp_path), 'map.map')
+        # Note: '#' starts comment lines in compile, so use '.' for tiles
+        with open(source, 'w') as f:
+            for lvl in range(8):
+                f.write(f'# Level {lvl + 1}\n')
+                for _ in range(16):
+                    f.write('.' * 16 + '\n')
+                f.write('# ---\n')
+        output = os.path.join(str(tmp_path), 'MAPB')
+        args = argparse.Namespace(
+            source=source, output=output, dungeon=True)
+        cmd_compile(args)
+        with open(output, 'rb') as f:
+            data = f.read()
+        # 8 levels * 256 bytes = 2048
+        assert len(data) == 2048
+        assert data[0] == DUNGEON_TILE_CHARS_REVERSE['.']
+
+    def test_compile_unknown_chars_mapped(self, tmp_path):
+        """Unknown tile characters mapped to default with warning."""
+        from u3edit.map import cmd_compile
+        source = os.path.join(str(tmp_path), 'map.map')
+        with open(source, 'w') as f:
+            for _ in range(64):
+                f.write('Q' * 64 + '\n')  # 'Q' is not a tile char
+        output = os.path.join(str(tmp_path), 'MAPA')
+        args = argparse.Namespace(
+            source=source, output=output, dungeon=False)
+        cmd_compile(args)
+        with open(output, 'rb') as f:
+            data = f.read()
+        assert len(data) == MAP_OVERWORLD_SIZE
+        # Unknown chars should map to default (0x04 for overworld)
+        assert data[0] == 0x04
+
+
+# =============================================================================
+# Text cmd_import
+# =============================================================================
+
+class TestTextCmdImport:
+    """Test text.py cmd_import."""
+
+    def test_import_list_format(self, tmp_path):
+        """Import text from JSON list of strings."""
+        from u3edit.text import cmd_import as text_import
+        data = bytearray(TEXT_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'TEXT')
+        with open(path, 'wb') as f:
+            f.write(data)
+        jdata = [{'text': 'HELLO'}, {'text': 'WORLD'}]
+        json_path = os.path.join(str(tmp_path), 'text.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=False)
+        text_import(args)
+        records = load_text_records(path)
+        assert records[0] == 'HELLO'
+        assert records[1] == 'WORLD'
+
+    def test_import_dict_format(self, tmp_path):
+        """Import text from JSON with 'records' key."""
+        from u3edit.text import cmd_import as text_import
+        data = bytearray(TEXT_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'TEXT')
+        with open(path, 'wb') as f:
+            f.write(data)
+        jdata = {'records': [{'text': 'TEST'}]}
+        json_path = os.path.join(str(tmp_path), 'text.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=False)
+        text_import(args)
+        records = load_text_records(path)
+        assert records[0] == 'TEST'
+
+    def test_import_dry_run(self, tmp_path):
+        """Import with dry-run doesn't write."""
+        from u3edit.text import cmd_import as text_import
+        data = bytearray(TEXT_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'TEXT')
+        with open(path, 'wb') as f:
+            f.write(data)
+        jdata = [{'text': 'NOPE'}]
+        json_path = os.path.join(str(tmp_path), 'text.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=True)
+        text_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result == bytes(TEXT_FILE_SIZE)  # unchanged
+
+    def test_import_zeros_remaining(self, tmp_path):
+        """Import clears stale data after last record."""
+        from u3edit.text import cmd_import as text_import
+        # Fill with non-zero bytes first
+        data = bytearray(b'\xAA' * TEXT_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'TEXT')
+        with open(path, 'wb') as f:
+            f.write(data)
+        jdata = [{'text': 'A'}]
+        json_path = os.path.join(str(tmp_path), 'text.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=False)
+        text_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        # After 'A' + null (2 bytes), everything should be zero
+        assert all(b == 0 for b in result[2:])
+
+
+# =============================================================================
+# TLK find-replace
+# =============================================================================
+
+class TestTlkFindReplace:
+    """Test TLK _cmd_find_replace."""
+
+    def _make_tlk(self, tmp_path, text_records):
+        """Create a TLK file with given text records."""
+        from u3edit.tlk import encode_record
+        data = bytearray()
+        for rec in text_records:
+            data.extend(encode_record(rec))
+        path = os.path.join(str(tmp_path), 'TLKA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        return path
+
+    def test_find_replace_basic(self, tmp_path):
+        """Basic find-replace across records."""
+        from u3edit.tlk import _cmd_find_replace
+        path = self._make_tlk(tmp_path, [['HELLO WORLD'], ['HELLO AGAIN']])
+        args = argparse.Namespace(
+            file=path, output=None, dry_run=False, backup=False,
+            ignore_case=False)
+        _cmd_find_replace(args, 'HELLO', 'GREETINGS')
+        records = load_tlk_records(path)
+        assert 'GREETINGS WORLD' in records[0]
+        assert 'GREETINGS AGAIN' in records[1]
+
+    def test_find_replace_case_insensitive(self, tmp_path):
+        """Case-insensitive find-replace."""
+        from u3edit.tlk import _cmd_find_replace
+        path = self._make_tlk(tmp_path, [['hello world']])
+        args = argparse.Namespace(
+            file=path, output=None, dry_run=False, backup=False,
+            ignore_case=True)
+        _cmd_find_replace(args, 'HELLO', 'HI')
+        records = load_tlk_records(path)
+        assert 'HI' in records[0][0]
+
+    def test_find_replace_no_match(self, tmp_path, capsys):
+        """No matches found — no write."""
+        from u3edit.tlk import _cmd_find_replace
+        path = self._make_tlk(tmp_path, [['HELLO WORLD']])
+        args = argparse.Namespace(
+            file=path, output=None, dry_run=False, backup=False,
+            ignore_case=False)
+        _cmd_find_replace(args, 'XXXXX', 'YYYYY')
+        captured = capsys.readouterr()
+        assert '0 replacement' in captured.out
+
+    def test_find_replace_dry_run(self, tmp_path):
+        """Dry-run doesn't write changes."""
+        from u3edit.tlk import _cmd_find_replace
+        path = self._make_tlk(tmp_path, [['HELLO WORLD']])
+        with open(path, 'rb') as f:
+            original = f.read()
+        args = argparse.Namespace(
+            file=path, output=None, dry_run=True, backup=False,
+            ignore_case=False)
+        _cmd_find_replace(args, 'HELLO', 'BYE')
+        with open(path, 'rb') as f:
+            after = f.read()
+        assert after == original
+
+
+# =============================================================================
+# Roster _apply_edits coverage
+# =============================================================================
+
+class TestRosterApplyEdits:
+    """Test _apply_edits for comprehensive field coverage."""
+
+    def test_apply_no_edits_returns_false(self):
+        """No edit flags → returns False."""
+        from u3edit.roster import _apply_edits
+        char = Character(bytearray(CHAR_RECORD_SIZE))
+        args = argparse.Namespace(
+            name=None, str=None, dex=None, int_=None, wis=None,
+            hp=None, max_hp=None, mp=None, gold=None, exp=None,
+            food=None, gems=None, keys=None, powders=None, torches=None,
+            race=None, class_=None, status=None, gender=None,
+            weapon=None, armor=None, give_weapon=None, give_armor=None,
+            marks=None, cards=None, in_party=None, not_in_party=None,
+            sub_morsels=None)
+        assert _apply_edits(char, args) is False
+
+    def test_apply_marks_and_cards(self):
+        """Setting marks and cards via comma-separated strings."""
+        from u3edit.roster import _apply_edits
+        char = Character(bytearray(CHAR_RECORD_SIZE))
+        args = argparse.Namespace(
+            name=None, str=None, dex=None, int_=None, wis=None,
+            hp=None, max_hp=None, mp=None, gold=None, exp=None,
+            food=None, gems=None, keys=None, powders=None, torches=None,
+            race=None, class_=None, status=None, gender=None,
+            weapon=None, armor=None, give_weapon=None, give_armor=None,
+            marks='Kings,Snake', cards='Death,Sol',
+            in_party=None, not_in_party=None, sub_morsels=None)
+        assert _apply_edits(char, args) is True
+        assert 'Kings' in char.marks
+        assert 'Snake' in char.marks
+        assert 'Death' in char.cards
+        assert 'Sol' in char.cards
+
+    def test_apply_give_weapon(self):
+        """Setting weapon inventory via --give-weapon."""
+        from u3edit.roster import _apply_edits
+        char = Character(bytearray(CHAR_RECORD_SIZE))
+        args = argparse.Namespace(
+            name=None, str=None, dex=None, int_=None, wis=None,
+            hp=None, max_hp=None, mp=None, gold=None, exp=None,
+            food=None, gems=None, keys=None, powders=None, torches=None,
+            race=None, class_=None, status=None, gender=None,
+            weapon=None, armor=None, give_weapon=[5, 3], give_armor=None,
+            marks=None, cards=None, in_party=None, not_in_party=None,
+            sub_morsels=None)
+        assert _apply_edits(char, args) is True
+        # Weapon index 5, count 3 → BCD 0x03 at raw offset
+        from u3edit.constants import CHAR_WEAPON_START
+        assert char.raw[CHAR_WEAPON_START + 5 - 1] == int_to_bcd(3)
+
+    def test_apply_in_party(self):
+        """Setting in-party flag."""
+        from u3edit.roster import _apply_edits
+        char = Character(bytearray(CHAR_RECORD_SIZE))
+        args = argparse.Namespace(
+            name=None, str=None, dex=None, int_=None, wis=None,
+            hp=None, max_hp=None, mp=None, gold=None, exp=None,
+            food=None, gems=None, keys=None, powders=None, torches=None,
+            race=None, class_=None, status=None, gender=None,
+            weapon=None, armor=None, give_weapon=None, give_armor=None,
+            marks=None, cards=None, in_party=True, not_in_party=None,
+            sub_morsels=None)
+        assert _apply_edits(char, args) is True
+        assert char.in_party is True
+
+    def test_apply_hp_raises_max(self):
+        """Setting HP also raises max_hp if needed."""
+        from u3edit.roster import _apply_edits
+        char = Character(bytearray(CHAR_RECORD_SIZE))
+        char.max_hp = 50
+        args = argparse.Namespace(
+            name=None, str=None, dex=None, int_=None, wis=None,
+            hp=200, max_hp=None, mp=None, gold=None, exp=None,
+            food=None, gems=None, keys=None, powders=None, torches=None,
+            race=None, class_=None, status=None, gender=None,
+            weapon=None, armor=None, give_weapon=None, give_armor=None,
+            marks=None, cards=None, in_party=None, not_in_party=None,
+            sub_morsels=None)
+        _apply_edits(char, args)
+        assert char.hp == 200
+        assert char.max_hp == 200  # raised to match HP
+
+
+# =============================================================================
+# Bestiary validate_monster coverage
+# =============================================================================
+
+class TestBestiaryValidate:
+    """Test bestiary.py validate_monster edge cases."""
+
+    def test_validate_empty_monster(self):
+        """Empty monster produces no warnings."""
+        from u3edit.bestiary import Monster, validate_monster
+        attrs = [0] * 10  # tile1=0, hp=0 → is_empty
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert len(warnings) == 0
+
+    def test_validate_undefined_flag_bits(self):
+        """Undefined flag bits produce warning."""
+        from u3edit.bestiary import Monster, validate_monster
+        # attrs: tile1, tile2, flags1, flags2, hp, atk, def, spd, abil1, abil2
+        attrs = [0x10, 0x10, 0x60, 0, 10, 5, 5, 5, 0, 0]
+        # flags1=0x60: bits 5,6 set → undefined (defined = 0x04|0x08|0x0C|0x80)
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert any('flag1' in w.lower() or 'undefined' in w.lower()
+                    for w in warnings)
+
+    def test_validate_undefined_ability_bits(self):
+        """Undefined ability bits produce warning."""
+        from u3edit.bestiary import Monster, validate_monster
+        attrs = [0x10, 0x10, 0, 0, 10, 5, 5, 5, 0x10, 0]
+        # ability1=0x10: bit 4 — not in defined set (0x01|0x02|0x04|0x40|0x80)
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert any('ability1' in w.lower() or 'undefined' in w.lower()
+                    for w in warnings)
