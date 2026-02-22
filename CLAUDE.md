@@ -11,7 +11,7 @@ u3edit is a data toolkit for Ultima III: Exodus (Apple II, 1983). It provides CL
 ```bash
 pip install -e ".[dev]"              # Install with pytest
 pip install -e ".[tui]"              # Install with prompt_toolkit for TUI editors
-pytest -v                            # Run all 1415 tests
+pytest -v                            # Run all 1553 tests
 pytest tests/test_roster.py          # Run one test module
 pytest -v tests/test_bcd.py::TestBcdToInt::test_zero  # Run single test
 u3edit roster view path/to/ROST      # CLI usage pattern
@@ -54,10 +54,14 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 
 ### TUI architecture (`tui/`)
 
-- **`GameSession`** wraps `DiskContext`, catalogs available files by category, provides factory methods for editors
+- **`GameSession`** wraps `DiskContext`, catalogs available files by category, provides read/write access and save callbacks
 - **`UnifiedApp`** (`app.py`): Master tabbed editor using prompt_toolkit
 - **`EditorState`** (`base.py`): Pure dataclass with zero I/O — all editor logic (cursor, viewport, painting) is testable without prompt_toolkit
+- **`EditorTab`** / **`DrillDownTab`** / **`TileEditorTab`** (`editor_tab.py`): Tab abstractions for form-based and tile-painting editors
 - **`BaseTileEditor`**: UI layer that wraps `EditorState` for rendering and key handling
+- **`theme.py`**: `U3_STYLE` prompt_toolkit stylesheet for consistent look
+- **`form_editor.py`**: Reusable form-based editing component for character/monster/save fields
+- Note: PLRS editing is CLI-only (`save edit --plrs-slot`), not available in TUI
 
 ### File resolution (`fileutil.py`)
 
@@ -89,7 +93,7 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 - **`roster edit --in-party/--not-in-party`**: Toggle character's in-party status. `--sub-morsels` sets food fraction (0-99).
 - **`text edit --record/--text`**: Per-record CLI editing for TEXT game strings (uppercased to match engine). Falls through to TUI when no CLI args provided.
 - **`shapes view/export/edit/edit-string/import/compile/decompile`**: SHPS character set tile graphics — glyph rendering, PNG export (stdlib, no Pillow), HGR color logic, SHP overlay inline string extraction and replacement (`edit-string --offset --text`), SHPS embedded code guard at $9F9, TEXT detection as HGR bitmap. `compile` reads `.tiles` text-art → SHPS binary or JSON. `decompile` reads SHPS binary → `.tiles` text-art.
-- **`sound view/edit/import`**: SOSA/SOSM/MBS sound data files — hex dump, AY-3-8910 register parsing and music stream decoding (notes, tempo, loops) for MBS.
+- **`sound view/edit/import`**: SOSA/SOSM/MBS data files — hex dump, AY-3-8910 register parsing and music stream decoding (notes, tempo, loops) for MBS. Note: SOSA (overworld map state) and SOSM (overworld monster positions) are save-state files, not sound data, despite being managed by the sound subcommand.
 - **`patch view/edit/dump/import/strings/strings-edit/strings-import/compile-names/decompile-names/validate-names`**: Engine binary patcher for CIDAR-identified offsets in ULT3/EXOD — name table (921 bytes, terrain/monster/weapon/armor/spell names), moongate coordinates, food depletion rate, town/dungeon coords. `view --json` → `import` round-trips all region types (text, bytes, coords). `strings` subcommand catalogs all 245 JSR $46BA inline strings with `--search` filter and `--json` export. `strings-edit` / `strings-import` for in-place inline string editing by index/vanilla/address. `compile-names` / `decompile-names` / `validate-names` for text-first `.names` file workflow.
 - **`ddrw view/edit/import`**: Dungeon drawing data (1792 bytes) with structured perspective vector and tile record parsing.
 - **`disk info/list/extract/audit`**: ProDOS disk image operations — show volume info, list files, extract all files, audit disk space (free blocks, alignment waste, capacity estimates). Requires external `diskiigs` tool.

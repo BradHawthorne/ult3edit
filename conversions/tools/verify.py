@@ -122,6 +122,7 @@ def verify_category(game_dir, category, info, vanilla_dir=None):
     modified = []
     missing = []
     unchanged = []
+    size_warnings = []
 
     for i, name in enumerate(info['files']):
         path = find_file(game_dir, name)
@@ -136,7 +137,9 @@ def verify_category(game_dir, category, info, vanilla_dir=None):
         if info['sizes'] is not None:
             expected_size = info['sizes'][i] if i < len(info['sizes']) else None
             if expected_size and path.stat().st_size != expected_size:
-                pass  # Size mismatch — still counts as found
+                size_warnings.append(
+                    f"{name}: size {path.stat().st_size} != expected {expected_size}"
+                )
 
         # Compare against vanilla if provided
         if vanilla_dir:
@@ -149,7 +152,7 @@ def verify_category(game_dir, category, info, vanilla_dir=None):
             else:
                 modified.append(name)  # No vanilla = assume modified
 
-    return found, modified, missing, unchanged
+    return found, modified, missing, unchanged, size_warnings
 
 
 def verify_game(game_dir, vanilla_dir=None, verbose=False):
@@ -164,7 +167,7 @@ def verify_game(game_dir, vanilla_dir=None, verbose=False):
 
     for category, info in ASSET_MANIFEST.items():
         total_cats += 1
-        found, modified, missing, unchanged = verify_category(
+        found, modified, missing, unchanged, size_warns = verify_category(
             game_dir, category, info, vanilla_dir
         )
 
@@ -182,6 +185,10 @@ def verify_game(game_dir, vanilla_dir=None, verbose=False):
         if passed:
             passed_cats += 1
 
+        if verbose and size_warns:
+            for w in size_warns:
+                print(f"  Warning: {w}", file=sys.stderr)
+
         results[category] = {
             'total': total_files,
             'found': found_count,
@@ -191,6 +198,7 @@ def verify_game(game_dir, vanilla_dir=None, verbose=False):
             'passed': passed,
             'missing_files': missing,
             'unchanged_files': unchanged,
+            'size_warnings': size_warns,
         }
 
     return total_cats, passed_cats, results

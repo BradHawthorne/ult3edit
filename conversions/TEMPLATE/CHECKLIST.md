@@ -70,6 +70,7 @@ Copy this file into your conversion directory and track progress.
 |------|----------------|-------|
 | [ ] CONA — LB Castle battlefield | `combat edit CONA --tile X Y VAL` | |
 | [ ] CONB — Castle of Death battlefield | `combat edit CONB --tile X Y VAL` | |
+| [ ] CONC — Castle Arena battlefield | `combat edit CONC --tile X Y VAL` | |
 | [ ] CONF — Dungeon battlefield | `combat edit CONF --tile X Y VAL` | |
 | [ ] CONG — Grassland battlefield | `combat edit CONG --tile X Y VAL` | |
 | [ ] CONM — Mountain battlefield | `combat edit CONM --tile X Y VAL` | |
@@ -82,7 +83,7 @@ Copy this file into your conversion directory and track progress.
 
 ## 5. Overworld Maps
 
-4 surface maps (64x64 tiles each).
+13 surface maps (64x64 tiles each).
 
 | Item | u3edit Command | Notes |
 |------|----------------|-------|
@@ -96,7 +97,7 @@ Copy this file into your conversion directory and track progress.
 
 ## 6. Dungeon Maps
 
-8 dungeons, 16x16 tiles per level, 8 levels each.
+7 dungeons, 16x16 tiles per level, 8 levels each.
 
 | Item | u3edit Command | Notes |
 |------|----------------|-------|
@@ -173,9 +174,13 @@ u3edit tlk edit TLKA --find "OLD TEXT" --replace "NEW TEXT" --ignore-case
 
 **Tile compiler workflow** (text-art source):
 ```bash
-python conversions/tools/tile_compiler.py decompile SHPS --output vanilla.tiles
-# Edit vanilla.tiles with text editor
-python conversions/tools/tile_compiler.py compile custom.tiles --format json > tiles.json
+# Decompile existing tiles to editable text-art
+u3edit shapes decompile SHPS --output vanilla.tiles
+
+# Edit vanilla.tiles with text editor (#=on .=off, 7x8 pixel grids)
+# Compile back to binary or JSON
+u3edit shapes compile custom.tiles --output SHPS
+u3edit shapes compile custom.tiles --format json --output tiles.json
 u3edit shapes import SHPS tiles.json
 ```
 
@@ -219,9 +224,16 @@ See `conversions/tools/MUSIC_FORMAT.md` for the MBS byte format reference.
 
 **Name table workflow**:
 ```bash
-# Edit encode_nametable.py with your conversion's names
-python encode_nametable.py /path/to/ULT3 > nametable.hex
-u3edit patch edit ULT3 --region name-table --data "$(cat nametable.hex)"
+# Decompile current names to editable text file
+u3edit patch decompile-names ULT3 --output names.names
+
+# Edit names.names (one name per line, # comments for groups)
+# Validate budget (891 usable bytes)
+u3edit patch validate-names names.names
+
+# Compile to JSON and apply
+u3edit patch compile-names names.names --output names.json
+u3edit patch import ULT3 names.json
 ```
 
 ## 14. Title Screen Text

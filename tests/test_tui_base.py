@@ -136,6 +136,7 @@ class TestPalette:
 
     def test_select_palette_index(self):
         state = EditorState(data=bytearray(16), width=4, height=4)
-        state.select_palette_index(5)
+        state.palette_index = 5
+        state.selected_tile = state.palette[5]
         assert state.palette_index == 5
         assert state.selected_tile == state.palette[5]

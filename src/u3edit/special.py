@@ -8,9 +8,6 @@ tile grid. The padding contains residual disk data (text fragments like
 Preserved for round-trip fidelity but not meaningful game data.
 """
 
-SPECIAL_META_OFFSET = 121  # Offset of 7 trailing padding bytes
-SPECIAL_META_SIZE = 7
-
 import argparse
 import json
 import os
@@ -19,6 +16,7 @@ import sys
 from .constants import (
     SPECIAL_NAMES, SPECIAL_FILE_SIZE,
     SPECIAL_MAP_WIDTH, SPECIAL_MAP_HEIGHT, SPECIAL_MAP_TILES,
+    SPECIAL_META_OFFSET, SPECIAL_META_SIZE,
     tile_char, TILE_CHARS_REVERSE,
 )
 from .fileutil import resolve_single_file, backup_file, hex_int

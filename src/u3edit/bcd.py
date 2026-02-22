@@ -12,7 +12,7 @@ def bcd_to_int(b: int) -> int:
 
 
 def bcd16_to_int(hi: int, lo: int) -> int:
-    """Decode a two-byte BCD value to integer (0-9999). hi=hundreds, lo=ones."""
+    """Decode a two-byte BCD value to integer (0-9999). hi=top two digits, lo=bottom two."""
     return bcd_to_int(hi) * 100 + bcd_to_int(lo)
 
 

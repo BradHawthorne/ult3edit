@@ -85,6 +85,10 @@ def apply_shop_strings(json_path, game_dir, dry_run=False, backup=False):
             try:
                 data = replace_overlay_string(
                     data, match['text_offset'], match['text_end'], voidborn)
+                # Rebuild text_map after mutation so subsequent lookups use
+                # correct offsets (replacement may shift null positions)
+                found_strings = extract_overlay_strings(data)
+                text_map = {s['text'].upper(): s for s in found_strings}
                 replaced += 1
                 total_replaced += 1
             except ValueError as e:

@@ -963,9 +963,22 @@ def cmd_compile_tiles(args) -> None:
     fmt = getattr(args, 'format', 'binary')
 
     if fmt == 'json':
-        tile_list = [{'index': idx, 'raw': list(glyph)}
-                     for idx, glyph in tiles]
-        result = json.dumps({'tiles': [{'frames': tile_list}]}, indent=2)
+        # Group glyphs by tile (4 animation frames per tile)
+        tile_groups: dict[int, list] = {}
+        for idx, glyph in tiles:
+            tile_id = idx & 0xFC  # Round to tile base (every 4)
+            if tile_id not in tile_groups:
+                tile_groups[tile_id] = []
+            tile_groups[tile_id].append({'index': idx, 'raw': list(glyph)})
+        tile_list = []
+        for tid in sorted(tile_groups):
+            tile_entry = TILES.get(tid)
+            name = tile_entry[1] if tile_entry else f'Tile 0x{tid:02X}'
+            tile_list.append({
+                'tile_id': tid, 'name': name,
+                'frames': tile_groups[tid],
+            })
+        result = json.dumps({'tiles': tile_list}, indent=2)
         output = getattr(args, 'output', None)
         if output:
             with open(output, 'w', encoding='utf-8') as f:

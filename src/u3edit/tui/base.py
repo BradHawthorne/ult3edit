@@ -82,10 +82,6 @@ class EditorState:
             self.palette_index = (self.palette_index - 1) % len(self.palette)
             self.selected_tile = self.palette[self.palette_index]
 
-    def select_palette_index(self, idx: int) -> None:
-        if self.palette and 0 <= idx < len(self.palette):
-            self.palette_index = idx
-            self.selected_tile = self.palette[idx]
 
 
 # =============================================================================
@@ -103,6 +99,9 @@ class BaseTileEditor:
     | Status: pos, tile, mode, dirty       |
     | Keys: arrows/space/[]/Ctrl-S/Ctrl-Q  |
     +--------------------------------------+
+
+    In embedded mode (within UnifiedApp), Ctrl-S/Ctrl-Q/Escape are handled
+    by the parent app, not this widget.
 
     Subclasses override: _save(), _extra_status(), _extra_keybindings(),
     _render_cell() for custom overlays.

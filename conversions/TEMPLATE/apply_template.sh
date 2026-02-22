@@ -120,9 +120,8 @@ echo "--- Phase 5: Building world maps ---"
 #     MAP=$(find_file "MAP${letter}")
 #     SRC="${SOURCES_DIR}/map${letter,,}.map"
 #     if [ -f "$MAP" ] && [ -f "$SRC" ]; then
-#         python "${SCRIPT_DIR}/../tools/map_compiler.py" compile "$SRC" \
-#             --output "/tmp/map${letter,,}.json"
-#         u3edit map import "$MAP" "/tmp/map${letter,,}.json" --backup
+#         u3edit map compile "$SRC" --output "${SCRIPT_DIR}/build/map${letter,,}.json"
+#         u3edit map import "$MAP" "${SCRIPT_DIR}/build/map${letter,,}.json" --backup
 #     fi
 # done
 
@@ -131,9 +130,8 @@ echo "--- Phase 5: Building world maps ---"
 #     MAP=$(find_file "MAP${letter}")
 #     SRC="${SOURCES_DIR}/map${letter,,}.map"
 #     if [ -f "$MAP" ] && [ -f "$SRC" ]; then
-#         python "${SCRIPT_DIR}/../tools/map_compiler.py" compile "$SRC" \
-#             --dungeon --output "/tmp/map${letter,,}.json"
-#         u3edit map import "$MAP" "/tmp/map${letter,,}.json" --backup
+#         u3edit map compile "$SRC" --dungeon --output "${SCRIPT_DIR}/build/map${letter,,}.json"
+#         u3edit map import "$MAP" "${SCRIPT_DIR}/build/map${letter,,}.json" --backup
 #     fi
 # done
 
@@ -187,9 +185,9 @@ echo "--- Phase 8: Applying tile graphics ---"
 # SHPS=$(find_file "SHPS")
 
 # Option A: Compile from text-art and import
-# python "${SCRIPT_DIR}/../tools/tile_compiler.py" compile \
-#     "${SOURCES_DIR}/tiles.tiles" --format json > /tmp/tiles.json
-# u3edit shapes import "$SHPS" /tmp/tiles.json --backup
+# u3edit shapes compile "${SOURCES_DIR}/tiles.tiles" --format json \
+#     --output "${SCRIPT_DIR}/build/tiles.json"
+# u3edit shapes import "$SHPS" "${SCRIPT_DIR}/build/tiles.json" --backup
 
 # Option B: Edit individual glyphs
 # u3edit shapes edit "$SHPS" --glyph 0 --data "00 14 08 14 22 08 14 00" --backup
@@ -203,9 +201,11 @@ echo "--- Phase 9: Patching engine binary ---"
 
 ULT3=$(find_file "ULT3")
 
-# Apply name table
-# NAMETABLE_HEX=$(python3 "${SCRIPT_DIR}/encode_nametable.py" "$ULT3")
-# u3edit patch edit "$ULT3" --region name-table --data "$NAMETABLE_HEX" --backup
+# Apply name table (compile .names file, then import)
+# u3edit patch compile-names "${SOURCES_DIR}/names.names" --ult3 "$ULT3" \
+#     --format hex > "${SCRIPT_DIR}/build/nametable.hex"
+# u3edit patch edit "$ULT3" --region name-table \
+#     --data "$(cat "${SCRIPT_DIR}/build/nametable.hex")" --backup
 
 # Relocate moongates (8 X + 8 Y coordinates, hex bytes)
 # u3edit patch edit "$ULT3" --region moongate-x --data "0A 14 1E 28 32 1E 14 0A"

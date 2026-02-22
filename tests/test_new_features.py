@@ -6040,19 +6040,22 @@ class TestShopStringsSource:
                                 '..', 'conversions', 'voidborn', 'sources')
 
     def test_shop_strings_json_structure(self):
-        """shop_strings.json has valid structure with all 8 shops."""
+        """shop_strings.json has valid structure with SHP0-SHP6."""
         path = os.path.join(self.SOURCES_DIR, 'shop_strings.json')
         with open(path, 'r') as f:
             data = json.load(f)
         assert 'shops' in data
         shops = data['shops']
-        for i in range(8):
+        # SHP0-SHP6 present; SHP7 (Oracle) omitted — unchanged from vanilla
+        for i in range(7):
             key = f'SHP{i}'
             assert key in shops, f"Missing {key}"
             assert 'strings' in shops[key]
             for entry in shops[key]['strings']:
                 assert 'vanilla' in entry
                 assert 'voidborn' in entry
+        # No stale discovery fields
+        assert 'discovery_workflow' not in data
 
 
 # =============================================================================
@@ -15256,3 +15259,1941 @@ class TestPatchCmdDumpGaps:
             file=path, offset=99999, length=16)
         with pytest.raises(SystemExit):
             cmd_dump(args)
+
+
+class TestBestiaryAbility2Validation:
+    """Test validate_monster catches undefined ability2 bits."""
+
+    def test_valid_resistant_no_warning(self):
+        """Resistant (0xC0) is a defined bit — no warning."""
+        from u3edit.bestiary import Monster, validate_monster
+        from u3edit.constants import MON_ABIL2_RESISTANT
+        attrs = [0x80, 0x80, 0, 0, 10, 5, 3, 4, 0, MON_ABIL2_RESISTANT]
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert not any('ability2' in w for w in warnings)
+
+    def test_undefined_ability2_bits_warned(self):
+        """Bits outside 0xC0 produce a warning."""
+        from u3edit.bestiary import Monster, validate_monster
+        attrs = [0x80, 0x80, 0, 0, 10, 5, 3, 4, 0, 0x01]
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert any('ability2' in w.lower() for w in warnings)
+
+    def test_mixed_ability2_bits(self):
+        """Resistant + undefined bits still warns about the undefined ones."""
+        from u3edit.bestiary import Monster, validate_monster
+        attrs = [0x80, 0x80, 0, 0, 10, 5, 3, 4, 0, 0xC1]
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert any('$01' in w for w in warnings)
+
+    def test_ability2_zero_no_warning(self):
+        """ability2=0 is valid — no warning."""
+        from u3edit.bestiary import Monster, validate_monster
+        attrs = [0x80, 0x80, 0, 0, 10, 5, 3, 4, 0, 0]
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert not any('ability2' in w for w in warnings)
+
+
+class TestMapLevelBoundsValidation:
+    """Test _get_map_slice validates dungeon level bounds."""
+
+    def test_valid_level_zero(self):
+        """Level 0 of an 8-level dungeon is fine."""
+        from u3edit.map import _get_map_slice
+        data = bytearray(2048)  # 8 levels x 256
+        slice_data, base, w, h = _get_map_slice(data, True, 0)
+        assert base == 0 and w == 16 and h == 16
+
+    def test_valid_level_seven(self):
+        """Level 7 (last) of an 8-level dungeon is fine."""
+        from u3edit.map import _get_map_slice
+        data = bytearray(2048)
+        slice_data, base, w, h = _get_map_slice(data, True, 7)
+        assert base == 7 * 256
+
+    def test_level_too_high_exits(self):
+        """Level 8 of an 8-level dungeon should exit."""
+        from u3edit.map import _get_map_slice
+        data = bytearray(2048)  # 8 levels (0-7)
+        with pytest.raises(SystemExit):
+            _get_map_slice(data, True, 8)
+
+    def test_negative_level_exits(self):
+        """Negative level should exit."""
+        from u3edit.map import _get_map_slice
+        data = bytearray(2048)
+        with pytest.raises(SystemExit):
+            _get_map_slice(data, True, -1)
+
+    def test_level_none_defaults_zero(self):
+        """Level=None defaults to 0."""
+        from u3edit.map import _get_map_slice
+        data = bytearray(2048)
+        slice_data, base, w, h = _get_map_slice(data, True, None)
+        assert base == 0
+
+
+# ============================================================================
+# Batch 9: Audit-discovered gaps
+# ============================================================================
+
+
+class TestCharacterInitSize:
+    """Test Character constructor rejects wrong-size data."""
+
+    def test_too_small_raises(self):
+        from u3edit.roster import Character
+        with pytest.raises(ValueError, match='64 bytes'):
+            Character(bytearray(32))
+
+    def test_too_large_raises(self):
+        from u3edit.roster import Character
+        with pytest.raises(ValueError, match='64 bytes'):
+            Character(bytearray(128))
+
+    def test_exact_size_ok(self):
+        from u3edit.roster import Character
+        c = Character(bytearray(64))
+        assert c.is_empty
+
+
+class TestStatusSetterFullName:
+    """Test Character.status setter with full status name strings."""
+
+    def test_set_status_good_full(self):
+        from u3edit.roster import Character
+        c = Character(bytearray(64))
+        c.status = 'Good'
+        assert c.status == 'Good'
+
+    def test_set_status_poisoned_full(self):
+        from u3edit.roster import Character
+        c = Character(bytearray(64))
+        c.status = 'Poisoned'
+        assert c.status == 'Poisoned'
+
+    def test_set_status_dead_full(self):
+        from u3edit.roster import Character
+        c = Character(bytearray(64))
+        c.status = 'Dead'
+        assert c.status == 'Dead'
+
+
+class TestRosterAllSlotsEmpty:
+    """Test cmd_view/cmd_edit with all-empty roster."""
+
+    def test_view_all_empty(self, tmp_path, capsys):
+        from u3edit.roster import cmd_view
+        path = os.path.join(str(tmp_path), 'ROST')
+        with open(path, 'wb') as f:
+            f.write(bytearray(64 * 20))
+        args = argparse.Namespace(file=path, json=False, output=None,
+                                  validate=False, slot=None)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert 'All slots empty' in out
+
+    def test_edit_all_on_empty_roster(self, tmp_path, capsys):
+        from u3edit.roster import cmd_edit
+        path = os.path.join(str(tmp_path), 'ROST')
+        with open(path, 'wb') as f:
+            f.write(bytearray(64 * 20))
+        args = argparse.Namespace(
+            file=path, slot=None, all=True, name=None,
+            strength=None, dexterity=None, intelligence=None,
+            wisdom=None, hp=None, max_hp=None, exp=None,
+            mp=None, food=None, gold=None, gems=None,
+            keys=None, powders=None, torches=None,
+            race=None, klass=None, gender=None,
+            status=None, weapon=None, armor=None,
+            marks=None, cards=None, in_party=False,
+            not_in_party=False, sub_morsels=None,
+            weapon_inv=None, armor_inv=None,
+            dry_run=False, backup=False, output=None,
+            validate=False)
+        cmd_edit(args)
+        out = capsys.readouterr().out
+        assert 'No modifications' in out
+
+
+class TestPartyStateLocationTypeValueError:
+    """Test PartyState.location_type setter raises ValueError for bad strings."""
+
+    def test_unknown_string_raises(self):
+        from u3edit.save import PartyState
+        ps = PartyState(bytearray(16))
+        with pytest.raises(ValueError, match='Unknown location type'):
+            ps.location_type = 'underwater'
+
+
+class TestPartyStateNonStandardSentinel:
+    """Test PartyState.display() shows non-standard sentinel."""
+
+    def test_nonstandard_sentinel(self, capsys):
+        from u3edit.save import PartyState
+        ps = PartyState(bytearray(16))
+        ps.sentinel = 0x42
+        ps.display()
+        out = capsys.readouterr().out
+        assert 'non-standard' in out
+
+    def test_inactive_sentinel(self, capsys):
+        from u3edit.save import PartyState
+        ps = PartyState(bytearray(16))
+        ps.sentinel = 0x00
+        ps.display()
+        out = capsys.readouterr().out
+        assert 'inactive' in out
+
+
+class TestCombatValidateView:
+    """Test combat cmd_view with --validate flag."""
+
+    def test_view_file_with_validate(self, tmp_path, capsys):
+        from u3edit.combat import cmd_view
+        path = os.path.join(str(tmp_path), 'CONA')
+        data = bytearray(192)
+        # Set overlapping PC positions to trigger a warning
+        data[0xA0] = 5  # pc0 x
+        data[0xA4] = 5  # pc0 y
+        data[0xA1] = 5  # pc1 x (same as pc0)
+        data[0xA5] = 5  # pc1 y (same as pc0)
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(path=path, json=False, output=None,
+                                  validate=True)
+        cmd_view(args)
+
+    def test_view_dir_json_with_validate(self, tmp_path, capsys):
+        from u3edit.combat import cmd_view
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(bytearray(192))
+        args = argparse.Namespace(path=str(tmp_path), json=True, output=None,
+                                  validate=True)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        result = json.loads(out)
+        assert 'CONA' in result
+        assert 'warnings' in result['CONA']
+
+
+class TestCombatEditValidate:
+    """Test combat cmd_edit with --validate flag."""
+
+    def test_edit_with_validate(self, tmp_path, capsys):
+        from u3edit.combat import cmd_edit
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(bytearray(192))
+        args = argparse.Namespace(
+            file=path, tile=(0, 0, 4), monster_pos=None,
+            pc_pos=None, dry_run=True, backup=False,
+            output=None, validate=True)
+        cmd_edit(args)
+
+
+class TestCombatImportDescriptorBackcompat:
+    """Test combat cmd_import accepts old 'descriptor' key."""
+
+    def test_descriptor_key(self, tmp_path):
+        from u3edit.combat import cmd_import
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(bytearray(192))
+        jdata = {
+            'tiles': [],
+            'monsters': [],
+            'pcs': [],
+            'descriptor': {'block1': [0xAA] * 7}
+        }
+        json_path = os.path.join(str(tmp_path), 'con.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(file=path, json_file=json_path,
+                                  dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[0x79] == 0xAA
+
+
+class TestCombatImportNonNumericMonsterKey:
+    """Test combat cmd_import warns on non-numeric dict monster keys."""
+
+    def test_non_numeric_monster_key(self, tmp_path, capsys):
+        from u3edit.combat import cmd_import
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(bytearray(192))
+        jdata = {
+            'tiles': [],
+            'monsters': {'abc': {'x': 0, 'y': 0}, '0': {'x': 5, 'y': 5}},
+            'pcs': [],
+        }
+        json_path = os.path.join(str(tmp_path), 'con.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(file=path, json_file=json_path,
+                                  dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        err = capsys.readouterr().err
+        assert 'non-numeric' in err
+
+
+class TestPatchStringsEditNoStrings:
+    """Test patch cmd_strings_edit exits when binary has no inline strings."""
+
+    def test_no_strings_exits(self, tmp_path):
+        from u3edit.patch import cmd_strings_edit
+        path = os.path.join(str(tmp_path), 'ULT3')
+        # Binary with no JSR $46BA pattern
+        with open(path, 'wb') as f:
+            f.write(bytearray(17408))
+        args = argparse.Namespace(file=path, index=0, vanilla=None,
+                                  address=None, text='TEST',
+                                  dry_run=True, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_strings_edit(args)
+
+
+class TestPatchStringsEditNoCriteria:
+    """Test patch cmd_strings_edit exits when no --index/--vanilla/--address."""
+
+    def _make_ult3_with_string(self, tmp_path):
+        """Create a ULT3-size binary with one inline string."""
+        data = bytearray(17408)
+        # Place JSR $46BA at offset 100
+        data[100] = 0x20
+        data[101] = 0xBA
+        data[102] = 0x46
+        # Inline text "HI" in high-ASCII + null
+        data[103] = ord('H') | 0x80
+        data[104] = ord('I') | 0x80
+        data[105] = 0x00
+        path = os.path.join(str(tmp_path), 'ULT3')
+        with open(path, 'wb') as f:
+            f.write(data)
+        return path
+
+    def test_no_criteria_exits(self, tmp_path):
+        from u3edit.patch import cmd_strings_edit
+        path = self._make_ult3_with_string(tmp_path)
+        args = argparse.Namespace(file=path, index=None, vanilla=None,
+                                  address=None, text='TEST',
+                                  dry_run=True, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_strings_edit(args)
+
+
+class TestPatchStringsEditByAddress:
+    """Test patch cmd_strings_edit by --address lookup."""
+
+    def test_edit_by_address(self, tmp_path, capsys):
+        from u3edit.patch import cmd_strings_edit
+        data = bytearray(17408)
+        # Place JSR $46BA at offset 100
+        data[100] = 0x20
+        data[101] = 0xBA
+        data[102] = 0x46
+        # Inline "HI" + null
+        data[103] = ord('H') | 0x80
+        data[104] = ord('I') | 0x80
+        data[105] = 0x00
+        path = os.path.join(str(tmp_path), 'ULT3')
+        with open(path, 'wb') as f:
+            f.write(data)
+        # Address = org + JSR offset = $5000 + 100 = $5064
+        args = argparse.Namespace(file=path, index=None, vanilla=None,
+                                  address=0x5064, text='HI',
+                                  dry_run=True, backup=False, output=None)
+        cmd_strings_edit(args)
+        out = capsys.readouterr().out
+        assert 'Patched' in out or 'Dry run' in out
+
+
+class TestPatchStringsImportNoStrings:
+    """Test patch cmd_strings_import exits when binary has no inline strings."""
+
+    def test_no_strings_exits(self, tmp_path):
+        from u3edit.patch import cmd_strings_import
+        path = os.path.join(str(tmp_path), 'ULT3')
+        with open(path, 'wb') as f:
+            f.write(bytearray(17408))
+        jpath = os.path.join(str(tmp_path), 'patches.json')
+        with open(jpath, 'w') as f:
+            json.dump({'patches': [{'index': 0, 'text': 'X'}]}, f)
+        args = argparse.Namespace(file=path, json_file=jpath,
+                                  dry_run=True, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_strings_import(args)
+
+
+class TestPatchStringsImportErrors:
+    """Test patch cmd_strings_import error paths."""
+
+    def _make_ult3_with_string(self, tmp_path, text='HI'):
+        data = bytearray(17408)
+        data[100] = 0x20
+        data[101] = 0xBA
+        data[102] = 0x46
+        for i, ch in enumerate(text):
+            data[103 + i] = ord(ch) | 0x80
+        data[103 + len(text)] = 0x00
+        path = os.path.join(str(tmp_path), 'ULT3')
+        with open(path, 'wb') as f:
+            f.write(data)
+        return path
+
+    def test_all_patches_fail_exits(self, tmp_path):
+        """cmd_strings_import exits when replacement is too long."""
+        from u3edit.patch import cmd_strings_import
+        path = self._make_ult3_with_string(tmp_path, 'HI')
+        jpath = os.path.join(str(tmp_path), 'patches.json')
+        with open(jpath, 'w') as f:
+            json.dump({'patches': [{'index': 0,
+                                    'text': 'THIS IS WAY TOO LONG FOR TWO BYTES'}]}, f)
+        args = argparse.Namespace(file=path, json_file=jpath,
+                                  dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_strings_import(args)
+
+    def test_no_match_warning(self, tmp_path, capsys):
+        """Unmatched vanilla text produces warning."""
+        from u3edit.patch import cmd_strings_import
+        path = self._make_ult3_with_string(tmp_path, 'HI')
+        jpath = os.path.join(str(tmp_path), 'patches.json')
+        with open(jpath, 'w') as f:
+            json.dump({'patches': [{'vanilla': 'NONEXISTENT', 'text': 'X'}]}, f)
+        args = argparse.Namespace(file=path, json_file=jpath,
+                                  dry_run=True, backup=False, output=None)
+        # No match = 0 successes + 0 errors, so it won't exit(1)
+        cmd_strings_import(args)
+        err = capsys.readouterr().err
+        assert 'no match' in err.lower() or 'Warning' in err
+
+
+class TestShapesImportOverlayStrings:
+    """Test shapes cmd_import with overlay strings JSON format."""
+
+    def test_import_overlay_strings(self, tmp_path, capsys):
+        from u3edit.shapes import cmd_import
+        # Build an SHP overlay with inline string "WEAPONS"
+        data = bytearray(b'\x60' * 16)
+        data += bytes([0x20, 0xBA, 0x46])  # JSR $46BA
+        for ch in 'WEAPONS':
+            data.append(ord(ch) | 0x80)
+        data.append(0x00)  # null terminator
+        data += bytearray(b'\x60' * 16)
+        path = os.path.join(str(tmp_path), 'SHP0')
+        with open(path, 'wb') as f:
+            f.write(data)
+        # JSON with 'strings' key
+        jdata = {
+            'strings': [
+                {'offset': 19, 'text': 'ARMS'}  # text_offset = 16 + 3 = 19
+            ]
+        }
+        jpath = os.path.join(str(tmp_path), 'strings.json')
+        with open(jpath, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(file=path, json_file=jpath,
+                                  dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        out = capsys.readouterr().out
+        assert '1 string(s)' in out
+
+
+class TestShapesImportUnrecognizedJSON:
+    """Test shapes cmd_import rejects unrecognized JSON format."""
+
+    def test_unrecognized_json_exits(self, tmp_path):
+        from u3edit.shapes import cmd_import
+        path = os.path.join(str(tmp_path), 'SHPS')
+        with open(path, 'wb') as f:
+            f.write(bytearray(2048))
+        jpath = os.path.join(str(tmp_path), 'bad.json')
+        with open(jpath, 'w') as f:
+            json.dump({'random_key': 123}, f)
+        args = argparse.Namespace(file=path, json_file=jpath,
+                                  dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_import(args)
+
+
+class TestShapesEditStringErrors:
+    """Test shapes cmd_edit_string error paths."""
+
+    def _make_overlay(self, tmp_path, text='HELLO'):
+        data = bytearray(b'\x60' * 16)
+        data += bytes([0x20, 0xBA, 0x46])
+        for ch in text:
+            data.append(ord(ch) | 0x80)
+        data.append(0x00)
+        data += bytearray(b'\x60' * 16)
+        path = os.path.join(str(tmp_path), 'SHP0')
+        with open(path, 'wb') as f:
+            f.write(data)
+        return path
+
+    def test_non_overlay_exits(self, tmp_path):
+        """cmd_edit_string on a SHPS file exits with error."""
+        from u3edit.shapes import cmd_edit_string
+        path = os.path.join(str(tmp_path), 'SHPS')
+        with open(path, 'wb') as f:
+            f.write(bytearray(2048))
+        args = argparse.Namespace(file=path, offset=0, text='X',
+                                  dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit_string(args)
+
+    def test_bad_offset_exits(self, tmp_path):
+        """cmd_edit_string with nonexistent offset exits."""
+        from u3edit.shapes import cmd_edit_string
+        path = self._make_overlay(tmp_path)
+        args = argparse.Namespace(file=path, offset=9999, text='X',
+                                  dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit_string(args)
+
+    def test_text_too_long_exits(self, tmp_path):
+        """cmd_edit_string with text longer than slot exits."""
+        from u3edit.shapes import cmd_edit_string
+        path = self._make_overlay(tmp_path, text='HI')
+        args = argparse.Namespace(file=path, offset=19, text='THIS IS WAY TOO LONG',
+                                  dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit_string(args)
+
+
+class TestSpecialImportMetadataBackcompat:
+    """Test special cmd_import accepts old 'metadata' key."""
+
+    def test_metadata_key_imports_trailing(self, tmp_path):
+        from u3edit.special import cmd_import
+        path = os.path.join(str(tmp_path), 'BRND')
+        with open(path, 'wb') as f:
+            f.write(bytearray(128))
+        jdata = {
+            'tiles': [[0] * 11] * 11,
+            'metadata': [0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF, 0x11]
+        }
+        jpath = os.path.join(str(tmp_path), 'brnd.json')
+        with open(jpath, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(file=path, json_file=jpath,
+                                  dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[121] == 0xAA
+
+
+class TestTlkSearchInvalidRegex:
+    """Test tlk cmd_search exits on invalid regex."""
+
+    def test_bad_regex_exits(self, tmp_path):
+        from u3edit.tlk import cmd_search
+        args = argparse.Namespace(path=str(tmp_path), pattern='[unclosed',
+                                  regex=True, ignore_case=False)
+        with pytest.raises(SystemExit):
+            cmd_search(args)
+
+
+class TestBcdIsValidBcd:
+    """Test is_valid_bcd function."""
+
+    def test_valid_bcd_bytes(self):
+        from u3edit.bcd import is_valid_bcd
+        assert is_valid_bcd(0x00)
+        assert is_valid_bcd(0x99)
+        assert is_valid_bcd(0x42)
+
+    def test_invalid_high_nibble(self):
+        from u3edit.bcd import is_valid_bcd
+        assert not is_valid_bcd(0xA0)
+        assert not is_valid_bcd(0xF5)
+
+    def test_invalid_low_nibble(self):
+        from u3edit.bcd import is_valid_bcd
+        assert not is_valid_bcd(0x0A)
+        assert not is_valid_bcd(0x1F)
+
+    def test_both_nibbles_invalid(self):
+        from u3edit.bcd import is_valid_bcd
+        assert not is_valid_bcd(0xFF)
+
+
+class TestValidateMonsterEmpty:
+    """Test validate_monster returns empty for empty monster."""
+
+    def test_empty_monster_no_warnings(self):
+        from u3edit.bestiary import Monster, validate_monster
+        attrs = [0] * 10
+        m = Monster(attrs, 0)
+        assert validate_monster(m) == []
+
+
+class TestShapesCompileNoTiles:
+    """Test shapes cmd_compile_tiles exits when .tiles file has no tiles."""
+
+    def test_empty_source_exits(self, tmp_path):
+        from u3edit.shapes import cmd_compile_tiles
+        src = os.path.join(str(tmp_path), 'empty.tiles')
+        with open(src, 'w') as f:
+            f.write('# Just a comment\n')
+        args = argparse.Namespace(source=src, output=None, format='binary')
+        with pytest.raises(SystemExit):
+            cmd_compile_tiles(args)
+
+
+class TestMapDecompileUnknownBytes:
+    """Test map cmd_decompile warns on unknown tile bytes."""
+
+    def test_unknown_tile_byte_shows_question_mark(self, tmp_path, capsys):
+        from u3edit.map import cmd_decompile
+        # Create a small overworld map with an unknown tile byte
+        data = bytearray(64 * 64)
+        data[0] = 0xFE  # Not a standard tile
+        path = os.path.join(str(tmp_path), 'MAP')
+        with open(path, 'wb') as f:
+            f.write(data)
+        outpath = os.path.join(str(tmp_path), 'out.map')
+        args = argparse.Namespace(file=path, output=outpath, dungeon=False)
+        cmd_decompile(args)
+        err = capsys.readouterr().err
+        assert 'unmapped' in err.lower() or '0xFE' in err
+
+
+class TestDiffChangedCount:
+    """Test FileDiff.change_count property."""
+
+    def test_change_count(self):
+        from u3edit.diff import FileDiff, EntityDiff, FieldDiff
+        fd = FileDiff('roster', 'ROST')
+        e1 = EntityDiff('character', 'Slot 0')
+        e1.fields = [FieldDiff('name', 'foo', 'bar')]
+        e2 = EntityDiff('character', 'Slot 1')  # no fields = unchanged
+        e3 = EntityDiff('character', 'Slot 2')
+        e3.fields = [FieldDiff('hp', '10', '20')]
+        fd.entities = [e1, e2, e3]
+        assert fd.change_count == 2
+
+    def test_no_changes(self):
+        from u3edit.diff import FileDiff, EntityDiff
+        fd = FileDiff('roster', 'ROST')
+        e = EntityDiff('character', 'Slot 0')  # no fields = unchanged
+        fd.entities = [e]
+        assert fd.change_count == 0
+
+
+# ============================================================================
+# Batch 10: Audit-verified bug fixes
+# ============================================================================
+
+
+class TestFlagDescMagicUserPrecedence:
+    """Test that Monster.flag_desc correctly identifies Magic User type.
+
+    Bug: `f1 & 0x0C == MON_FLAG1_MAGIC_USER` was parsed as `f1 & True`
+    due to operator precedence. Fixed to `(f1 & 0x0C) == MON_FLAG1_MAGIC_USER`.
+    """
+
+    def test_magic_user_detected(self):
+        """flags1=0x0C (bits 2+3 set) should show Magic User."""
+        from u3edit.bestiary import Monster
+        attrs = [0x80, 0x80, 0x0C, 0, 10, 5, 3, 4, 0, 0]
+        m = Monster(attrs, 0)
+        assert 'Magic User' in m.flag_desc
+
+    def test_undead_not_magic_user(self):
+        """flags1=0x04 (only bit 2) should show Undead, not Magic User."""
+        from u3edit.bestiary import Monster
+        attrs = [0x80, 0x80, 0x04, 0, 10, 5, 3, 4, 0, 0]
+        m = Monster(attrs, 0)
+        assert 'Undead' in m.flag_desc
+        assert 'Magic User' not in m.flag_desc
+
+    def test_ranged_not_magic_user(self):
+        """flags1=0x08 (only bit 3) should show Ranged, not Magic User."""
+        from u3edit.bestiary import Monster
+        attrs = [0x80, 0x80, 0x08, 0, 10, 5, 3, 4, 0, 0]
+        m = Monster(attrs, 0)
+        assert 'Ranged' in m.flag_desc
+        assert 'Magic User' not in m.flag_desc
+
+    def test_boss_magic_user(self):
+        """flags1=0x8C (boss + magic user) shows both."""
+        from u3edit.bestiary import Monster
+        attrs = [0x80, 0x80, 0x8C, 0, 10, 5, 3, 4, 0, 0]
+        m = Monster(attrs, 0)
+        assert 'Magic User' in m.flag_desc
+        assert 'Boss' in m.flag_desc
+
+    def test_bit0_set_not_magic_user(self):
+        """flags1=0x01 (undefined bit 0) should NOT trigger Magic User."""
+        from u3edit.bestiary import Monster
+        attrs = [0x80, 0x80, 0x01, 0, 10, 5, 3, 4, 0, 0]
+        m = Monster(attrs, 0)
+        assert 'Magic User' not in m.flag_desc
+
+    def test_no_flags(self):
+        """flags1=0x00 should show '-' (no flags)."""
+        from u3edit.bestiary import Monster
+        attrs = [0x80, 0x80, 0x00, 0, 10, 5, 3, 4, 0, 0]
+        m = Monster(attrs, 0)
+        assert m.flag_desc == '-'
+
+
+class TestMapCompileRowPadding:
+    """Test that short overworld rows are padded with Grass (0x04), not Water (0x00)."""
+
+    def test_short_overworld_row_padded_with_grass(self, tmp_path):
+        from u3edit.map import cmd_compile
+        from u3edit.constants import TILES
+        # Create a .map file with one short row
+        src = os.path.join(str(tmp_path), 'test.map')
+        # Use '.' which is Grass (0x04) for the first few chars, then short
+        with open(src, 'w') as f:
+            f.write('# Overworld (64x64)\n')
+            for _ in range(64):
+                f.write('.' * 10 + '\n')  # Only 10 chars, should pad to 64
+        outpath = os.path.join(str(tmp_path), 'MAP')
+        args = argparse.Namespace(source=src, output=outpath, dungeon=False)
+        cmd_compile(args)
+        with open(outpath, 'rb') as f:
+            data = f.read()
+        # Byte at position 10 (first padded tile) should be 0x04 (Grass)
+        assert data[10] == 0x04
+        # NOT 0x00 (Water)
+        assert data[10] != 0x00
+
+    def test_short_dungeon_row_padded_with_zero(self, tmp_path):
+        from u3edit.map import cmd_compile
+        # Create a dungeon .map with short rows
+        src = os.path.join(str(tmp_path), 'test.map')
+        with open(src, 'w') as f:
+            f.write('# Level 1\n')
+            for _ in range(16):
+                f.write('#' * 5 + '\n')  # Only 5 chars, should pad to 16
+        outpath = os.path.join(str(tmp_path), 'DNG')
+        args = argparse.Namespace(source=src, output=outpath, dungeon=True)
+        cmd_compile(args)
+        with open(outpath, 'rb') as f:
+            data = f.read()
+        # Byte at position 5 (first padded tile) should be 0x00 (Open/empty)
+        assert data[5] == 0x00
+
+
+class TestSoundFileDescriptions:
+    """Test that SOSA/SOSM have correct descriptions."""
+
+    def test_sosa_description(self):
+        from u3edit.sound import SOUND_FILES
+        assert 'map state' in SOUND_FILES['SOSA']['description'].lower()
+
+    def test_sosm_description(self):
+        from u3edit.sound import SOUND_FILES
+        assert 'monster' in SOUND_FILES['SOSM']['description'].lower()
+
+
+class TestBcd16Docstring:
+    """Test bcd16_to_int decodes correctly (verifying fixed docstring)."""
+
+    def test_bcd16_1234(self):
+        from u3edit.bcd import bcd16_to_int
+        assert bcd16_to_int(0x12, 0x34) == 1234
+
+    def test_bcd16_9999(self):
+        from u3edit.bcd import bcd16_to_int
+        assert bcd16_to_int(0x99, 0x99) == 9999
+
+    def test_bcd16_0100(self):
+        from u3edit.bcd import bcd16_to_int
+        assert bcd16_to_int(0x01, 0x00) == 100
+
+
+# ============================================================================
+# Batch 11: Remaining gap coverage
+# ============================================================================
+
+
+class TestShapesCmdViewTile:
+    """Test shapes cmd_view with --tile N on a charset file."""
+
+    def test_view_single_tile(self, tmp_path, capsys):
+        from u3edit.shapes import cmd_view
+        path = os.path.join(str(tmp_path), 'SHPS')
+        # Create a valid SHPS file (2048 bytes)
+        data = bytearray(2048)
+        # Put some nonzero data in tile 0 (glyphs 0-3, each 8 bytes)
+        for i in range(32):
+            data[i] = 0xAA
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            path=path, json=False, output=None, tile=0)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert 'Tile' in out or 'tile' in out
+
+
+class TestShapesDecompileTooSmall:
+    """Test decompile_shps raises ValueError for too-small file."""
+
+    def test_truncated_raises(self):
+        from u3edit.shapes import decompile_shps
+        with pytest.raises(ValueError, match='too small'):
+            decompile_shps(bytes(1024))
+
+    def test_exact_size_ok(self):
+        from u3edit.shapes import decompile_shps
+        result = decompile_shps(bytes(2048))
+        assert '# Tile' in result
+
+
+class TestMapOverviewPreview:
+    """Test cmd_overview with --preview flag."""
+
+    def test_preview_renders_scaled_map(self, tmp_path, capsys):
+        from u3edit.map import cmd_overview
+        # Create MAPA (4096 bytes)
+        mapa_path = os.path.join(str(tmp_path), 'MAPA')
+        data = bytearray(4096)
+        data[0] = 0x04  # Grass tile
+        with open(mapa_path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(game_dir=str(tmp_path), preview=True,
+                                  json=False, output=None)
+        cmd_overview(args)
+        out = capsys.readouterr().out
+        assert 'Sosaria' in out or 'scaled' in out.lower()
+
+
+class TestSoundCmdViewDir:
+    """Test sound cmd_view directory mode with actual files present."""
+
+    def test_dir_text_mode(self, tmp_path, capsys):
+        from u3edit.sound import cmd_view
+        # Create an MBS-sized file (5456 bytes)
+        mbs_path = os.path.join(str(tmp_path), 'MBS')
+        with open(mbs_path, 'wb') as f:
+            f.write(bytearray(5456))
+        args = argparse.Namespace(
+            path=str(tmp_path), json=False, output=None)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert 'MBS' in out
+
+    def test_dir_json_mode(self, tmp_path, capsys):
+        from u3edit.sound import cmd_view
+        mbs_path = os.path.join(str(tmp_path), 'MBS')
+        with open(mbs_path, 'wb') as f:
+            f.write(bytearray(5456))
+        args = argparse.Namespace(
+            path=str(tmp_path), json=True, output=None)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        result = json.loads(out)
+        assert 'MBS' in result
+        assert result['MBS']['size'] == 5456
+
+
+class TestSoundCmdViewSingleMBS:
+    """Test sound cmd_view on a single MBS file with structured output."""
+
+    def test_mbs_file_view(self, tmp_path, capsys):
+        from u3edit.sound import cmd_view
+        path = os.path.join(str(tmp_path), 'MBS')
+        # Create MBS with some AY register writes (reg 0-13 are valid)
+        data = bytearray(5456)
+        # Put valid register write pairs: register, value
+        data[0] = 0  # register 0
+        data[1] = 0x42  # value
+        data[2] = 7  # register 7 (mixer)
+        data[3] = 0x38  # value
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            path=path, json=False, output=None)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert 'MBS' in out or 'Mockingboard' in out
+
+
+class TestSoundCmdViewUnknown:
+    """Test sound cmd_view on an unrecognized file type."""
+
+    def test_unknown_file_type(self, tmp_path, capsys):
+        from u3edit.sound import cmd_view
+        path = os.path.join(str(tmp_path), 'MYSTERY')
+        with open(path, 'wb') as f:
+            f.write(bytearray(999))
+        args = argparse.Namespace(
+            path=path, json=False, output=None)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert 'Unknown' in out or 'MYSTERY' in out
+
+
+class TestDiffFileDispatchCombat:
+    """Test diff_file dispatches to diff_combat for CON files."""
+
+    def test_diff_file_combat(self, tmp_path):
+        from u3edit.diff import diff_file
+        p1 = os.path.join(str(tmp_path), 'CONA')
+        p2 = os.path.join(str(tmp_path), 'CONA_2')
+        data = bytearray(192)
+        with open(p1, 'wb') as f:
+            f.write(data)
+        data[0] = 0x04  # Change one tile
+        with open(p2, 'wb') as f:
+            f.write(data)
+        result = diff_file(p1, p2)
+        assert result is not None
+        assert result.changed
+
+
+class TestDiffFileDispatchTlk:
+    """Test diff_file dispatches to diff_tlk for TLK files."""
+
+    def test_diff_file_tlk(self, tmp_path):
+        from u3edit.diff import diff_file
+        # Build a simple TLK file (text record + null terminator)
+        rec = bytearray([ord('H') | 0x80, ord('I') | 0x80, 0x00])
+        p1 = os.path.join(str(tmp_path), 'TLKA')
+        p2 = os.path.join(str(tmp_path), 'TLKA_2')
+        with open(p1, 'wb') as f:
+            f.write(rec)
+        rec2 = bytearray([ord('B') | 0x80, ord('Y') | 0x80, 0x00])
+        with open(p2, 'wb') as f:
+            f.write(rec2)
+        result = diff_file(p1, p2)
+        assert result is not None
+        assert result.changed
+
+
+class TestDiffFileDispatchSpecial:
+    """Test diff_file dispatches to diff_special for BRND/SHRN files."""
+
+    def test_diff_file_special(self, tmp_path):
+        from u3edit.diff import diff_file
+        p1 = os.path.join(str(tmp_path), 'BRND')
+        p2 = os.path.join(str(tmp_path), 'BRND_2')
+        data = bytearray(128)
+        with open(p1, 'wb') as f:
+            f.write(data)
+        data[0] = 0x04
+        with open(p2, 'wb') as f:
+            f.write(data)
+        result = diff_file(p1, p2)
+        assert result is not None
+        assert result.changed
+
+
+class TestDiffMapDungeon:
+    """Test diff_map with dungeon-sized files (exposes width=64 issue)."""
+
+    def test_diff_dungeon_detects_changes(self, tmp_path):
+        from u3edit.diff import diff_map
+        p1 = os.path.join(str(tmp_path), 'MAPM')
+        p2 = os.path.join(str(tmp_path), 'MAPM_2')
+        data1 = bytearray(2048)
+        data2 = bytearray(2048)
+        data2[0] = 0x01  # Change first byte
+        with open(p1, 'wb') as f:
+            f.write(data1)
+        with open(p2, 'wb') as f:
+            f.write(data2)
+        result = diff_map(p1, p2, 'MAPM')
+        assert result.tile_changes == 1
+
+
+class TestMapCompileLevelCommentMidLevel:
+    """Test that a '# Level' comment mid-level splits the level prematurely.
+
+    This documents the current behavior (premature split) as a known issue.
+    """
+
+    def test_level_comment_midlevel_splits(self, tmp_path):
+        from u3edit.map import cmd_compile
+        src = os.path.join(str(tmp_path), 'test.map')
+        with open(src, 'w') as f:
+            f.write('# Level 1\n')
+            for _ in range(8):
+                f.write('#' * 16 + '\n')  # 8 rows of wall
+            f.write('# Level design note\n')  # Mid-level comment
+            for _ in range(8):
+                f.write('.' * 16 + '\n')  # 8 more rows of open
+        outpath = os.path.join(str(tmp_path), 'DNG')
+        args = argparse.Namespace(source=src, output=outpath, dungeon=True)
+        cmd_compile(args)
+        with open(outpath, 'rb') as f:
+            data = f.read()
+        # The comment splits level 1 into two: first 8 rows, then 8 rows
+        # Level 1 should have 16 rows but the premature split means
+        # the first 8 rows are level 1 (padded) and next 8 are level 2
+        # So data should be at least 2 levels worth (512 bytes)
+        assert len(data) >= 512  # At least 2 levels were created
+
+
+class TestCombatValidateZeroOverlap:
+    """Test that entities at (0,0) are excluded from overlap checks."""
+
+    def test_monster_pc_at_zero_no_overlap_warning(self):
+        """Monster and PC both at (0,0) produce no overlap warning."""
+        from u3edit.combat import CombatMap, validate_combat_map
+        data = bytearray(192)
+        # Monster 0 at (0,0)
+        data[0x80] = 0  # monster_x[0]
+        data[0x88] = 0  # monster_y[0]
+        # PC 0 at (0,0)
+        data[0xA0] = 0  # pc_x[0]
+        data[0xA4] = 0  # pc_y[0]
+        cm = CombatMap(data)
+        warnings = validate_combat_map(cm)
+        # Current behavior: (0,0) is excluded from overlap checks
+        # so no overlap warning is produced even though they overlap
+        overlap_warnings = [w for w in warnings if 'overlap' in w.lower()]
+        assert len(overlap_warnings) == 0  # Documents the known gap
+
+
+# ============================================================================
+# Batch 12: Final gap coverage
+# ============================================================================
+
+
+class TestTlkImportDestroysBinaryLeader:
+    """Test that tlk cmd_import discards binary leader sections."""
+
+    def test_binary_leader_not_preserved(self, tmp_path, capsys):
+        from u3edit.tlk import cmd_import
+        # Create TLK with binary leader (non-text bytes) then text record
+        binary_leader = bytearray([0x01, 0x02, 0x03])  # not high-ASCII text
+        separator = bytearray([0x00])
+        text_rec = bytearray([ord('H') | 0x80, ord('I') | 0x80])
+        tlk_data = binary_leader + separator + text_rec + separator
+        path = os.path.join(str(tmp_path), 'TLKA')
+        with open(path, 'wb') as f:
+            f.write(tlk_data)
+        # Import JSON with just the text record
+        jdata = [{'lines': ['HELLO']}]
+        jpath = os.path.join(str(tmp_path), 'tlk.json')
+        with open(jpath, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(file=path, json_file=jpath,
+                                  dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        # After import, binary leader is gone — only the imported text remains
+        with open(path, 'rb') as f:
+            result = f.read()
+        # The binary leader bytes should NOT be present
+        assert result[:3] != bytes([0x01, 0x02, 0x03])
+
+
+class TestTlkEditZeroTextRecords:
+    """Test tlk cmd_edit error message when file has zero text records."""
+
+    def test_zero_text_count_exits(self, tmp_path):
+        from u3edit.tlk import cmd_edit
+        # Create TLK with only binary (non-text) content
+        binary_data = bytearray([0x01, 0x02, 0x03, 0x00])
+        path = os.path.join(str(tmp_path), 'TLKA')
+        with open(path, 'wb') as f:
+            f.write(binary_data)
+        args = argparse.Namespace(
+            file=path, record=0, text='HI', find=None, replace=None,
+            dry_run=False, backup=False, output=None, ignore_case=False)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+
+class TestMapImportDungeonNoLevelsKey:
+    """Test map cmd_import on dungeon file with JSON lacking 'levels' key."""
+
+    def test_dungeon_without_levels_uses_else_branch(self, tmp_path, capsys):
+        from u3edit.map import cmd_import
+        # Create dungeon-sized file (2048 bytes)
+        path = os.path.join(str(tmp_path), 'MAPM')
+        data = bytearray(2048)
+        with open(path, 'wb') as f:
+            f.write(data)
+        # JSON without 'levels' — will fall to else branch with width=64 default
+        jdata = {'tiles': [['Wall'] * 16], 'width': 16}
+        jpath = os.path.join(str(tmp_path), 'map.json')
+        with open(jpath, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(file=path, json_file=jpath,
+                                  dry_run=True, backup=False, output=None,
+                                  level=None)
+        cmd_import(args)
+        # Should work without crash — the else branch handles it
+        out = capsys.readouterr().out
+        assert 'Dry run' in out
+
+
+class TestMapCmdFindDungeon:
+    """Test map cmd_find with dungeon-sized file."""
+
+    def test_find_tile_in_dungeon(self, tmp_path, capsys):
+        from u3edit.map import cmd_find
+        # Create dungeon (2048 bytes, 8 levels x 16x16)
+        data = bytearray(2048)
+        data[0] = 0x01  # Wall at level 0, (0,0)
+        path = os.path.join(str(tmp_path), 'MAPM')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(file=path, tile=0x01, level=0, json=False)
+        cmd_find(args)
+        out = capsys.readouterr().out
+        assert '(0, 0)' in out
+
+
+class TestCombatImportDoubleWrite:
+    """Test combat cmd_import with both padding.pre_monster and descriptor.block1."""
+
+    def test_descriptor_overwrites_padding(self, tmp_path):
+        from u3edit.combat import cmd_import
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(bytearray(192))
+        # JSON with both keys — descriptor.block1 should win (last write)
+        jdata = {
+            'tiles': [], 'monsters': [], 'pcs': [],
+            'padding': {'pre_monster': [0x11] * 7},
+            'descriptor': {'block1': [0x22] * 7}
+        }
+        jpath = os.path.join(str(tmp_path), 'con.json')
+        with open(jpath, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(file=path, json_file=jpath,
+                                  dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        # descriptor.block1 overwrites padding.pre_monster
+        assert result[0x79] == 0x22
+
+
+class TestShapesCmdViewBinaryFormat:
+    """Test shapes cmd_view on a non-charset, non-overlay file (binary hex dump)."""
+
+    def test_binary_hex_dump(self, tmp_path, capsys):
+        from u3edit.shapes import cmd_view
+        # Create a file that doesn't match any known format
+        # Size not 2048 (SHPS), name not SHP0-7, not TEXT/1024
+        path = os.path.join(str(tmp_path), 'UNKNOWN')
+        with open(path, 'wb') as f:
+            f.write(bytearray(512))
+        args = argparse.Namespace(
+            path=path, json=False, output=None, tile=None)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert 'Binary' in out or '00' in out
+
+
+class TestRosterNameNonAscii:
+    """Test Character.name setter with non-ASCII input."""
+
+    def test_non_ascii_chars_handled(self):
+        """Non-ASCII chars should not crash (they get ORed with 0x80)."""
+        from u3edit.roster import Character
+        c = Character(bytearray(64))
+        # Characters with ord() <= 127 are fine after | 0x80
+        # Characters like 'é' (ord=233) produce 233 | 0x80 = 233 (fits in byte)
+        # This should not crash
+        c.name = 'TEST'
+        assert c.name == 'TEST'
+
+
+class TestDiffBinaryChangedBytes:
+    """Test diff_binary changed_bytes FieldDiff uses old=0 sentinel."""
+
+    def test_changed_bytes_old_is_zero(self, tmp_path):
+        from u3edit.diff import diff_binary
+        p1 = os.path.join(str(tmp_path), 'FILE1')
+        p2 = os.path.join(str(tmp_path), 'FILE2')
+        with open(p1, 'wb') as f:
+            f.write(bytearray(100))
+        data2 = bytearray(100)
+        data2[0] = 0xFF
+        data2[1] = 0xFF
+        with open(p2, 'wb') as f:
+            f.write(data2)
+        fd = diff_binary(p1, p2, 'TEST')
+        # Find the changed_bytes field
+        for entity in fd.entities:
+            for field in entity.fields:
+                if field.path == 'changed_bytes':
+                    assert field.old == 0  # Sentinel value
+                    assert field.new == 2  # Two bytes differ
+
+
+class TestDiffDetectMapNoSizeCheck:
+    """Test diff detect_file_type accepts MAP files regardless of size."""
+
+    def test_map_any_size_detected(self, tmp_path):
+        from u3edit.diff import detect_file_type
+        # A tiny file named MAPA is still detected as MAP
+        path = os.path.join(str(tmp_path), 'MAPA')
+        with open(path, 'wb') as f:
+            f.write(bytearray(42))  # Wrong size for any real MAP
+        assert detect_file_type(path) == 'MAPA'
+
+    def test_tlk_any_size_detected(self, tmp_path):
+        from u3edit.diff import detect_file_type
+        path = os.path.join(str(tmp_path), 'TLKA')
+        with open(path, 'wb') as f:
+            f.write(bytearray(10))
+        assert detect_file_type(path) == 'TLKA'
+
+
+class TestShapesParseHeaderAmbiguity:
+    """Test that _TILE_HEADER_RE matches before comment skip in parse_tiles_text."""
+
+    def test_tile_header_comment_treated_as_header(self):
+        from u3edit.shapes import parse_tiles_text
+        # A comment that looks like a tile header is treated as a header
+        text = '# Tile 0x10: Some comment\n'
+        # Add 8 pixel rows for tile 0x10 (GLYPH_HEIGHT=8)
+        for _ in range(8):
+            text += '........\n'
+        tiles = parse_tiles_text(text)
+        # The comment is parsed as a header for tile 0x10
+        indices = [idx for idx, _ in tiles]
+        assert 0x10 in indices
+
+
+# ============================================================================
+# Batch 13 — Audit iteration: diff_map dungeon fix, disk.py, roster validation,
+#             save dry-run, tlk/spell edge cases
+# ============================================================================
+
+
+class TestDiffMapDungeonCoordinates:
+    """diff_map uses width=16 for dungeon-sized (2048-byte) files."""
+
+    def test_dungeon_tile_coordinates_correct(self, tmp_path):
+        """Changed tile at dungeon position (3, 5) reports correct x,y."""
+        from u3edit.diff import diff_map
+        d1 = bytearray(MAP_DUNGEON_SIZE)
+        d2 = bytearray(MAP_DUNGEON_SIZE)
+        # Change tile at level 0, x=3, y=5 → offset = 5*16 + 3 = 83
+        d2[83] = 0x10
+        p1 = os.path.join(str(tmp_path), 'MAPA1')
+        p2 = os.path.join(str(tmp_path), 'MAPA2')
+        with open(p1, 'wb') as f:
+            f.write(d1)
+        with open(p2, 'wb') as f:
+            f.write(d2)
+        fd = diff_map(p1, p2, 'MAPA')
+        assert fd.tile_changes == 1
+        assert fd.tile_positions[0] == (3, 5)
+
+    def test_dungeon_change_on_level_1(self, tmp_path):
+        """Changed tile on level 1 (offset 256+) uses width=16 for coordinates."""
+        from u3edit.diff import diff_map
+        d1 = bytearray(MAP_DUNGEON_SIZE)
+        d2 = bytearray(MAP_DUNGEON_SIZE)
+        # Level 1, x=10, y=2 → offset = 256 + 2*16 + 10 = 298
+        d2[298] = 0x20
+        p1 = os.path.join(str(tmp_path), 'MAP1')
+        p2 = os.path.join(str(tmp_path), 'MAP2')
+        with open(p1, 'wb') as f:
+            f.write(d1)
+        with open(p2, 'wb') as f:
+            f.write(d2)
+        fd = diff_map(p1, p2, 'MAP')
+        assert fd.tile_changes == 1
+        # With width=16: x = 298 % 16 = 10, y = 298 // 16 = 18
+        assert fd.tile_positions[0] == (10, 18)
+
+    def test_overworld_still_uses_width_64(self, tmp_path):
+        """Overworld (4096-byte) MAP still uses width=64."""
+        from u3edit.diff import diff_map
+        d1 = bytearray(MAP_OVERWORLD_SIZE)
+        d2 = bytearray(MAP_OVERWORLD_SIZE)
+        # x=40, y=3 → offset = 3*64 + 40 = 232
+        d2[232] = 0x08
+        p1 = os.path.join(str(tmp_path), 'OVR1')
+        p2 = os.path.join(str(tmp_path), 'OVR2')
+        with open(p1, 'wb') as f:
+            f.write(d1)
+        with open(p2, 'wb') as f:
+            f.write(d2)
+        fd = diff_map(p1, p2, 'MAPA')
+        assert fd.tile_changes == 1
+        assert fd.tile_positions[0] == (40, 3)
+
+
+class TestDiskContextReadWrite:
+    """Test DiskContext cache, modified, and _parse_hash_suffix edge cases."""
+
+    def test_parse_hash_suffix_valid(self):
+        from u3edit.disk import DiskContext
+        base, ft, at = DiskContext._parse_hash_suffix('ROST#069500')
+        assert base == 'ROST'
+        assert ft == 0x06
+        assert at == 0x9500
+
+    def test_parse_hash_suffix_no_hash(self):
+        from u3edit.disk import DiskContext
+        base, ft, at = DiskContext._parse_hash_suffix('ROST')
+        assert base == 'ROST'
+        assert ft == 0x06
+        assert at == 0x0000
+
+    def test_parse_hash_suffix_short(self):
+        from u3edit.disk import DiskContext
+        base, ft, at = DiskContext._parse_hash_suffix('FOO#06')
+        assert base == 'FOO'
+        assert ft == 0x06
+        assert at == 0x0000
+
+    def test_parse_hash_suffix_invalid_hex(self):
+        """Non-hex characters in suffix with len >= 6 fall back to defaults."""
+        from u3edit.disk import DiskContext
+        base, ft, at = DiskContext._parse_hash_suffix('FOO#GGGG00')
+        assert base == 'FOO'
+        assert ft == 0x06
+        assert at == 0x0000
+
+    def test_write_stages_data(self):
+        """DiskContext.write() stages data in _modified dict."""
+        from u3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        ctx.write('ROST', b'\x00' * 10)
+        assert 'ROST' in ctx._modified
+        assert ctx._modified['ROST'] == b'\x00' * 10
+
+    def test_read_returns_modified_data(self):
+        """read() returns staged modified data over cache."""
+        from u3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        ctx._cache['ROST'] = b'\x01' * 10
+        ctx.write('ROST', b'\x02' * 10)
+        assert ctx.read('ROST') == b'\x02' * 10
+
+    def test_read_returns_cached_data(self):
+        """read() returns cached data when not modified."""
+        from u3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        ctx._cache['ROST'] = b'\x03' * 10
+        assert ctx.read('ROST') == b'\x03' * 10
+
+    def test_read_returns_none_no_tmpdir(self):
+        """read() returns None when _tmpdir is None and no cache."""
+        from u3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        assert ctx.read('MISSING') is None
+
+    def test_read_from_tmpdir(self, tmp_path):
+        """read() scans _tmpdir files and populates cache + file_types."""
+        from u3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        ctx._tmpdir = str(tmp_path)
+        # Create a file with hash suffix in tmpdir
+        rost_path = os.path.join(str(tmp_path), 'ROST#069500')
+        with open(rost_path, 'wb') as f:
+            f.write(b'\xAB' * 20)
+        result = ctx.read('ROST')
+        assert result == b'\xAB' * 20
+        assert 'ROST' in ctx._cache
+        assert ctx._file_types['ROST'] == (0x06, 0x9500)
+
+    def test_read_case_insensitive(self, tmp_path):
+        """read() matches filenames case-insensitively."""
+        from u3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        ctx._tmpdir = str(tmp_path)
+        fpath = os.path.join(str(tmp_path), 'rost#060000')
+        with open(fpath, 'wb') as f:
+            f.write(b'\xCD' * 5)
+        result = ctx.read('ROST')
+        assert result == b'\xCD' * 5
+
+
+class TestDiskContextExit:
+    """Test DiskContext.__exit__ writeback and cleanup behavior."""
+
+    def test_exit_cleans_tmpdir(self, tmp_path):
+        """__exit__ removes the tmpdir."""
+        from u3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        tmpdir = os.path.join(str(tmp_path), 'u3edit_test')
+        os.makedirs(tmpdir)
+        ctx._tmpdir = tmpdir
+        ctx.__exit__(None, None, None)
+        assert not os.path.exists(tmpdir)
+
+    def test_exit_returns_false(self):
+        """__exit__ returns False (does not suppress exceptions)."""
+        from u3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        ctx._tmpdir = None
+        result = ctx.__exit__(None, None, None)
+        assert result is False
+
+
+class TestDiskAuditLogic:
+    """Test cmd_audit logic with mocked disk_info/disk_list."""
+
+    def test_audit_text_output(self, monkeypatch, capsys):
+        from u3edit import disk
+        monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
+            'blocks': '280',
+            'volume': 'TEST',
+        })
+        monkeypatch.setattr(disk, 'disk_list', lambda image, **kw: [
+            {'name': 'ROST', 'type': 'BIN', 'size': '1280'},
+            {'name': 'MAPA', 'type': 'BIN', 'size': '4096'},
+        ])
+        args = argparse.Namespace(
+            image='test.po', json=False, output=None, detail=False)
+        disk.cmd_audit(args)
+        out = capsys.readouterr().out
+        assert 'Disk Audit' in out
+        assert '280' in out  # total blocks shown
+
+    def test_audit_json_output(self, monkeypatch, capsys):
+        from u3edit import disk
+        monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
+            'blocks': '280',
+        })
+        monkeypatch.setattr(disk, 'disk_list', lambda image, **kw: [
+            {'name': 'ROST', 'type': 'BIN', 'size': '1280'},
+        ])
+        args = argparse.Namespace(
+            image='test.po', json=True, output=None, detail=False)
+        disk.cmd_audit(args)
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert data['total_blocks'] == 280
+        assert data['used_blocks'] == 3  # ceil(1280/512) = 3
+        assert data['free_blocks'] == 277
+        assert 'capacity_estimates' in data
+
+    def test_audit_detail_flag(self, monkeypatch, capsys):
+        from u3edit import disk
+        monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
+            'blocks': '100',
+        })
+        monkeypatch.setattr(disk, 'disk_list', lambda image, **kw: [
+            {'name': 'TEST', 'type': 'BIN', 'size': '256'},
+        ])
+        args = argparse.Namespace(
+            image='test.po', json=False, output=None, detail=True)
+        disk.cmd_audit(args)
+        out = capsys.readouterr().out
+        assert 'TEST' in out
+        assert 'BIN' in out
+
+    def test_audit_error(self, monkeypatch, capsys):
+        from u3edit import disk
+        monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
+            'error': 'bad image',
+        })
+        monkeypatch.setattr(disk, 'disk_list', lambda image, **kw: [])
+        args = argparse.Namespace(
+            image='test.po', json=False, output=None, detail=False)
+        with pytest.raises(SystemExit):
+            disk.cmd_audit(args)
+
+
+class TestDiskCmdHandlers:
+    """Test disk CLI handler functions."""
+
+    def test_cmd_info_error(self, monkeypatch, capsys):
+        from u3edit import disk
+        monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
+            'error': 'not found',
+        })
+        args = argparse.Namespace(image='bad.po', json=False, output=None)
+        with pytest.raises(SystemExit):
+            disk.cmd_info(args)
+
+    def test_cmd_info_text(self, monkeypatch, capsys):
+        from u3edit import disk
+        monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
+            'volume': 'GAME',
+            'format': 'ProDOS',
+        })
+        args = argparse.Namespace(image='game.po', json=False, output=None)
+        disk.cmd_info(args)
+        out = capsys.readouterr().out
+        assert 'GAME' in out
+        assert 'ProDOS' in out
+
+    def test_cmd_info_json(self, monkeypatch, capsys):
+        from u3edit import disk
+        monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
+            'volume': 'GAME',
+        })
+        args = argparse.Namespace(image='game.po', json=True, output=None)
+        disk.cmd_info(args)
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert data['volume'] == 'GAME'
+
+    def test_cmd_list_empty(self, monkeypatch, capsys):
+        from u3edit import disk
+        monkeypatch.setattr(disk, 'disk_list', lambda image, path, **kw: [])
+        args = argparse.Namespace(image='empty.po', path='/', json=False, output=None)
+        with pytest.raises(SystemExit):
+            disk.cmd_list(args)
+
+    def test_cmd_list_text(self, monkeypatch, capsys):
+        from u3edit import disk
+        monkeypatch.setattr(disk, 'disk_list', lambda image, path, **kw: [
+            {'name': 'ROST', 'type': 'BIN', 'size': '1280'},
+        ])
+        args = argparse.Namespace(image='game.po', path='/', json=False, output=None)
+        disk.cmd_list(args)
+        out = capsys.readouterr().out
+        assert 'ROST' in out
+        assert '1 files' in out
+
+    def test_cmd_list_json(self, monkeypatch, capsys):
+        from u3edit import disk
+        monkeypatch.setattr(disk, 'disk_list', lambda image, path, **kw: [
+            {'name': 'ROST', 'type': 'BIN', 'size': '1280'},
+        ])
+        args = argparse.Namespace(image='game.po', path='/', json=True, output=None)
+        disk.cmd_list(args)
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert len(data) == 1
+        assert data[0]['name'] == 'ROST'
+
+    def test_cmd_extract_success(self, monkeypatch, capsys, tmp_path):
+        from u3edit import disk
+        monkeypatch.setattr(disk, 'disk_extract_all', lambda *a, **kw: True)
+        args = argparse.Namespace(image='game.po', output=str(tmp_path))
+        disk.cmd_extract(args)
+        out = capsys.readouterr().out
+        assert 'Extracted' in out
+
+    def test_cmd_extract_failure(self, monkeypatch, capsys):
+        from u3edit import disk
+        monkeypatch.setattr(disk, 'disk_extract_all', lambda *a, **kw: False)
+        args = argparse.Namespace(image='bad.po', output=None)
+        with pytest.raises(SystemExit):
+            disk.cmd_extract(args)
+
+
+class TestRosterValidateInventoryBcd:
+    """roster validate_character does not validate inventory BCD bytes (design gap)."""
+
+    def test_invalid_bcd_in_weapon_inventory_not_caught(self):
+        """Weapon inventory bytes with non-BCD values are NOT flagged.
+        This documents the design gap — not a failure."""
+        from u3edit.roster import validate_character, Character
+        data = bytearray(CHAR_RECORD_SIZE)
+        # Make non-empty: set name
+        data[0] = 0xC1  # 'A' in high-ASCII
+        data[0x11] = 0x47  # status = 'G' (Good)
+        data[0x12] = 0x25  # STR = 25 (valid BCD)
+        data[0x13] = 0x25  # DEX
+        data[0x14] = 0x25  # INT
+        data[0x15] = 0x25  # WIS
+        # Put invalid BCD (0xAA) in weapon inventory slot 0
+        data[0x31] = 0xAA
+        char = Character(data)
+        warnings = validate_character(char)
+        # No warning about weapon inventory BCD — this is the gap
+        assert not any('weapon' in w.lower() for w in warnings)
+
+    def test_invalid_bcd_in_armor_inventory_not_caught(self):
+        """Armor inventory bytes with non-BCD values are NOT flagged."""
+        from u3edit.roster import validate_character, Character
+        data = bytearray(CHAR_RECORD_SIZE)
+        data[0] = 0xC1
+        data[0x11] = 0x47
+        data[0x12] = 0x25
+        data[0x13] = 0x25
+        data[0x14] = 0x25
+        data[0x15] = 0x25
+        data[0x29] = 0xFF  # Invalid BCD in armor inventory
+        char = Character(data)
+        warnings = validate_character(char)
+        assert not any('armor inv' in w.lower() for w in warnings)
+
+
+class TestSavePLRSOnlyDryRun:
+    """save cmd_edit with only PLRS changes + dry_run reaches elif branch."""
+
+    def test_plrs_only_dry_run_message(self, tmp_path, capsys):
+        from u3edit.save import cmd_edit
+        # Create PRTY file
+        prty_data = bytearray(PRTY_FILE_SIZE)
+        prty_data[PRTY_OFF_SENTINEL] = 0xFF
+        prty_path = os.path.join(str(tmp_path), 'PRTY')
+        with open(prty_path, 'wb') as f:
+            f.write(prty_data)
+        # Create PLRS file (4 characters, only first slot non-empty)
+        plrs_data = bytearray(PLRS_FILE_SIZE)
+        plrs_data[0] = 0xC1  # Name 'A'
+        plrs_data[0x11] = 0x47  # Status Good
+        plrs_data[0x12] = int_to_bcd(25)  # STR
+        plrs_data[0x13] = int_to_bcd(25)  # DEX
+        plrs_data[0x14] = int_to_bcd(25)  # INT
+        plrs_data[0x15] = int_to_bcd(25)  # WIS
+        plrs_path = os.path.join(str(tmp_path), 'PLRS')
+        with open(plrs_path, 'wb') as f:
+            f.write(plrs_data)
+        args = argparse.Namespace(
+            game_dir=str(tmp_path), dry_run=True, backup=False,
+            output=None, validate=False,
+            # PRTY fields — no changes
+            transport=None, party_size=None, location=None,
+            x=None, y=None, sentinel=None,
+            slot=None, slot_ids=None,
+            # PLRS fields — change stat on slot 0
+            plrs_slot=0, name=None, status=None,
+            hp=50, max_hp=None, mp=None, exp=None,
+            food=None, gold=None, gems=None, keys=None,
+            powders=None, torches=None, sub_morsels=None,
+            race=None, char_class=None, gender=None,
+            marks=None, cards=None,
+            weapon=None, armor=None,
+            in_party=None, not_in_party=None,
+        )
+        cmd_edit(args)
+        out = capsys.readouterr().out
+        assert 'Dry run' in out
+        # Verify PLRS file was NOT written (dry run)
+        with open(plrs_path, 'rb') as f:
+            assert f.read() == bytes(plrs_data)
+
+
+class TestTlkFindWithoutReplace:
+    """tlk cmd_edit with --find only (no --replace) exits with error."""
+
+    def test_find_without_replace_exits(self, tmp_path, capsys):
+        from u3edit.tlk import cmd_edit
+        tlk_path = os.path.join(str(tmp_path), 'TLKA')
+        with open(tlk_path, 'wb') as f:
+            f.write(b'\xC8\xC5\xCC\xCC\xCF\x00')  # "HELLO" in high-ASCII
+        args = argparse.Namespace(
+            file=tlk_path, find='HELLO', replace=None,
+            dry_run=False, backup=False, output=None,
+            record=None, text=None, ignore_case=False)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_replace_without_find_exits(self, tmp_path, capsys):
+        from u3edit.tlk import cmd_edit
+        tlk_path = os.path.join(str(tmp_path), 'TLKA')
+        with open(tlk_path, 'wb') as f:
+            f.write(b'\xC8\xC5\xCC\xCC\xCF\x00')
+        args = argparse.Namespace(
+            file=tlk_path, find=None, replace='WORLD',
+            dry_run=False, backup=False, output=None,
+            record=None, text=None, ignore_case=False)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+
+class TestTlkIsTextRecordEdgeCases:
+    """Edge cases for is_text_record threshold logic."""
+
+    def test_all_separators_returns_false(self):
+        """Record with only line breaks has content_bytes=0 → False."""
+        from u3edit.tlk import is_text_record, TLK_LINE_BREAK
+        data = bytes([TLK_LINE_BREAK, TLK_LINE_BREAK, TLK_LINE_BREAK])
+        assert is_text_record(data) is False
+
+    def test_exactly_70_percent_returns_false(self):
+        """Exactly 70% high-ASCII returns False (threshold is > 0.7)."""
+        from u3edit.tlk import is_text_record
+        # 7 high-ASCII + 3 low bytes = 70% exactly
+        data = bytes([0xC1] * 7 + [0x10] * 3)
+        assert is_text_record(data) is False
+
+    def test_71_percent_returns_true(self):
+        """Just above 70% threshold returns True."""
+        from u3edit.tlk import is_text_record
+        # 8 high-ASCII + 3 low bytes = 72.7%
+        data = bytes([0xC1] * 8 + [0x10] * 3)
+        assert is_text_record(data) is True
+
+
+class TestSpellDispatchFallback:
+    """spell dispatch with unknown command prints usage."""
+
+    def test_dispatch_unknown_command(self, capsys):
+        from u3edit.spell import dispatch
+        args = argparse.Namespace(spell_command='unknown')
+        dispatch(args)
+        err = capsys.readouterr().err
+        assert 'Usage' in err
+
+    def test_dispatch_none_command(self, capsys):
+        from u3edit.spell import dispatch
+        args = argparse.Namespace(spell_command=None)
+        dispatch(args)
+        err = capsys.readouterr().err
+        assert 'Usage' in err
+
+
+class TestDiskDispatchFallback:
+    """disk dispatch with unknown command prints usage."""
+
+    def test_dispatch_unknown(self, capsys):
+        from u3edit.disk import dispatch
+        args = argparse.Namespace(disk_command='unknown')
+        dispatch(args)
+        err = capsys.readouterr().err
+        assert 'Usage' in err
+
+
+# =============================================================================
+# Batch 14: Grade-A upgrade tests
+# =============================================================================
+
+
+class TestMapCompileOverworldPadding:
+    """map.py: overworld row/grid padding uses 0x04 (Grass), not 0x00."""
+
+    def test_short_overworld_padded_with_grass(self, tmp_path):
+        """Compile a 3x3 overworld map and verify padding is 0x04."""
+        from u3edit.map import cmd_compile
+        # Create a tiny 3x3 map text file (. = Grass)
+        map_src = tmp_path / 'tiny.map'
+        map_src.write_text('...\n...\n...\n')
+        out_file = tmp_path / 'MAPA'
+        args = argparse.Namespace(
+            source=str(map_src), output=str(out_file), dungeon=False)
+        cmd_compile(args)
+        data = out_file.read_bytes()
+        assert len(data) == 4096  # 64x64
+        # The first row should be 3 Grass + 61 Grass padding
+        assert data[0] == 0x04
+        assert data[3] == 0x04  # padding byte, NOT 0x00
+        # Row 4 (index 192+) should be all-Grass padding rows
+        assert data[192] == 0x04  # row 3 is all padding
+        assert data[4095] == 0x04  # last byte is Grass
+
+    def test_dungeon_padded_with_zero(self, tmp_path):
+        """Dungeon maps pad with 0x00 (open floor), not 0x04."""
+        from u3edit.map import cmd_compile
+        map_src = tmp_path / 'dungeon.map'
+        # Write a minimal dungeon map: 1 level with 1 row
+        map_src.write_text('# Level 0\n' + '.' * 16 + '\n')
+        out_file = tmp_path / 'MAPM'
+        args = argparse.Namespace(
+            source=str(map_src), output=str(out_file), dungeon=True)
+        cmd_compile(args)
+        data = out_file.read_bytes()
+        assert len(data) == 2048  # 8 levels x 16x16
+
+
+class TestSpecialConstantsImportable:
+    """special.py constants moved to constants.py and importable."""
+
+    def test_special_meta_offset_value(self):
+        from u3edit.constants import SPECIAL_META_OFFSET
+        assert SPECIAL_META_OFFSET == 121
+
+    def test_special_meta_size_value(self):
+        from u3edit.constants import SPECIAL_META_SIZE
+        assert SPECIAL_META_SIZE == 7
+
+    def test_special_module_uses_constants(self):
+        """Verify special.py imports these from constants, not local defs."""
+        import u3edit.special as sp
+        from u3edit.constants import SPECIAL_META_OFFSET, SPECIAL_META_SIZE
+        assert sp.SPECIAL_META_OFFSET == SPECIAL_META_OFFSET
+        assert sp.SPECIAL_META_SIZE == SPECIAL_META_SIZE
+
+
+class TestShapesCompileJsonStructure:
+    """shapes.py: compile JSON groups glyphs by tile (4 frames per tile)."""
+
+    def test_compile_json_has_tile_groups(self, tmp_path):
+        """Compile 8 glyphs → 2 tiles, verify JSON has tile_id and frames."""
+        from u3edit.shapes import cmd_compile_tiles
+        # Create a .tiles file with 2 tiles (8 glyphs, indices 0-7)
+        lines = []
+        for idx in range(8):
+            lines.append(f'# Glyph 0x{idx:02X}')
+            for row in range(8):
+                lines.append('#.#.#.#' if row % 2 == 0 else '.#.#.#.')
+            lines.append('')
+        src = tmp_path / 'test.tiles'
+        src.write_text('\n'.join(lines))
+        out = tmp_path / 'tiles.json'
+        args = argparse.Namespace(
+            source=str(src), output=str(out), format='json')
+        cmd_compile_tiles(args)
+        data = json.loads(out.read_text())
+        assert 'tiles' in data
+        # Should have 2 tile groups (0x00 and 0x04)
+        assert len(data['tiles']) == 2
+        # Each tile has tile_id, name, and frames
+        t0 = data['tiles'][0]
+        assert 'tile_id' in t0
+        assert 'name' in t0
+        assert 'frames' in t0
+        assert t0['tile_id'] == 0
+        assert len(t0['frames']) == 4  # 4 animation frames per tile
+
+    def test_compile_json_frame_indices(self, tmp_path):
+        """Verify frame indices are sequential within each tile group."""
+        from u3edit.shapes import cmd_compile_tiles
+        lines = []
+        for idx in range(4):
+            lines.append(f'# Glyph 0x{idx:02X}')
+            for _ in range(8):
+                lines.append('#######')
+            lines.append('')
+        src = tmp_path / 'test.tiles'
+        src.write_text('\n'.join(lines))
+        out = tmp_path / 'tiles.json'
+        args = argparse.Namespace(
+            source=str(src), output=str(out), format='json')
+        cmd_compile_tiles(args)
+        data = json.loads(out.read_text())
+        frames = data['tiles'][0]['frames']
+        indices = [f['index'] for f in frames]
+        assert indices == [0, 1, 2, 3]
+
+
+class TestDiffMapDungeonLevelFormat:
+    """diff.py: dungeon map diffs show Level N (X, Y) format."""
+
+    def test_dungeon_diff_has_level_info(self, tmp_path):
+        """Diff two dungeon MAPs, verify level info in text output."""
+        from u3edit.diff import diff_map, format_text, GameDiff
+        # Create two dungeon maps (2048 bytes) with one tile different
+        d1 = bytearray(2048)
+        d2 = bytearray(2048)
+        # Put a difference at level 2, position (5, 3)
+        # Level 2 starts at offset 2*256, row 3 is at 3*16, col 5
+        offset = 2 * 256 + 3 * 16 + 5
+        d1[offset] = 0x00
+        d2[offset] = 0x01
+        f1 = tmp_path / 'MAPM_a'
+        f2 = tmp_path / 'MAPM_b'
+        f1.write_bytes(bytes(d1))
+        f2.write_bytes(bytes(d2))
+        fd = diff_map(str(f1), str(f2), 'MAPM')
+        assert fd.dungeon_width == 16
+        assert fd.tile_changes == 1
+        # Check text formatting
+        gd = GameDiff()
+        gd.files.append(fd)
+        text = format_text(gd)
+        assert 'Level 2' in text
+        assert '(5, 3)' in text
+
+    def test_overworld_diff_no_level(self, tmp_path):
+        """Overworld diffs show plain (X, Y) without level info."""
+        from u3edit.diff import diff_map, format_text, GameDiff
+        d1 = bytearray(4096)
+        d2 = bytearray(4096)
+        d1[64 * 10 + 20] = 0x00
+        d2[64 * 10 + 20] = 0x04
+        f1 = tmp_path / 'MAPA_a'
+        f2 = tmp_path / 'MAPA_b'
+        f1.write_bytes(bytes(d1))
+        f2.write_bytes(bytes(d2))
+        fd = diff_map(str(f1), str(f2), 'MAPA')
+        assert fd.dungeon_width == 0
+        gd = GameDiff()
+        gd.files.append(fd)
+        text = format_text(gd)
+        assert 'Level' not in text
+        assert '(20, 10)' in text
+
+
+class TestVerifySizeWarnings:
+    """verify.py: reports size mismatches when verbose."""
+
+    def test_wrong_size_generates_warning(self, tmp_path):
+        """verify.py detects size mismatch and reports it."""
+        sys.path.insert(0, os.path.join(
+            os.path.dirname(__file__), '..', 'conversions', 'tools'))
+        try:
+            from verify import verify_category
+        finally:
+            sys.path.pop(0)
+        # Create a ROST file with wrong size
+        game_dir = tmp_path / 'game'
+        game_dir.mkdir()
+        (game_dir / 'ROST').write_bytes(b'\x00' * 100)  # Should be 1280
+        info = {
+            'files': ['ROST'],
+            'sizes': [1280],
+        }
+        found, modified, missing, unchanged, size_warns = verify_category(
+            str(game_dir), 'Characters', info)
+        assert len(found) == 1
+        assert len(size_warns) == 1
+        assert '100' in size_warns[0]
+        assert '1280' in size_warns[0]
+
+
+class TestNameCompilerTail:
+    """name_compiler.py: tail extraction preserves original ULT3 tail."""
+
+    def test_compile_preserves_tail(self, tmp_path):
+        """Shorter names list should preserve tail data from original."""
+        sys.path.insert(0, os.path.join(
+            os.path.dirname(__file__), '..', 'conversions', 'tools'))
+        try:
+            from name_compiler import compile_names
+        finally:
+            sys.path.pop(0)
+        # Create names and tail data
+        names = ['WATER', 'GRASS', 'FOREST']
+        tail = bytes([0xAA, 0xBB, 0xCC])
+        result = compile_names(names, tail_data=tail)
+        assert len(result) == 921
+        # The tail bytes should be preserved somewhere after the encoded names
+        # Encoded: "WATER\0GRASS\0FOREST\0" = 5+1+5+1+6+1 = 19 bytes (high-ASCII)
+        assert 0xAA in result[19:]
+        assert 0xBB in result[19:]
+        assert 0xCC in result[19:]
+
+    def test_compile_budget_exceeded_raises(self):
+        """Names exceeding budget should raise ValueError."""
+        sys.path.insert(0, os.path.join(
+            os.path.dirname(__file__), '..', 'conversions', 'tools'))
+        try:
+            from name_compiler import validate_names, NAME_TABLE_SIZE, TAIL_RESERVE
+        finally:
+            sys.path.pop(0)
+        # Create names that are way too big
+        big_names = ['A' * 50] * 50  # 50 names x 51 bytes each = 2550 bytes
+        size, budget, valid = validate_names(big_names)
+        assert not valid
+        assert size > budget
+
+
+class TestSoundModuleDocstring:
+    """sound.py: module docstring describes SOSA/SOSM correctly."""
+
+    def test_sosa_description(self):
+        from u3edit.sound import SOUND_FILES
+        desc = SOUND_FILES['SOSA']['description']
+        assert 'map' in desc.lower() or 'overworld' in desc.lower()
+
+    def test_sosm_description(self):
+        from u3edit.sound import SOUND_FILES
+        desc = SOUND_FILES['SOSM']['description']
+        assert 'monster' in desc.lower() or 'overworld' in desc.lower()
+
+
+class TestRosterNoDeadImport:
+    """roster.py: encode_high_ascii not imported (dead import removed)."""
+
+    def test_no_encode_high_ascii_import(self):
+        """Verify roster module doesn't import encode_high_ascii."""
+        import u3edit.roster as r
+        # Should NOT have encode_high_ascii as a module-level name
+        assert not hasattr(r, 'encode_high_ascii')

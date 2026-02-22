@@ -86,7 +86,7 @@ def _cmd_edit_record(args, record_idx: int, new_text: str) -> None:
               file=sys.stderr)
         sys.exit(1)
 
-    records[record_idx].text = new_text.upper()
+    records[record_idx].text = new_text.upper()  # Uppercase to match engine display
     out = rebuild_text_data(records, len(data))
 
     if dry_run:

@@ -80,6 +80,12 @@ def parse_tiles_file(text):
                 tiles.append((current_index, _rows_to_bytes(current_rows)))
                 current_index = None
                 current_rows = []
+            elif current_index is not None and current_rows:
+                print(f"Warning: Tile 0x{current_index:02X} has "
+                      f"{len(current_rows)} rows (expected {GLYPH_HEIGHT}),"
+                      f" discarding", file=sys.stderr)
+                current_index = None
+                current_rows = []
             continue
 
         # Row data line: must be exactly GLYPH_WIDTH characters of on/off

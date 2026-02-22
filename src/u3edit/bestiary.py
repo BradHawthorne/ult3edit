@@ -64,7 +64,7 @@ class Monster:
     def flag_desc(self) -> str:
         desc = []
         f1 = self.flags1
-        if f1 & 0x0C == MON_FLAG1_MAGIC_USER:
+        if (f1 & 0x0C) == MON_FLAG1_MAGIC_USER:
             desc.append('Magic User')
         else:
             if f1 & MON_FLAG1_UNDEAD:
@@ -161,6 +161,11 @@ def validate_monster(monster: Monster) -> list[str]:
     undefined_abil1 = monster.ability1 & ~defined_abil1
     if undefined_abil1:
         warnings.append(f"Undefined ability1 bits: ${undefined_abil1:02X}")
+
+    # Ability2 defined bits (0xC0 = Resistant)
+    undefined_abil2 = monster.ability2 & ~MON_ABIL2_RESISTANT
+    if undefined_abil2:
+        warnings.append(f"Undefined ability2 bits: ${undefined_abil2:02X}")
 
     return warnings
 

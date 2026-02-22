@@ -1,14 +1,19 @@
 {
   "description": "Voidborn source-level string patches for ULT3 engine (no length constraints)",
-  "note": "Used with source_patcher.py + asmiigs reassembly. Replaces ASC directives in ult3.s.",
+  "note": "Used with source_patcher.py + asmiigs reassembly. Replaces ASC directives in ult3.s. Falls back to engine_strings.json (binary, length-constrained) when asmiigs is unavailable.",
   "patches": [
-    {"vanilla": "CARD OF DEATH",  "text": "SHARD OF VOID"},
-    {"vanilla": "CARD OF SOL",    "text": "SHARD OF FLUX"},
-    {"vanilla": "CARD OF LOVE",   "text": "SHARD OF GLOOM"},
-    {"vanilla": "CARD OF MOONS",  "text": "SHARD OF WARP"},
-    {"vanilla": "MARK OF FORCE",  "text": "SIGIL OF FORCE"},
-    {"vanilla": "MARK OF FIRE",   "text": "SIGIL OF FIRE"},
-    {"vanilla": "MARK OF SNAKE",  "text": "SIGIL OF VENOM"},
-    {"vanilla": "MARK OF KINGS",  "text": "SIGIL OF KINGS"}
+    {"vanilla": "\nCARD OF DEATH",  "text": "\nSHARD OF THE VOID"},
+    {"vanilla": "\nCARD OF SOL",    "text": "\nSHARD OF FLUX"},
+    {"vanilla": "\nCARD OF LOVE",   "text": "\nSHARD OF GLOOM"},
+    {"vanilla": "\nCARD OF MOONS",  "text": "\nSHARD OF WARP"},
+    {"vanilla": "\nMARK OF FORCE",  "text": "\nSIGIL OF FORCE"},
+    {"vanilla": "\nMARK OF FIRE",   "text": "\nSIGIL OF FIRE"},
+    {"vanilla": "\nMARK OF SNAKE",  "text": "\nSIGIL OF VENOM"},
+    {"vanilla": "\nMARK OF KINGS",  "text": "\nSIGIL OF KINGS"},
+    {"index": 244, "text": "SIGIL BRANDED!\n"},
+    {"index": 94,  "text": "\nYELL 'INVOKE'\n\n"},
+    {"index": 115, "text": "SEEK YE, THE\nSIGIL OF KINGS!\n"},
+    {"index": 231, "text": "YOU SEE A VISION\nOF THE TIME LORD\n  HE TELLS YOU\n THE ONE WAY IS\n GLOOM, FLUX,\n WARP & VOID,\n ALL ELSE FAILS."},
+    {"index": 90,  "text": "A SHARD, WITH\nSTRANGE MARKS!"}
   ]
 }

@@ -133,7 +133,7 @@ if [ -f "$FULL_PATCHES" ] && [ -n "$ASMIIGS" ]; then
     }
     if [ $ERRORS -eq 0 ]; then
         echo -e "${GREEN}OK${NC}"
-        echo "$PATCH_OUT" | grep "^\[" | head -20
+        echo "$PATCH_OUT" | grep "^ *\[" | head -20
 
         # Assemble
         echo -n "  Assembling... "

@@ -74,6 +74,7 @@ class FileDiff:
         self.removed_entities: list[str] = []
         self.tile_changes: int = 0
         self.tile_positions: list[tuple[int, int]] = []
+        self.dungeon_width: int = 0  # Set to 16 for dungeon maps
 
     @property
     def changed(self) -> bool:
@@ -272,7 +273,12 @@ def diff_map(path1: str, path2: str, name: str) -> FileDiff:
     with open(path2, 'rb') as f:
         data2 = f.read()
     fd = FileDiff(name, name)
-    width = 64
+    # Dungeon MAPs are 2048 bytes (8 levels × 16×16), overworld are 4096 (64×64)
+    if len(data1) == MAP_DUNGEON_SIZE:
+        width = 16
+        fd.dungeon_width = 16
+    else:
+        width = 64
     height = len(data1) // width if len(data1) >= width else 1
     _diff_tile_grid(fd, data1, data2, width, height)
     return fd
@@ -519,12 +525,14 @@ def format_text(gd: GameDiff) -> str:
 
         if fd.tile_changes > 0:
             lines.append(f"  Tiles changed: {fd.tile_changes}")
-            if fd.tile_changes <= 20:
-                for x, y in fd.tile_positions:
+            show = fd.tile_positions if fd.tile_changes <= 20 else fd.tile_positions[:10]
+            for x, y in show:
+                if fd.dungeon_width:
+                    lvl, row = divmod(y, fd.dungeon_width)
+                    lines.append(f"    Level {lvl} ({x}, {row})")
+                else:
                     lines.append(f"    ({x}, {y})")
-            else:
-                for x, y in fd.tile_positions[:10]:
-                    lines.append(f"    ({x}, {y})")
+            if fd.tile_changes > 20:
                 lines.append(f"    ... and {fd.tile_changes - 10} more")
         lines.append('')
 

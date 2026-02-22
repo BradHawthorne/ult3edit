@@ -85,11 +85,16 @@ def parse_map_file(text, is_dungeon=False):
 
         # Parse row of tile characters
         row = []
+        unknown_chars = set()
         for ch in stripped:
             if ch in char_map:
                 row.append(char_map[ch])
             else:
+                unknown_chars.add(ch)
                 row.append(0)  # Default to first tile type
+        if unknown_chars:
+            print(f"Warning: unknown tile character(s) {unknown_chars!r} "
+                  f"treated as tile 0", file=sys.stderr)
 
         if is_dungeon:
             width = DUNGEON_WIDTH
@@ -121,9 +126,7 @@ def parse_map_file(text, is_dungeon=False):
 
         return level_grids
     else:
-        grid_lines = current_level if not grid_lines else grid_lines
-        if not grid_lines:
-            grid_lines = current_level
+        grid_lines = current_level
 
         # Pad to correct height
         while len(grid_lines) < OVERWORLD_HEIGHT:

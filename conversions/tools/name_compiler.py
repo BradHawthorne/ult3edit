@@ -190,12 +190,20 @@ def cmd_compile(args):
     if args.ult3:
         with open(args.ult3, 'rb') as f:
             data = f.read()
-        # Calculate where names end to extract tail
-        encoded_len = sum(len(s) + 1 for s in names)
-        tail_start = NAME_TABLE_OFFSET + encoded_len
+        # Find actual end of original names in ULT3 by scanning for nulls
+        orig_end = NAME_TABLE_OFFSET
+        null_count = 0
+        expected_names = len(names)
+        while orig_end < NAME_TABLE_OFFSET + NAME_TABLE_SIZE:
+            if data[orig_end] == 0x00:
+                null_count += 1
+                if null_count >= expected_names:
+                    orig_end += 1
+                    break
+            orig_end += 1
         tail_end = NAME_TABLE_OFFSET + NAME_TABLE_SIZE
-        if tail_end <= len(data):
-            tail_data = data[tail_start:tail_end]
+        if orig_end < tail_end and tail_end <= len(data):
+            tail_data = data[orig_end:tail_end]
 
     result = compile_names(names, tail_data)
 

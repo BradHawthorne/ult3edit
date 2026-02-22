@@ -57,15 +57,15 @@ u3edit roster create "$ROST" --slot 0 \
     --name "KAEL" --race H --class R --gender M \
     --str 30 --dex 45 --hp 250 --gold 300 --backup
 
-u3edit roster create "$ROST" --slot 1 \
+u3edit roster create "$ROST" --slot 1 --force \
     --name "LYRA" --race E --class W --gender F \
     --str 15 --dex 30 --hp 150 --gold 300
 
-u3edit roster create "$ROST" --slot 2 \
+u3edit roster create "$ROST" --slot 2 --force \
     --name "THARN" --race D --class F --gender M \
     --str 50 --dex 25 --hp 350 --gold 300
 
-u3edit roster create "$ROST" --slot 3 \
+u3edit roster create "$ROST" --slot 3 --force \
     --name "MIRA" --race B --class T --gender F \
     --str 20 --dex 50 --hp 180 --gold 300
 
@@ -389,10 +389,10 @@ if [ -d "$SOURCES_DIR" ]; then
     TILES_SRC="${SOURCES_DIR}/tiles.tiles"
     SHPS=$(find_file "SHPS")
     if [ -f "$TILES_SRC" ] && [ -f "$SHPS" ]; then
+        mkdir -p "${SCRIPT_DIR}/build"
         u3edit shapes compile "$TILES_SRC" --format json \
-            -o /tmp/voidborn_tiles.json 2>/dev/null
-        u3edit shapes import "$SHPS" /tmp/voidborn_tiles.json 2>/dev/null || true
-        rm -f /tmp/voidborn_tiles.json
+            -o "${SCRIPT_DIR}/build/tiles.json" 2>/dev/null
+        u3edit shapes import "$SHPS" "${SCRIPT_DIR}/build/tiles.json" 2>/dev/null || true
         echo "  Compiled and imported tile graphics (256 tiles)"
     fi
 
@@ -430,10 +430,10 @@ if [ -d "$SOURCES_DIR" ]; then
     NAMES_SRC="${SOURCES_DIR}/names.names"
     ULT3=$(find_file "ULT3")
     if [ -f "$NAMES_SRC" ] && [ -f "$ULT3" ]; then
+        mkdir -p "${SCRIPT_DIR}/build"
         u3edit patch compile-names "$NAMES_SRC" \
-            -o /tmp/voidborn_names.json 2>/dev/null
-        u3edit patch import "$ULT3" /tmp/voidborn_names.json 2>/dev/null || true
-        rm -f /tmp/voidborn_names.json
+            -o "${SCRIPT_DIR}/build/names.json" 2>/dev/null
+        u3edit patch import "$ULT3" "${SCRIPT_DIR}/build/names.json" 2>/dev/null || true
         echo "  Compiled and applied Voidborn name table"
     fi
 

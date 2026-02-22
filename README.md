@@ -71,6 +71,19 @@ u3edit edit path/to/GAME/
 
 The TUI supports tile painting for maps, form editing for character stats (including sub-morsels, in-party, marks, and cards) and monster attributes, party state (including location type and sentinel), and in-place dialog editing. Changes are written back to the disk image or directory on save.
 
+**Keybindings:**
+
+| Key | Action |
+|-----|--------|
+| F5 / Ctrl+Left | Previous tab |
+| F6 / Ctrl+Right | Next tab |
+| Arrow keys | Navigate / move cursor |
+| Space | Paint tile (map/combat/special editors) |
+| `[` / `]` | Previous / next tile in palette |
+| Ctrl+S | Save changes |
+| Ctrl+Q | Quit |
+| Escape | Close current editor / cancel |
+
 ## Disk Image Support
 
 If you have [diskiigs](https://github.com/BradHawthorne/rosetta) on your PATH (or set `DISKIIGS_PATH`), u3edit can work directly with ProDOS disk images:
@@ -339,7 +352,7 @@ u3edit sound view SOSA#061000 --json -o sosa.json
 u3edit sound import SOSA#061000 sosa.json --backup
 ```
 
-Sound files: SOSA (4096 bytes, speaker patterns), SOSM (256 bytes, sound map), MBS (5456 bytes, Mockingboard AY-3-8910 sequences). All are external BLOAD data files.
+Sound-related files: SOSA (4096 bytes, overworld map state — dynamic copy of MAPA), SOSM (256 bytes, overworld monster positions), MBS (5456 bytes, Mockingboard AY-3-8910 music sequences). Note: SOSA and SOSM are save-state files despite being managed by the `sound` subcommand.
 
 ## Engine Binary Patching
 
@@ -430,7 +443,7 @@ The `scenario_build.sh` script automatically selects source-level patching when 
 
 ### Scenario Template
 
-See `engine/SCENARIO_TEMPLATE.md` for the complete scenario author guide, including directory layout, patch file format, and tool reference.
+See `engine/SCENARIO_TEMPLATE.md` for the engine-level scenario author guide (inline string patching, reassembly). For full total conversions (all game assets), see `conversions/TEMPLATE/` which provides `CHECKLIST.md`, `STORY_TEMPLATE.md`, and `apply_template.sh`.
 
 ## Comparing Game Data
 
@@ -543,7 +556,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-1415 tests covering all modules with synthesized game data (no real game files needed).
+1553 tests covering all modules with synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 

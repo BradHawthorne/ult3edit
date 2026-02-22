@@ -32,7 +32,7 @@ from .constants import (
     CHAR_WORN_ARMOR, CHAR_ARMOR_START,
     CHAR_READIED_WEAPON, CHAR_WEAPON_START,
 )
-from .fileutil import decode_high_ascii, encode_high_ascii, backup_file
+from .fileutil import decode_high_ascii, backup_file
 from .json_export import export_json
 
 
@@ -973,7 +973,7 @@ def cmd_check_progress(args) -> None:
 
 def _add_edit_args(p) -> None:
     """Add common character edit arguments to a parser."""
-    p.add_argument('--name', help='Character name (max 9 chars)')
+    p.add_argument('--name', help='Character name (max 13 chars)')
     p.add_argument('--str', type=int, help='Strength (0-99)')
     p.add_argument('--dex', type=int, help='Dexterity (0-99)')
     p.add_argument('--int', type=int, dest='int_', help='Intelligence (0-99)')

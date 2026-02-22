@@ -1,8 +1,8 @@
 """Ultima III: Exodus - Sound Data Viewer/Editor.
 
-Sound files are separate data files loaded via BLOAD:
-  SOSA (4096 bytes, $1000) — Apple II speaker sound patterns
-  SOSM (256 bytes, $4F00)  — Sound map/parameter table
+Sound-related data files loaded via BLOAD:
+  SOSA (4096 bytes, $1000) — Overworld map state (dynamic copy of MAPA)
+  SOSM (256 bytes, $4F00)  — Overworld monster positions
   MBS  (5456 bytes, $9A00) — Mockingboard AY-3-8910 register sequences
 """
 
@@ -17,9 +17,9 @@ from .json_export import export_json
 
 SOUND_FILES = {
     'SOSA': {'size': SOSA_FILE_SIZE, 'load_addr': 0x1000,
-             'description': 'Speaker sound patterns'},
+             'description': 'Overworld map state (dynamic copy of MAPA)'},
     'SOSM': {'size': SOSM_FILE_SIZE, 'load_addr': 0x4F00,
-             'description': 'Sound map/parameters'},
+             'description': 'Overworld monster positions'},
     'MBS':  {'size': MBS_FILE_SIZE, 'load_addr': 0x9A00,
              'description': 'Mockingboard AY-3-8910 sequences'},
 }

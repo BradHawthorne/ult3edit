@@ -87,6 +87,9 @@ def is_inline_string(lines, asc_info):
         if '$20,$BA,$46' in prev or '$BA,$46' in prev:
             has_jsr_before = True
             break
+        # Skip blank lines and comments, keep looking
+        if not prev or prev.startswith(';'):
+            continue
         # Stop searching if we hit a non-DB/non-ASC line
         if not prev.startswith('DB') and not prev.startswith('ASC'):
             break

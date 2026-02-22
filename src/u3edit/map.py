@@ -228,6 +228,10 @@ def _get_map_slice(data: bytearray, is_dungeon: bool, level: int | None):
     """Return (slice_data, offset, width, height) for the working region."""
     if is_dungeon:
         lvl = level if level is not None else 0
+        max_level = max(0, len(data) // 256 - 1)
+        if lvl < 0 or lvl > max_level:
+            print(f"Error: level {lvl} out of range (0-{max_level})", file=sys.stderr)
+            sys.exit(1)
         base = lvl * 256
         return data[base:base + 256], base, 16, 16
     return data, 0, 64, len(data) // 64
@@ -460,8 +464,9 @@ def cmd_compile(args) -> None:
             row.append(char_map.get(ch, 0 if is_dungeon else 0x04))
 
         width = 16 if is_dungeon else 64
+        pad_tile = 0 if is_dungeon else 0x04
         if len(row) < width:
-            row.extend([0] * (width - len(row)))
+            row.extend([pad_tile] * (width - len(row)))
         elif len(row) > width:
             row = row[:width]
 
@@ -498,7 +503,7 @@ def cmd_compile(args) -> None:
             print(f"  Warning: only {len(grid)} rows found "
                   f"(expected 64), padding with empty rows", file=sys.stderr)
         while len(grid) < 64:
-            grid.append([0] * 64)
+            grid.append([0x04] * 64)  # Pad with Grass (not Water)
         data = bytearray()
         for row in grid[:64]:
             data.extend(row[:64])

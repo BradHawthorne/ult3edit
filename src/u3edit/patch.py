@@ -79,7 +79,7 @@ PATCHABLE_REGIONS: dict[str, dict[str, list]] = {
             'data_type': 'bytes',
         },
         # Food depletion rate counter
-        # CIDAR-verified at address $772C (word_732C)
+        # CIDAR-verified at address $772C (word_772C)
         # Default value $04 — decremented each step, triggers food loss at 0
         'food-rate': {
             'offset': 0x272C,
@@ -456,14 +456,14 @@ def cmd_import(args) -> None:
         else:
             print("  Updated")
 
-        data[offset:offset + len(new_bytes)] = new_bytes
+        data[offset:offset + len(new_bytes)] = new_bytes  # Local buffer only
         patched += 1
 
     if patched == 0:
         print("No matching regions found in JSON.", file=sys.stderr)
         sys.exit(1)
 
-    if dry_run:
+    if dry_run:  # Buffer mutations above are discarded — no file written
         print(f"Dry run — {patched} region(s) would be updated.")
         return
 

@@ -523,6 +523,8 @@ SPECIAL_NAMES = {
 SPECIAL_MAP_WIDTH = 11
 SPECIAL_MAP_HEIGHT = 11
 SPECIAL_MAP_TILES = SPECIAL_MAP_WIDTH * SPECIAL_MAP_HEIGHT  # 121 bytes
+SPECIAL_META_OFFSET = 121  # Offset of 7 trailing padding bytes
+SPECIAL_META_SIZE = 7
 
 # =============================================================================
 # Save State Constants (PRTY file — 16 bytes at zero-page $E0-$EF)

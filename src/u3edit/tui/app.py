@@ -184,8 +184,7 @@ class UnifiedApp:
         # Global help
         def get_global_help():
             return [
-                ('class:help-key', ' Ctrl+←/→ '), ('class:help-text', '=tab '),
-                ('class:help-key', 'Shift+Tab'), ('class:help-text', '=next '),
+                ('class:help-key', ' F5/F6 '), ('class:help-text', '=prev/next tab '),
                 ('class:help-key', 'Ctrl+S'), ('class:help-text', '=save '),
                 ('class:help-key', 'Ctrl+Q'), ('class:help-text', '=quit '),
             ]
@@ -200,12 +199,14 @@ class UnifiedApp:
         global_kb = KeyBindings()
 
         @global_kb.add('c-right')
-        @global_kb.add('s-tab', eager=True)  # Shift+Tab fallback
+        @global_kb.add('s-tab', eager=True)
+        @global_kb.add('f6')
         def _next_tab(event):
             app_ref.active_tab_index = (
                 (app_ref.active_tab_index + 1) % len(app_ref.tabs))
 
         @global_kb.add('c-left')
+        @global_kb.add('f5')
         def _prev_tab(event):
             app_ref.active_tab_index = (
                 (app_ref.active_tab_index - 1) % len(app_ref.tabs))

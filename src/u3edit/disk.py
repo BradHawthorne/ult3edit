@@ -175,7 +175,6 @@ class DiskContext:
                                file_type=ft, aux_type=at,
                                diskiigs_path=self.diskiigs_path)
                 except Exception as e:
-                    import sys
                     print(f'Warning: failed to write {name}: {e}',
                           file=sys.stderr)
         if self._tmpdir:
@@ -418,25 +417,26 @@ def main() -> None:
     sub = parser.add_subparsers(dest='disk_command')
 
     p_info = sub.add_parser('info', help='Show disk image info')
-    p_info.add_argument('image', help='Disk image file')
-    p_info.add_argument('--json', action='store_true')
-    p_info.add_argument('--output', '-o')
+    p_info.add_argument('image', help='Disk image file (.po, .2mg, .dsk)')
+    p_info.add_argument('--json', action='store_true', help='Output as JSON')
+    p_info.add_argument('--output', '-o', help='Output file (for --json)')
 
     p_list = sub.add_parser('list', help='List files on disk image')
     p_list.add_argument('image', help='Disk image file')
-    p_list.add_argument('--path', default='/')
-    p_list.add_argument('--json', action='store_true')
-    p_list.add_argument('--output', '-o')
+    p_list.add_argument('--path', default='/', help='ProDOS directory path (default: /)')
+    p_list.add_argument('--json', action='store_true', help='Output as JSON')
+    p_list.add_argument('--output', '-o', help='Output file (for --json)')
 
     p_extract = sub.add_parser('extract', help='Extract all files')
     p_extract.add_argument('image', help='Disk image file')
-    p_extract.add_argument('--output', '-o')
+    p_extract.add_argument('--output', '-o', help='Output directory (default: current)')
 
     p_audit = sub.add_parser('audit', help='Analyze disk space usage')
     p_audit.add_argument('image', help='Disk image file')
-    p_audit.add_argument('--detail', action='store_true')
-    p_audit.add_argument('--json', action='store_true')
-    p_audit.add_argument('--output', '-o')
+    p_audit.add_argument('--detail', action='store_true',
+                         help='Show per-file allocation details')
+    p_audit.add_argument('--json', action='store_true', help='Output as JSON')
+    p_audit.add_argument('--output', '-o', help='Output file (for --json)')
 
     args = parser.parse_args()
     dispatch(args)
