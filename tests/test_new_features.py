@@ -11579,3 +11579,662 @@ class TestBcdEdgeCases:
         from u3edit.bcd import bcd_to_int, int_to_bcd
         for val in range(100):
             assert bcd_to_int(int_to_bcd(val)) == val
+
+
+# =============================================================================
+# Roster check_progress (endgame readiness)
+# =============================================================================
+
+class TestCheckProgress:
+    """Test check_progress() endgame readiness analysis."""
+
+    def _make_char(self, name='HERO', status='G', marks=0, cards=0,
+                   weapon=0, armor=0):
+        """Create a character with specific attributes."""
+        raw = bytearray(CHAR_RECORD_SIZE)
+        # Set name
+        for i, ch in enumerate(name[:13]):
+            raw[i] = ord(ch) | 0x80
+        raw[CHAR_STATUS] = ord(status)
+        raw[CHAR_MARKS_CARDS] = (marks << 4) | cards
+        raw[CHAR_READIED_WEAPON] = weapon
+        raw[CHAR_WORN_ARMOR] = armor
+        # Set HP so character is "alive"
+        raw[CHAR_HP_HI] = 0x01
+        return Character(raw)
+
+    def test_empty_roster_not_ready(self):
+        """Empty roster produces not-ready result."""
+        chars = [Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(20)]
+        result = check_progress(chars)
+        assert result['party_alive'] == 0
+        assert not result['party_ready']
+        assert not result['exodus_ready']
+        assert len(result['marks_missing']) == 4
+        assert len(result['cards_missing']) == 4
+
+    def test_partial_party_not_ready(self):
+        """Two characters — not ready (need 4)."""
+        chars = [Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(20)]
+        chars[0] = self._make_char('ALICE')
+        chars[1] = self._make_char('BOB')
+        result = check_progress(chars)
+        assert result['party_alive'] == 2
+        assert not result['party_ready']
+
+    def test_dead_chars_dont_count(self):
+        """Dead characters don't count toward party_alive."""
+        chars = [Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(20)]
+        chars[0] = self._make_char('ALIVE')
+        chars[1] = self._make_char('DEAD', status='D')
+        chars[2] = self._make_char('ASHES', status='A')
+        result = check_progress(chars)
+        assert result['party_alive'] == 1
+
+    def test_all_marks_collected(self):
+        """All 4 marks across multiple characters."""
+        chars = [Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(20)]
+        # marks bitmask: Kings=0x8, Snake=0x4, Fire=0x2, Force=0x1
+        chars[0] = self._make_char('A', marks=0xC)  # Kings + Snake
+        chars[1] = self._make_char('B', marks=0x3)  # Fire + Force
+        result = check_progress(chars)
+        assert result['marks_complete']
+        assert len(result['marks_missing']) == 0
+
+    def test_all_cards_collected(self):
+        """All 4 cards across multiple characters."""
+        chars = [Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(20)]
+        # cards bitmask: Death=0x8, Sol=0x4, Love=0x2, Moons=0x1
+        chars[0] = self._make_char('A', cards=0xF)  # all 4
+        result = check_progress(chars)
+        assert result['cards_complete']
+        assert len(result['cards_missing']) == 0
+
+    def test_exotic_weapon_detected(self):
+        """Exotic weapon (index 15) detected on any character."""
+        chars = [Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(20)]
+        chars[0] = self._make_char('HERO', weapon=15)
+        result = check_progress(chars)
+        assert result['has_exotic_weapon']
+
+    def test_exotic_armor_detected(self):
+        """Exotic armor (index 7) detected on any character."""
+        chars = [Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(20)]
+        chars[0] = self._make_char('HERO', armor=7)
+        result = check_progress(chars)
+        assert result['has_exotic_armor']
+
+    def test_fully_ready(self):
+        """Full party with all marks, cards, exotic gear = exodus_ready."""
+        chars = [Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(20)]
+        for i in range(4):
+            chars[i] = self._make_char(f'HERO{i}', marks=0xF, cards=0xF,
+                                       weapon=15, armor=7)
+        result = check_progress(chars)
+        assert result['exodus_ready']
+        assert result['party_ready']
+        assert result['marks_complete']
+        assert result['cards_complete']
+        assert result['has_exotic_weapon']
+        assert result['has_exotic_armor']
+
+    def test_missing_one_requirement(self):
+        """4 alive with all marks/cards but no exotic weapon → not ready."""
+        chars = [Character(bytearray(CHAR_RECORD_SIZE)) for _ in range(20)]
+        for i in range(4):
+            chars[i] = self._make_char(f'HERO{i}', marks=0xF, cards=0xF,
+                                       weapon=0, armor=7)
+        result = check_progress(chars)
+        assert not result['exodus_ready']
+        assert not result['has_exotic_weapon']
+
+
+# =============================================================================
+# Roster cmd_view / cmd_edit / cmd_create error paths
+# =============================================================================
+
+class TestRosterCmdErrors:
+    """Test error paths in roster CLI commands."""
+
+    def _make_roster_file(self, tmp_path):
+        """Create a roster file with one non-empty character."""
+        data = bytearray(ROSTER_FILE_SIZE)
+        # Put a character in slot 0
+        offset = 0
+        name = 'HERO'
+        for i, ch in enumerate(name):
+            data[offset + i] = ord(ch) | 0x80
+        data[offset + CHAR_STATUS] = ord('G')
+        data[offset + CHAR_HP_HI] = 0x01
+        path = os.path.join(str(tmp_path), 'ROST')
+        with open(path, 'wb') as f:
+            f.write(data)
+        return path
+
+    def test_view_slot_out_of_range(self, tmp_path):
+        """cmd_view with --slot beyond range exits with error."""
+        from u3edit.roster import cmd_view
+        path = self._make_roster_file(tmp_path)
+        args = argparse.Namespace(
+            file=path, slot=99, json=False, validate=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_view(args)
+
+    def test_view_negative_slot(self, tmp_path):
+        """cmd_view with negative --slot exits with error."""
+        from u3edit.roster import cmd_view
+        path = self._make_roster_file(tmp_path)
+        args = argparse.Namespace(
+            file=path, slot=-1, json=False, validate=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_view(args)
+
+    def test_create_occupied_slot_no_force(self, tmp_path):
+        """cmd_create on occupied slot without --force exits."""
+        from u3edit.roster import cmd_create
+        path = self._make_roster_file(tmp_path)
+        args = argparse.Namespace(
+            file=path, slot=0, force=False, dry_run=True, backup=False,
+            output=None,
+            name=None, str=None, dex=None, int_=None, wis=None,
+            hp=None, max_hp=None, mp=None, gold=None, exp=None,
+            food=None, gems=None, keys=None, powders=None, torches=None,
+            race=None, class_=None, status=None, gender=None,
+            weapon=None, armor=None, give_weapon=None, give_armor=None,
+            marks=None, cards=None, in_party=None, not_in_party=None,
+            sub_morsels=None)
+        with pytest.raises(SystemExit):
+            cmd_create(args)
+
+    def test_create_slot_out_of_range(self, tmp_path):
+        """cmd_create with out-of-range slot exits."""
+        from u3edit.roster import cmd_create
+        path = self._make_roster_file(tmp_path)
+        args = argparse.Namespace(
+            file=path, slot=99, force=True, dry_run=True, backup=False,
+            output=None,
+            name=None, str=None, dex=None, int_=None, wis=None,
+            hp=None, max_hp=None, mp=None, gold=None, exp=None,
+            food=None, gems=None, keys=None, powders=None, torches=None,
+            race=None, class_=None, status=None, gender=None,
+            weapon=None, armor=None, give_weapon=None, give_armor=None,
+            marks=None, cards=None, in_party=None, not_in_party=None,
+            sub_morsels=None)
+        with pytest.raises(SystemExit):
+            cmd_create(args)
+
+    def test_import_non_list_json(self, tmp_path):
+        """cmd_import with JSON that's a dict (not list) exits."""
+        path = self._make_roster_file(tmp_path)
+        json_path = os.path.join(str(tmp_path), 'bad.json')
+        with open(json_path, 'w') as f:
+            json.dump({"name": "HERO"}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=True)
+        with pytest.raises(SystemExit):
+            cmd_import(args)
+
+
+# =============================================================================
+# Patch module: name compilation, region errors, hex dump
+# =============================================================================
+
+class TestPatchNameCompile:
+    """Test patch.py name table compilation and validation."""
+
+    def test_parse_names_file_basic(self):
+        """Parse a simple .names file."""
+        from u3edit.patch import _parse_names_file
+        text = "# Comment\nGRASS\nWATER\n\nFIRE\n"
+        result = _parse_names_file(text)
+        assert result == ['GRASS', 'WATER', 'FIRE']
+
+    def test_parse_names_file_empty_quotes(self):
+        """Empty string via double-quotes."""
+        from u3edit.patch import _parse_names_file
+        text = 'HELLO\n""\nWORLD\n'
+        result = _parse_names_file(text)
+        assert result == ['HELLO', '', 'WORLD']
+
+    def test_parse_names_file_single_quotes(self):
+        """Empty string via single-quotes."""
+        from u3edit.patch import _parse_names_file
+        text = "HELLO\n''\nWORLD\n"
+        result = _parse_names_file(text)
+        assert result == ['HELLO', '', 'WORLD']
+
+    def test_parse_names_comments_and_blanks(self):
+        """Comments and blank lines are skipped."""
+        from u3edit.patch import _parse_names_file
+        text = "# header\n\n# another comment\nONE\n#\nTWO\n"
+        result = _parse_names_file(text)
+        assert result == ['ONE', 'TWO']
+
+    def test_validate_names_within_budget(self):
+        """Names within the 921-byte budget pass validation."""
+        from u3edit.patch import _validate_names
+        names = ['GRASS', 'WATER', 'FIRE']
+        size, budget, valid = _validate_names(names)
+        assert valid
+        # size = len('GRASS')+1 + len('WATER')+1 + len('FIRE')+1 = 17
+        assert size == 17
+
+    def test_validate_names_overflow(self):
+        """Names exceeding the budget fail validation."""
+        from u3edit.patch import _validate_names
+        # Create names that total > 891 bytes (921 - 30 reserved)
+        names = ['X' * 100] * 10  # 10 * 101 = 1010 bytes > 891
+        size, budget, valid = _validate_names(names)
+        assert not valid
+        assert size > budget
+
+    def test_compile_names_overflow_exits(self, tmp_path):
+        """cmd_compile_names with too-large names exits with error."""
+        from u3edit.patch import cmd_compile_names
+        source = os.path.join(str(tmp_path), 'big.names')
+        with open(source, 'w') as f:
+            for i in range(100):
+                f.write('A' * 50 + '\n')
+        args = argparse.Namespace(source=source, output=None)
+        with pytest.raises(SystemExit):
+            cmd_compile_names(args)
+
+    def test_compile_names_empty_exits(self, tmp_path):
+        """cmd_compile_names with no names exits with error."""
+        from u3edit.patch import cmd_compile_names
+        source = os.path.join(str(tmp_path), 'empty.names')
+        with open(source, 'w') as f:
+            f.write('# only comments\n\n')
+        args = argparse.Namespace(source=source, output=None)
+        with pytest.raises(SystemExit):
+            cmd_compile_names(args)
+
+
+class TestPatchCmdErrors:
+    """Test error paths in patch CLI commands."""
+
+    def _make_ult3_binary(self, tmp_path):
+        """Create a fake ULT3-sized binary."""
+        data = bytearray(17408)
+        path = os.path.join(str(tmp_path), 'ULT3')
+        with open(path, 'wb') as f:
+            f.write(data)
+        return path
+
+    def test_cmd_edit_unknown_region(self, tmp_path):
+        """cmd_edit with non-existent region name exits."""
+        from u3edit.patch import cmd_edit
+        path = self._make_ult3_binary(tmp_path)
+        args = argparse.Namespace(
+            file=path, region='nonexistent', data='FF',
+            dry_run=True, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_cmd_edit_invalid_hex(self, tmp_path):
+        """cmd_edit with malformed hex exits."""
+        from u3edit.patch import cmd_edit
+        path = self._make_ult3_binary(tmp_path)
+        args = argparse.Namespace(
+            file=path, region='food-rate', data='ZZZZ',
+            dry_run=True, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_cmd_edit_data_too_long(self, tmp_path):
+        """cmd_edit with data exceeding region max exits."""
+        from u3edit.patch import cmd_edit
+        path = self._make_ult3_binary(tmp_path)
+        # food-rate max_length is 1, send 10 bytes
+        args = argparse.Namespace(
+            file=path, region='food-rate', data='FF' * 10,
+            dry_run=True, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_cmd_dump_offset_past_end(self, tmp_path):
+        """cmd_dump with offset past EOF exits."""
+        from u3edit.patch import cmd_dump
+        path = self._make_ult3_binary(tmp_path)
+        args = argparse.Namespace(
+            file=path, offset=99999, length=16)
+        with pytest.raises(SystemExit):
+            cmd_dump(args)
+
+    def test_cmd_view_unknown_region_filter(self, tmp_path):
+        """cmd_view with region filter for unknown region exits."""
+        from u3edit.patch import cmd_view
+        path = self._make_ult3_binary(tmp_path)
+        args = argparse.Namespace(
+            file=path, region='nonexistent', json=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_view(args)
+
+    def test_cmd_view_unrecognized_binary(self, tmp_path):
+        """cmd_view on unrecognized binary shows warning (no exit)."""
+        from u3edit.patch import cmd_view
+        path = os.path.join(str(tmp_path), 'UNKNOWN')
+        with open(path, 'wb') as f:
+            f.write(b'\x00' * 100)
+        args = argparse.Namespace(
+            file=path, region=None, json=False, output=None)
+        # Should not raise — just prints warning
+        cmd_view(args)
+
+    def test_cmd_import_no_matching_regions(self, tmp_path):
+        """cmd_import with JSON that has no matching region names exits."""
+        from u3edit.patch import cmd_import
+        path = self._make_ult3_binary(tmp_path)
+        json_path = os.path.join(str(tmp_path), 'bad.json')
+        with open(json_path, 'w') as f:
+            json.dump({'regions': {'fake-region': {'data': [0]}}}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            dry_run=True, backup=False, region=None)
+        with pytest.raises(SystemExit):
+            cmd_import(args)
+
+
+# =============================================================================
+# Patch encoding helpers
+# =============================================================================
+
+class TestPatchEncoding:
+    """Test encode/parse helpers for coords and text regions."""
+
+    def test_parse_text_region(self):
+        """Parse null-terminated high-ASCII strings."""
+        from u3edit.patch import parse_text_region
+        # Build: "HI\x00BYE\x00\x00" (trailing null padding)
+        data = bytearray(100)
+        for i, ch in enumerate('HI'):
+            data[10 + i] = ord(ch) | 0x80
+        data[12] = 0x00
+        for i, ch in enumerate('BYE'):
+            data[13 + i] = ord(ch) | 0x80
+        data[16] = 0x00
+        result = parse_text_region(bytes(data), 10, 20)
+        assert result == ['HI', 'BYE']
+
+    def test_encode_coord_region(self):
+        """Encode XY coordinate pairs."""
+        from u3edit.patch import encode_coord_region
+        coords = [{'x': 10, 'y': 20}, {'x': 30, 'y': 40}]
+        result = encode_coord_region(coords, 8)
+        assert result[:4] == bytes([10, 20, 30, 40])
+        assert len(result) == 8  # padded to max_length
+        assert result[4:] == bytes(4)  # remaining is null-padded
+
+    def test_encode_coord_region_overflow(self):
+        """Encoding coords that exceed max_length raises ValueError."""
+        from u3edit.patch import encode_coord_region
+        coords = [{'x': i, 'y': i} for i in range(10)]
+        with pytest.raises(ValueError, match='exceeds max'):
+            encode_coord_region(coords, 4)
+
+    def test_encode_text_region(self):
+        """Encode strings as null-terminated high-ASCII."""
+        from u3edit.patch import encode_text_region
+        result = encode_text_region(['HI', 'BYE'], 20)
+        # HI = 0xC8 0xC9 0x00, BYE = 0xC2 0xD9 0xC5 0x00
+        assert result[0] == ord('H') | 0x80
+        assert result[1] == ord('I') | 0x80
+        assert result[2] == 0x00
+        assert result[3] == ord('B') | 0x80
+        assert len(result) == 20  # padded to max
+
+
+# =============================================================================
+# TLK search and edit error paths
+# =============================================================================
+
+class TestTlkCmdErrors:
+    """Test TLK command error paths."""
+
+    def _make_tlk_file(self, tmp_path, records=None):
+        """Create a TLK file with simple text records."""
+        from u3edit.tlk import encode_record, TLK_RECORD_END
+        data = bytearray()
+        if records is None:
+            records = [['HELLO WORLD'], ['GOODBYE']]
+        for rec in records:
+            data.extend(encode_record(rec))
+        path = os.path.join(str(tmp_path), 'TLKA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        return path
+
+    def test_search_invalid_regex(self, tmp_path):
+        """cmd_search with malformed regex exits."""
+        path = self._make_tlk_file(tmp_path)
+        args = argparse.Namespace(
+            path=path, pattern='[unclosed', regex=True, json=False,
+            output=None)
+        with pytest.raises(SystemExit):
+            cmd_search(args)
+
+    def test_search_finds_text(self, tmp_path):
+        """cmd_search with valid pattern finds results."""
+        path = self._make_tlk_file(tmp_path)
+        args = argparse.Namespace(
+            path=path, pattern='HELLO', regex=False, json=False,
+            output=None)
+        # Should not raise
+        cmd_search(args)
+
+    def test_edit_record_out_of_range(self, tmp_path):
+        """cmd_edit with record index beyond count exits."""
+        from u3edit.tlk import cmd_edit as tlk_cmd_edit
+        path = self._make_tlk_file(tmp_path)
+        args = argparse.Namespace(
+            file=path, record=99, text='NEW TEXT',
+            output=None, dry_run=True, backup=False)
+        with pytest.raises(SystemExit):
+            tlk_cmd_edit(args)
+
+    def test_match_line_case_insensitive(self):
+        """_match_line plain text is case-insensitive."""
+        assert _match_line('Hello World', 'hello', False)
+        assert _match_line('HELLO WORLD', 'hello', False)
+
+    def test_match_line_regex(self):
+        """_match_line with regex pattern."""
+        assert _match_line('Hello World 123', r'\d+', True)
+        assert not _match_line('Hello World', r'\d+', True)
+
+
+# =============================================================================
+# Diff module: detect_file_type
+# =============================================================================
+
+class TestDiffDetectFileType:
+    """Test diff.py file type detection."""
+
+    def test_detect_roster(self, tmp_path):
+        """Detect ROST file by name and size."""
+        from u3edit.diff import detect_file_type
+        path = os.path.join(str(tmp_path), 'ROST')
+        with open(path, 'wb') as f:
+            f.write(bytes(ROSTER_FILE_SIZE))
+        assert detect_file_type(path) == 'ROST'
+
+    def test_detect_prty(self, tmp_path):
+        """Detect PRTY file."""
+        from u3edit.diff import detect_file_type
+        path = os.path.join(str(tmp_path), 'PRTY')
+        with open(path, 'wb') as f:
+            f.write(bytes(PRTY_FILE_SIZE))
+        assert detect_file_type(path) == 'PRTY'
+
+    def test_detect_mon_file(self, tmp_path):
+        """Detect MON file with letter suffix."""
+        from u3edit.diff import detect_file_type
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(bytes(MON_FILE_SIZE))
+        assert detect_file_type(path) == 'MONA'
+
+    def test_detect_con_file(self, tmp_path):
+        """Detect CON file with letter suffix."""
+        from u3edit.diff import detect_file_type
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(bytes(CON_FILE_SIZE))
+        assert detect_file_type(path) == 'CONA'
+
+    def test_detect_prodos_hash(self, tmp_path):
+        """Detect file with ProDOS #hash suffix."""
+        from u3edit.diff import detect_file_type
+        path = os.path.join(str(tmp_path), 'ROST#069500')
+        with open(path, 'wb') as f:
+            f.write(bytes(ROSTER_FILE_SIZE))
+        assert detect_file_type(path) == 'ROST'
+
+    def test_unknown_file_returns_none(self, tmp_path):
+        """Unrecognized file returns None."""
+        from u3edit.diff import detect_file_type
+        path = os.path.join(str(tmp_path), 'UNKNOWN')
+        with open(path, 'wb') as f:
+            f.write(bytes(42))
+        assert detect_file_type(path) is None
+
+    def test_nonexistent_file_returns_none(self, tmp_path):
+        """Nonexistent file returns None."""
+        from u3edit.diff import detect_file_type
+        path = os.path.join(str(tmp_path), 'NOFILE')
+        assert detect_file_type(path) is None
+
+    def test_detect_special_file(self, tmp_path):
+        """Detect special location file."""
+        from u3edit.diff import detect_file_type
+        from u3edit.constants import SPECIAL_NAMES
+        name = list(SPECIAL_NAMES.keys())[0]
+        path = os.path.join(str(tmp_path), name)
+        with open(path, 'wb') as f:
+            f.write(bytes(SPECIAL_FILE_SIZE))
+        assert detect_file_type(path) == name
+
+
+# =============================================================================
+# Patch identify_binary
+# =============================================================================
+
+class TestPatchIdentifyBinary:
+    """Test identify_binary engine detection."""
+
+    def test_identify_ult3_by_name(self):
+        """Identify ULT3 by filename."""
+        from u3edit.patch import identify_binary
+        data = bytes(17408)
+        result = identify_binary(data, 'ULT3')
+        assert result is not None
+        assert result['name'] == 'ULT3'
+        assert result['load_addr'] == 0x5000
+
+    def test_identify_exod_by_name(self):
+        """Identify EXOD by filename."""
+        from u3edit.patch import identify_binary
+        data = bytes(26208)
+        result = identify_binary(data, 'EXOD')
+        assert result is not None
+        assert result['name'] == 'EXOD'
+
+    def test_identify_by_size_only(self):
+        """Identify binary by size when filename doesn't match."""
+        from u3edit.patch import identify_binary
+        data = bytes(17408)  # ULT3 size
+        result = identify_binary(data, 'randomfile')
+        assert result is not None
+        assert result['name'] == 'ULT3'
+
+    def test_unrecognized_returns_none(self):
+        """Unrecognized binary returns None."""
+        from u3edit.patch import identify_binary
+        data = bytes(100)
+        result = identify_binary(data, 'UNKNOWN')
+        assert result is None
+
+    def test_identify_subs(self):
+        """Identify SUBS by filename."""
+        from u3edit.patch import identify_binary
+        data = bytes(3584)
+        result = identify_binary(data, 'SUBS')
+        assert result is not None
+        assert result['name'] == 'SUBS'
+
+
+# =============================================================================
+# Patch cmd_edit dry-run / actual write
+# =============================================================================
+
+class TestPatchCmdEditWriteback:
+    """Test patch cmd_edit writes correct bytes."""
+
+    def test_cmd_edit_dry_run_no_write(self, tmp_path):
+        """cmd_edit with --dry-run doesn't modify the file."""
+        from u3edit.patch import cmd_edit
+        path = os.path.join(str(tmp_path), 'ULT3')
+        data = bytearray(17408)
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, region='food-rate', data='08',
+            dry_run=True, backup=False, output=None)
+        cmd_edit(args)
+        with open(path, 'rb') as f:
+            after = f.read()
+        assert after == bytes(17408)  # unchanged
+
+    def test_cmd_edit_writes_bytes(self, tmp_path):
+        """cmd_edit actually patches the correct offset."""
+        from u3edit.patch import cmd_edit
+        path = os.path.join(str(tmp_path), 'ULT3')
+        data = bytearray(17408)
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, region='food-rate', data='08',
+            dry_run=False, backup=False, output=None)
+        cmd_edit(args)
+        with open(path, 'rb') as f:
+            after = f.read()
+        # food-rate is at offset 0x272C
+        assert after[0x272C] == 0x08
+
+
+# =============================================================================
+# Text module error paths
+# =============================================================================
+
+class TestTextCmdErrors:
+    """Test text.py command error paths."""
+
+    def test_text_edit_record_out_of_range(self, tmp_path):
+        """text cmd_edit with record index beyond count exits."""
+        from u3edit.text import cmd_edit as text_cmd_edit
+        path = os.path.join(str(tmp_path), 'TEXT')
+        with open(path, 'wb') as f:
+            f.write(bytes(TEXT_FILE_SIZE))
+        args = argparse.Namespace(
+            file=path, record=999, text='HELLO',
+            output=None, dry_run=True, backup=False)
+        with pytest.raises(SystemExit):
+            text_cmd_edit(args)
+
+    def test_text_load_records(self, tmp_path):
+        """load_text_records splits on null terminators."""
+        path = os.path.join(str(tmp_path), 'TEXT')
+        data = bytearray(TEXT_FILE_SIZE)
+        # Put 3 null-terminated high-ASCII strings at start
+        off = 0
+        for s in ('HELLO', 'WORLD', 'TEST'):
+            for ch in s:
+                data[off] = ord(ch) | 0x80
+                off += 1
+            data[off] = 0x00
+            off += 1
+        with open(path, 'wb') as f:
+            f.write(data)
+        records = load_text_records(path)
+        assert records[:3] == ['HELLO', 'WORLD', 'TEST']
