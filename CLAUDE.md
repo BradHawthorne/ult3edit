@@ -111,9 +111,9 @@ Setters follow a **named-first, raw-fallback** pattern for total conversion scen
 Reusable framework for building full game replacements:
 
 - **`conversions/TEMPLATE/`**: Starter templates — `CHECKLIST.md` (every replaceable asset with u3edit command), `STORY_TEMPLATE.md` (narrative structure), `apply_template.sh` (11-phase skeleton script)
-- **`conversions/tools/tile_compiler.py`**: Text-art tile definitions (`.tiles` files) → SHPS binary. `#`=pixel on, `.`=off, 8 rows × 7 columns per glyph. Supports compile (to JSON/script) and decompile (binary→text-art) for round-trip editing.
-- **`conversions/tools/map_compiler.py`**: Text-art maps (`.map` files) → game binary. Uses `TILE_CHARS_REVERSE` / `DUNGEON_TILE_CHARS_REVERSE` from constants.py. Handles overworld (64×64) and dungeon (16×16 × 8 levels) formats. Compile and decompile modes.
-- **`conversions/tools/name_compiler.py`**: Text-first name table editor (`.names` files) → engine name-table patch hex. Compile, decompile, validate modes. Budget: 921 bytes total, 30 reserved for BLOAD DDRW tail = 891 usable.
+- **`conversions/tools/tile_compiler.py`**: Standalone tile compiler (also available as `u3edit shapes compile/decompile`).
+- **`conversions/tools/map_compiler.py`**: Standalone map compiler (also available as `u3edit map compile/decompile`).
+- **`conversions/tools/name_compiler.py`**: Standalone name table compiler (also available as `u3edit patch compile-names/decompile-names/validate-names`).
 - **`conversions/tools/gen_maps.py`**: Programmatic map generator for guaranteed-dimension surface (64×64) and dungeon (8×16×16) maps.
 - **`conversions/tools/shop_apply.py`**: Text-matching shop overlay string replacer. Discovers inline strings via `extract_overlay_strings()` at runtime, matches by vanilla text, replaces with new text. No hardcoded offsets needed.
 - **`conversions/tools/verify.py`**: Post-conversion verification — checks file presence, sizes, and optionally compares hashes against vanilla to confirm all assets were replaced.
