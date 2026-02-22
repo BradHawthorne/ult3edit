@@ -83,7 +83,7 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 - **`tlk search`**: Text search across TLK dialog files. Case-insensitive by default, `--regex` for regex patterns.
 - **`tlk edit --find/--replace`**: Search-and-replace across all text records in a TLK file. `--ignore-case` for case-insensitive matching. Supports `--dry-run`.
 - **`roster check-progress`**: Endgame readiness checker — marks, cards, exotic gear, party status.
-- **`diff`**: Compare two game files or directories — text/JSON/summary output, auto-detects file types, supports all data formats (roster, bestiary, combat, save, maps, special, TLK).
+- **`diff`**: Compare two game files or directories — text/JSON/summary output, auto-detects file types, supports all data formats (roster, bestiary, combat, save, maps, special, TLK, sound, shapes, DDRW, TEXT).
 - **`bestiary edit`**: Named flag toggles (`--undead`, `--ranged`, `--magic-user`, `--boss`, `--poison`, `--sleep`, `--negate`, `--teleport`, `--divide`, `--resistant` + `--no-*` counterparts), `--type Name` for monster type by name, `--all` for bulk editing.
 - **`save edit --plrs-slot`**: Edit active characters in PLRS file via save subcommand — supports all Character fields (stats, equipment, status, race, class, gender, marks, cards, sub-morsels). `--sentinel` sets the party sentinel byte (0xFF=active). `--location` sets location type (sosaria/dungeon/town/castle or raw hex). `--transport` accepts named values or raw int/hex for total conversions. Note: `--output` is rejected when editing both PRTY and PLRS simultaneously (they are separate files).
 - **`roster edit --in-party/--not-in-party`**: Toggle character's in-party status. `--sub-morsels` sets food fraction (0-99).
