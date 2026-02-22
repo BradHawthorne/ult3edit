@@ -21,6 +21,7 @@ from u3edit.constants import (
     CHAR_IN_PARTY, CHAR_SUB_MORSELS,
     TILE_CHARS_REVERSE, DUNGEON_TILE_CHARS_REVERSE,
     PRTY_OFF_SENTINEL, PRTY_OFF_TRANSPORT, PRTY_OFF_LOCATION,
+    PRTY_OFF_SAVED_X, PRTY_OFF_SAVED_Y,
     PRTY_LOCATION_CODES,
 )
 from u3edit.fileutil import backup_file
@@ -11274,3 +11275,307 @@ class TestImportTypeValidation:
             backup=False, dry_run=False, output=str(snd_file))
         sound_import(args)
         assert len(snd_file.read_bytes()) == 256
+
+
+# =============================================================================
+# Shapes check_shps_code_region
+# =============================================================================
+
+class TestShpsCodeRegion:
+    """Tests for check_shps_code_region function."""
+
+    def test_data_too_short(self):
+        """Returns False when data is shorter than code region offset."""
+        from u3edit.shapes import check_shps_code_region
+        data = bytes(100)  # Way shorter than SHPS_CODE_OFFSET (0x1F9)
+        assert check_shps_code_region(data) is False
+
+    def test_code_region_all_zeros(self):
+        """Returns False when code region is all zeros."""
+        from u3edit.shapes import check_shps_code_region, SHPS_CODE_OFFSET, SHPS_CODE_SIZE
+        data = bytes(SHPS_CODE_OFFSET + SHPS_CODE_SIZE + 100)
+        assert check_shps_code_region(data) is False
+
+    def test_code_region_has_code(self):
+        """Returns True when code region has non-zero bytes."""
+        from u3edit.shapes import check_shps_code_region, SHPS_CODE_OFFSET, SHPS_CODE_SIZE
+        data = bytearray(SHPS_CODE_OFFSET + SHPS_CODE_SIZE + 100)
+        data[SHPS_CODE_OFFSET] = 0x60  # RTS opcode
+        assert check_shps_code_region(data) is True
+
+    def test_code_region_last_byte_nonzero(self):
+        """Returns True when only last byte of code region is non-zero."""
+        from u3edit.shapes import check_shps_code_region, SHPS_CODE_OFFSET, SHPS_CODE_SIZE
+        data = bytearray(SHPS_CODE_OFFSET + SHPS_CODE_SIZE + 100)
+        data[SHPS_CODE_OFFSET + SHPS_CODE_SIZE - 1] = 0x01
+        assert check_shps_code_region(data) is True
+
+
+# =============================================================================
+# Save validate_party_state coordinate bounds
+# =============================================================================
+
+class TestSaveValidationBounds:
+    """Tests for validate_party_state X/Y coordinate validation."""
+
+    def test_valid_coordinates_no_warning(self):
+        """Coordinates within 0-63 produce no warnings about coords."""
+        from u3edit.save import validate_party_state
+        data = bytearray(PRTY_FILE_SIZE)
+        party = PartyState(data)
+        party.transport = 'foot'
+        party.location_type = 'sosaria'
+        party.party_size = 1
+        party.x = 63
+        party.y = 0
+        party.sentinel = 0xFF
+        party.slot_ids = [0, 0, 0, 0]
+        warnings = validate_party_state(party)
+        coord_warnings = [w for w in warnings if 'coordinate' in w.lower()]
+        assert len(coord_warnings) == 0
+
+    def test_x_out_of_bounds_warning(self):
+        """X coordinate > 63 triggers warning."""
+        from u3edit.save import validate_party_state
+        data = bytearray(PRTY_FILE_SIZE)
+        party = PartyState(data)
+        party.transport = 'foot'
+        party.location_type = 'sosaria'
+        party.sentinel = 0xFF
+        # Bypass clamping setter to set raw value > 63
+        party.raw[PRTY_OFF_SAVED_X] = 200
+        warnings = validate_party_state(party)
+        coord_warnings = [w for w in warnings if 'X coordinate' in w]
+        assert len(coord_warnings) == 1
+
+    def test_y_out_of_bounds_warning(self):
+        """Y coordinate > 63 triggers warning."""
+        from u3edit.save import validate_party_state
+        data = bytearray(PRTY_FILE_SIZE)
+        party = PartyState(data)
+        party.transport = 'foot'
+        party.location_type = 'sosaria'
+        party.sentinel = 0xFF
+        party.raw[PRTY_OFF_SAVED_Y] = 128
+        warnings = validate_party_state(party)
+        coord_warnings = [w for w in warnings if 'Y coordinate' in w]
+        assert len(coord_warnings) == 1
+
+    def test_multiple_violations(self):
+        """Multiple validation issues produce multiple warnings."""
+        from u3edit.save import validate_party_state
+        data = bytearray(PRTY_FILE_SIZE)
+        party = PartyState(data)
+        # Unknown transport
+        party.raw[PRTY_OFF_TRANSPORT] = 0xFE
+        # Unknown location
+        party.raw[PRTY_OFF_LOCATION] = 0xFE
+        # Bad coords
+        party.raw[PRTY_OFF_SAVED_X] = 200
+        party.raw[PRTY_OFF_SAVED_Y] = 200
+        # Weird sentinel
+        party.raw[PRTY_OFF_SENTINEL] = 0x42
+        warnings = validate_party_state(party)
+        assert len(warnings) >= 4
+
+
+# =============================================================================
+# Map editing edge cases
+# =============================================================================
+
+class TestMapSetEdgeCases:
+    """Tests for map cmd_set edge cases."""
+
+    def test_set_negative_coords_exits(self, tmp_path):
+        """cmd_set with negative coordinates exits."""
+        map_file = tmp_path / 'SOSMAP'
+        map_file.write_bytes(bytes(MAP_OVERWORLD_SIZE))
+        args = argparse.Namespace(
+            file=str(map_file), x=-1, y=5, tile=0x04,
+            level=None, dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_set(args)
+
+    def test_set_beyond_bounds_exits(self, tmp_path):
+        """cmd_set with coords beyond map size exits."""
+        map_file = tmp_path / 'SOSMAP'
+        map_file.write_bytes(bytes(MAP_OVERWORLD_SIZE))
+        args = argparse.Namespace(
+            file=str(map_file), x=64, y=0, tile=0x04,
+            level=None, dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_set(args)
+
+    def test_set_valid_coords(self, tmp_path):
+        """cmd_set writes correct tile at (0,0)."""
+        map_file = tmp_path / 'SOSMAP'
+        map_file.write_bytes(bytes(MAP_OVERWORLD_SIZE))
+        args = argparse.Namespace(
+            file=str(map_file), x=0, y=0, tile=0x08,
+            level=None, dry_run=False, backup=False, output=None)
+        cmd_set(args)
+        result = map_file.read_bytes()
+        assert result[0] == 0x08
+
+
+class TestMapFillEdgeCases:
+    """Tests for map cmd_fill edge cases."""
+
+    def test_fill_reversed_coords(self, tmp_path):
+        """cmd_fill with x1>x2 clamps x2 to x1 (single column)."""
+        from u3edit.map import cmd_fill
+        map_file = tmp_path / 'SOSMAP'
+        map_file.write_bytes(bytes(MAP_OVERWORLD_SIZE))
+        # Reversed: x1=5 > x2=2 → after clamping: x2=max(5, min(2,63))=5
+        # So region collapses to single column at x=5, y=5
+        args = argparse.Namespace(
+            file=str(map_file), x1=5, y1=5, x2=2, y2=2, tile=0x08,
+            level=None, dry_run=False, backup=False, output=None)
+        cmd_fill(args)
+        result = map_file.read_bytes()
+        # Single tile at (5, 5)
+        assert result[5 * 64 + 5] == 0x08
+
+    def test_fill_entire_row(self, tmp_path):
+        """cmd_fill across full width fills all tiles in row."""
+        from u3edit.map import cmd_fill
+        map_file = tmp_path / 'SOSMAP'
+        map_file.write_bytes(bytes(MAP_OVERWORLD_SIZE))
+        args = argparse.Namespace(
+            file=str(map_file), x1=0, y1=0, x2=63, y2=0, tile=0x0C,
+            level=None, dry_run=False, backup=False, output=None)
+        cmd_fill(args)
+        result = map_file.read_bytes()
+        for x in range(64):
+            assert result[x] == 0x0C
+
+    def test_replace_no_matches(self, tmp_path):
+        """cmd_replace with no matching tiles reports 0 changes."""
+        from u3edit.map import cmd_replace
+        map_file = tmp_path / 'SOSMAP'
+        # All zeros, try to replace 0xFF -> 0x04
+        map_file.write_bytes(bytes(MAP_OVERWORLD_SIZE))
+        args = argparse.Namespace(
+            file=str(map_file), from_tile=0xFF, to_tile=0x04,
+            level=None, dry_run=False, backup=False, output=None)
+        cmd_replace(args)
+        result = map_file.read_bytes()
+        assert all(b == 0 for b in result)
+
+    def test_replace_preserves_file_size(self, tmp_path):
+        """cmd_replace preserves exact file size."""
+        from u3edit.map import cmd_replace
+        map_file = tmp_path / 'SOSMAP'
+        data = bytearray(MAP_OVERWORLD_SIZE)
+        data[0] = 0x04
+        map_file.write_bytes(bytes(data))
+        args = argparse.Namespace(
+            file=str(map_file), from_tile=0x04, to_tile=0x08,
+            level=None, dry_run=False, backup=False, output=None)
+        cmd_replace(args)
+        result = map_file.read_bytes()
+        assert len(result) == MAP_OVERWORLD_SIZE
+        assert result[0] == 0x08
+
+
+# =============================================================================
+# Combat validate edge cases
+# =============================================================================
+
+class TestCombatValidateEdgeCases:
+    """Tests for combat validation edge cases."""
+
+    def test_all_positions_populated(self):
+        """Validate with all 8 monster + 4 PC positions set."""
+        from u3edit.combat import CombatMap, validate_combat_map
+        from u3edit.constants import (CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET,
+                                       CON_PC_X_OFFSET, CON_PC_Y_OFFSET)
+        data = bytearray(CON_FILE_SIZE)
+        # Place 8 monsters in different positions
+        for i in range(8):
+            data[CON_MONSTER_X_OFFSET + i] = i + 1
+            data[CON_MONSTER_Y_OFFSET + i] = i + 1
+        # Place 4 PCs in different positions
+        for i in range(4):
+            data[CON_PC_X_OFFSET + i] = i + 1
+            data[CON_PC_Y_OFFSET + i] = 10 - i
+        cm = CombatMap(data)
+        warnings = validate_combat_map(cm)
+        # No overlaps — all positions are unique
+        overlap_warnings = [w for w in warnings if 'overlap' in w.lower()]
+        assert len(overlap_warnings) == 0
+
+    def test_monster_pc_overlap_detected(self):
+        """Validate detects monster-PC overlap at same position."""
+        from u3edit.combat import CombatMap, validate_combat_map
+        from u3edit.constants import (CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET,
+                                       CON_PC_X_OFFSET, CON_PC_Y_OFFSET)
+        data = bytearray(CON_FILE_SIZE)
+        # Monster 0 at (5, 5)
+        data[CON_MONSTER_X_OFFSET] = 5
+        data[CON_MONSTER_Y_OFFSET] = 5
+        # PC 0 at (5, 5) — same position
+        data[CON_PC_X_OFFSET] = 5
+        data[CON_PC_Y_OFFSET] = 5
+        cm = CombatMap(data)
+        warnings = validate_combat_map(cm)
+        overlap_warnings = [w for w in warnings if 'overlap' in w.lower()]
+        assert len(overlap_warnings) >= 1
+
+    def test_tile_misalignment_count(self):
+        """Validate counts multiple misaligned tiles."""
+        from u3edit.combat import CombatMap, validate_combat_map
+        data = bytearray(CON_FILE_SIZE)
+        # Set 3 misaligned tiles (not multiples of 4)
+        data[0] = 0x01  # misaligned
+        data[1] = 0x02  # misaligned
+        data[2] = 0x03  # misaligned
+        data[3] = 0x04  # aligned
+        cm = CombatMap(data)
+        warnings = validate_combat_map(cm)
+        alignment_warnings = [w for w in warnings if 'alignment' in w.lower()
+                              or 'aligned' in w.lower()]
+        assert len(alignment_warnings) == 1
+        assert '3' in alignment_warnings[0]  # 3 misaligned tiles
+
+
+# =============================================================================
+# BCD edge cases
+# =============================================================================
+
+class TestBcdEdgeCases:
+    """Tests for BCD encoding edge cases."""
+
+    def test_bcd_to_int_invalid_nibble(self):
+        """bcd_to_int(0xFF) returns 165 (15*10 + 15) — undocumented but stable."""
+        from u3edit.bcd import bcd_to_int
+        # 0xFF has nibbles F(15) and F(15): 15*10 + 15 = 165
+        assert bcd_to_int(0xFF) == 165
+        # 0xAB has nibbles A(10) and B(11): 10*10 + 11 = 111
+        assert bcd_to_int(0xAB) == 111
+
+    def test_bcd16_max_value(self):
+        """bcd16_to_int(0x99, 0x99) returns 9999."""
+        from u3edit.bcd import bcd16_to_int
+        assert bcd16_to_int(0x99, 0x99) == 9999
+
+    def test_int_to_bcd_negative_clamps(self):
+        """int_to_bcd(-5) clamps to 0."""
+        from u3edit.bcd import int_to_bcd
+        assert int_to_bcd(-5) == 0x00
+
+    def test_int_to_bcd16_negative_clamps(self):
+        """int_to_bcd16(-100) clamps to (0, 0)."""
+        from u3edit.bcd import int_to_bcd16
+        assert int_to_bcd16(-100) == (0x00, 0x00)
+
+    def test_int_to_bcd16_overflow_clamps(self):
+        """int_to_bcd16(10000) clamps to 9999."""
+        from u3edit.bcd import int_to_bcd16
+        assert int_to_bcd16(10000) == (0x99, 0x99)
+
+    def test_bcd_roundtrip_all_valid(self):
+        """Every value 0-99 round-trips through int_to_bcd→bcd_to_int."""
+        from u3edit.bcd import bcd_to_int, int_to_bcd
+        for val in range(100):
+            assert bcd_to_int(int_to_bcd(val)) == val
