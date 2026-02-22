@@ -154,7 +154,7 @@ class DiskContext:
         self._tmpdir: str | None = None
 
     def __enter__(self):
-        self._tmpdir = tempfile.mkdtemp(prefix='u3edit_')
+        self._tmpdir = tempfile.mkdtemp(prefix='ult3edit_')
         try:
             # Extract all files to cache directory
             disk_extract_all(self.image_path, self._tmpdir, self.diskiigs_path)
@@ -408,7 +408,7 @@ def dispatch(args) -> None:
     elif args.disk_command == 'audit':
         cmd_audit(args)
     else:
-        print("Usage: u3edit disk {info|list|extract|audit} ...", file=sys.stderr)
+        print("Usage: ult3edit disk {info|list|extract|audit} ...", file=sys.stderr)
 
 
 def main() -> None:

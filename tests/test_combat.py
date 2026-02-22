@@ -6,8 +6,8 @@ import types
 
 import pytest
 
-from u3edit.combat import CombatMap, cmd_edit, cmd_import, _has_cli_edit_args, validate_combat_map
-from u3edit.constants import (
+from ult3edit.combat import CombatMap, cmd_edit, cmd_import, _has_cli_edit_args, validate_combat_map
+from ult3edit.constants import (
     CON_MAP_WIDTH, CON_MAP_HEIGHT, CON_FILE_SIZE,
     CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET, CON_MONSTER_COUNT,
     CON_PC_X_OFFSET, CON_PC_Y_OFFSET, CON_PC_COUNT,

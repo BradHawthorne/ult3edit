@@ -2,8 +2,8 @@
 
 import os
 
-from u3edit.tui.map_editor import MapEditor
-from u3edit.tui.base import EditorState
+from ult3edit.tui.map_editor import MapEditor
+from ult3edit.tui.base import EditorState
 
 
 class TestDungeonLevelSwitching:

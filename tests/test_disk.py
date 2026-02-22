@@ -4,7 +4,7 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 
-from u3edit.disk import find_diskiigs, disk_info, disk_list, DiskContext
+from ult3edit.disk import find_diskiigs, disk_info, disk_list, DiskContext
 
 
 class TestFindDiskiigs:
@@ -35,7 +35,7 @@ class TestDiskInfo:
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = "Volume: ULTIMA3\nFormat: ProDOS\nBlocks: 280\n"
-        with patch('u3edit.disk._run_diskiigs', return_value=mock_result):
+        with patch('ult3edit.disk._run_diskiigs', return_value=mock_result):
             info = disk_info('game.po')
             assert info['volume'] == 'ULTIMA3'
             assert info['format'] == 'ProDOS'
@@ -45,7 +45,7 @@ class TestDiskInfo:
         mock_result = MagicMock()
         mock_result.returncode = 1
         mock_result.stderr = "File not found"
-        with patch('u3edit.disk._run_diskiigs', return_value=mock_result):
+        with patch('ult3edit.disk._run_diskiigs', return_value=mock_result):
             info = disk_info('missing.po')
             assert 'error' in info
 
@@ -60,7 +60,7 @@ class TestDiskList:
             "ROST                 BIN     1280\n"
             "MAPA                 BIN     4096\n"
         )
-        with patch('u3edit.disk._run_diskiigs', return_value=mock_result):
+        with patch('ult3edit.disk._run_diskiigs', return_value=mock_result):
             entries = disk_list('game.po')
             assert len(entries) == 2
             assert entries[0]['name'] == 'ROST'
@@ -69,7 +69,7 @@ class TestDiskList:
     def test_empty_on_error(self):
         mock_result = MagicMock()
         mock_result.returncode = 1
-        with patch('u3edit.disk._run_diskiigs', return_value=mock_result):
+        with patch('ult3edit.disk._run_diskiigs', return_value=mock_result):
             entries = disk_list('bad.po')
             assert entries == []
 
@@ -77,7 +77,7 @@ class TestDiskList:
 class TestDiskContext:
     def test_context_manager(self, tmp_dir):
         """DiskContext should raise FileNotFoundError when diskiigs not found."""
-        with patch('u3edit.disk.find_diskiigs', return_value=None):
+        with patch('ult3edit.disk.find_diskiigs', return_value=None):
             with pytest.raises(FileNotFoundError):
                 with DiskContext('fake.po') as ctx:
                     pass

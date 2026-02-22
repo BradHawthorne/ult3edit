@@ -1,4 +1,4 @@
-"""Color theme for u3edit TUI editors."""
+"""Color theme for ult3edit TUI editors."""
 
 from prompt_toolkit.styles import Style
 

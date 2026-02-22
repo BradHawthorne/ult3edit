@@ -354,34 +354,34 @@ bash apply.sh /path/to/GAME/
 
 # Or step by step:
 # 1. Compile and import tile graphics (256 tiles)
-u3edit shapes compile sources/tiles.tiles --format json -o /tmp/tiles.json
-u3edit shapes import SHPS /tmp/tiles.json --backup
+ult3edit shapes compile sources/tiles.tiles --format json -o /tmp/tiles.json
+ult3edit shapes import SHPS /tmp/tiles.json --backup
 
 # 2. Compile and import maps (20 maps total)
 for letter in a b c d e f g h i j k l z; do
-    u3edit map compile sources/map${letter}.map -o MAP$(echo $letter | tr a-z A-Z)
+    ult3edit map compile sources/map${letter}.map -o MAP$(echo $letter | tr a-z A-Z)
 done
 for letter in m n o p q r s; do
-    u3edit map compile sources/map${letter}.map --dungeon -o MAP$(echo $letter | tr a-z A-Z)
+    ult3edit map compile sources/map${letter}.map --dungeon -o MAP$(echo $letter | tr a-z A-Z)
 done
 
 # 3. Build all dialog (19 files)
 for letter in a b c d e f g h i j k l m n o p q r s; do
-    u3edit tlk build sources/tlk${letter}.txt TLK$(echo $letter | tr a-z A-Z) --backup
+    ult3edit tlk build sources/tlk${letter}.txt TLK$(echo $letter | tr a-z A-Z) --backup
 done
 
 # 4. Import all bestiary (13 files)
 for letter in a b c d e f g h i j k l z; do
-    u3edit bestiary import MON$(echo $letter | tr a-z A-Z) sources/bestiary_${letter}.json
+    ult3edit bestiary import MON$(echo $letter | tr a-z A-Z) sources/bestiary_${letter}.json
 done
 
 # 5. Compile and apply name table
-u3edit patch compile-names sources/names.names -o /tmp/names.json
-u3edit patch import ULT3 /tmp/names.json
+ult3edit patch compile-names sources/names.names -o /tmp/names.json
+ult3edit patch import ULT3 /tmp/names.json
 
 # 6. Apply engine inline string patches
 # Option A: Binary (in-place, length constrained)
-u3edit patch strings-import ULT3 sources/engine_strings.json --backup
+ult3edit patch strings-import ULT3 sources/engine_strings.json --backup
 
 # Option B: Source-level (no length limits, requires asmiigs)
 bash ../../engine/scenario_build.sh . --apply-to /path/to/GAME/

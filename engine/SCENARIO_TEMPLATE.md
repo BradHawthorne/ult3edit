@@ -54,17 +54,17 @@ Full catalog: `engine/tools/ult3_strings.json`
 
 ### Name Table (921 bytes)
 Terrain names, monster names, weapon/armor names, spell names.
-Edit via: `u3edit patch edit <ULT3> --region name-table --data <hex>`
+Edit via: `ult3edit patch edit <ULT3> --region name-table --data <hex>`
 Or compile from text: `conversions/tools/name_compiler.py`
 
 ### Moongates (8 X + 8 Y coordinates)
-Edit via: `u3edit patch edit <ULT3> --region moongate-x --data <hex>`
+Edit via: `ult3edit patch edit <ULT3> --region moongate-x --data <hex>`
 
 ### Food Depletion Rate (1 byte)
-Edit via: `u3edit patch edit <ULT3> --region food-rate --data <hex>`
+Edit via: `ult3edit patch edit <ULT3> --region food-rate --data <hex>`
 
 ### All Data Files
-Every game data file can be edited via u3edit CLI:
+Every game data file can be edited via ult3edit CLI:
 - `roster` — Characters (stats, equipment, inventory)
 - `bestiary` — Monster encounters (13 files)
 - `combat` — Battlefield maps (9 files)

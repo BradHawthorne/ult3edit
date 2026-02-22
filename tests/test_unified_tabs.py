@@ -2,8 +2,8 @@
 
 import pytest
 
-from u3edit.tui.editor_tab import TileEditorTab, DrillDownTab
-from u3edit.tui.base import EditorState, BaseTileEditor
+from ult3edit.tui.editor_tab import TileEditorTab, DrillDownTab
+from ult3edit.tui.base import EditorState, BaseTileEditor
 
 
 class TestTileEditorTab:

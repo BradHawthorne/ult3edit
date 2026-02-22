@@ -3,8 +3,8 @@
 import os
 import pytest
 
-from u3edit.constants import tile_char, tile_name, MAP_OVERWORLD_SIZE
-from u3edit.map import render_map, map_to_grid
+from ult3edit.constants import tile_char, tile_name, MAP_OVERWORLD_SIZE
+from ult3edit.map import render_map, map_to_grid
 
 
 class TestTileCharMapping:

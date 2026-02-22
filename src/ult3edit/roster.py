@@ -1071,7 +1071,7 @@ def dispatch(args) -> None:
     elif args.roster_command == 'check-progress':
         cmd_check_progress(args)
     else:
-        print("Usage: u3edit roster {view|edit|create|import|check-progress} ...", file=sys.stderr)
+        print("Usage: ult3edit roster {view|edit|create|import|check-progress} ...", file=sys.stderr)
 
 
 def main() -> None:

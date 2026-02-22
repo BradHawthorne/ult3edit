@@ -1,6 +1,6 @@
 """Tests for game data constants."""
 
-from u3edit.constants import (
+from ult3edit.constants import (
     TILES, DUNGEON_TILES, WEAPONS, ARMORS, RACES, CLASSES,
     MARKS_BITS, CARDS_BITS, MONSTER_NAMES, MAP_NAMES, MON_TERRAIN,
     WEAPON_DAMAGE, WEAPON_PRICE, ARMOR_EVASION, CLASS_MAX_WEAPON, CLASS_MAX_ARMOR,

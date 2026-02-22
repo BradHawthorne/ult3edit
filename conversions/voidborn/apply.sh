@@ -4,14 +4,14 @@
 # =============================================================================
 #
 # Transforms a vanilla Ultima III: Exodus into the Voidborn cosmic horror
-# scenario using only u3edit CLI commands.
+# scenario using only ult3edit CLI commands.
 #
 # Usage: bash apply.sh /path/to/GAME/
 #
-# Requires: u3edit installed (pip install -e .), extracted ProDOS game files
+# Requires: ult3edit installed (pip install -e .), extracted ProDOS game files
 # in the target directory.
 #
-# This script demonstrates every CLI editing capability in u3edit:
+# This script demonstrates every CLI editing capability in ult3edit:
 #   - roster create/edit/import     - map set/fill/replace/import
 #   - bestiary edit/import          - combat edit/import
 #   - save edit/import              - text edit
@@ -53,37 +53,37 @@ echo "--- Phase 1: Creating party roster ---"
 ROST=$(find_file "ROST")
 
 # Create 4 themed characters from scratch
-u3edit roster create "$ROST" --slot 0 \
+ult3edit roster create "$ROST" --slot 0 \
     --name "KAEL" --race H --class R --gender M \
     --str 30 --dex 45 --hp 250 --gold 300 --backup
 
-u3edit roster create "$ROST" --slot 1 --force \
+ult3edit roster create "$ROST" --slot 1 --force \
     --name "LYRA" --race E --class W --gender F \
     --str 15 --dex 30 --hp 150 --gold 300
 
-u3edit roster create "$ROST" --slot 2 --force \
+ult3edit roster create "$ROST" --slot 2 --force \
     --name "THARN" --race D --class F --gender M \
     --str 50 --dex 25 --hp 350 --gold 300
 
-u3edit roster create "$ROST" --slot 3 --force \
+ult3edit roster create "$ROST" --slot 3 --force \
     --name "MIRA" --race B --class T --gender F \
     --str 20 --dex 50 --hp 180 --gold 300
 
 # Mark all 4 as in-party and equip them
-u3edit roster edit "$ROST" --slot 0 --in-party --food 500 --gems 5 \
+ult3edit roster edit "$ROST" --slot 0 --in-party --food 500 --gems 5 \
     --keys 3 --torches 10 --sub-morsels 50
 
-u3edit roster edit "$ROST" --slot 1 --in-party --food 500 --gems 10 \
+ult3edit roster edit "$ROST" --slot 1 --in-party --food 500 --gems 10 \
     --torches 10 --powders 5
 
-u3edit roster edit "$ROST" --slot 2 --in-party --food 500 --keys 5 \
+ult3edit roster edit "$ROST" --slot 2 --in-party --food 500 --keys 5 \
     --torches 15
 
-u3edit roster edit "$ROST" --slot 3 --in-party --food 500 --gems 8 \
+ult3edit roster edit "$ROST" --slot 3 --in-party --food 500 --gems 8 \
     --keys 10 --torches 20 --powders 3
 
 # Alternatively, import the full party from JSON (demonstrates JSON import)
-# u3edit roster import "$ROST" "${DATA_DIR}/party.json" --backup
+# ult3edit roster import "$ROST" "${DATA_DIR}/party.json" --backup
 
 echo "  Created: KAEL (Warden), LYRA (Seer), THARN (Bulwark), MIRA (Ghost)"
 
@@ -92,12 +92,12 @@ echo "  Created: KAEL (Warden), LYRA (Seer), THARN (Bulwark), MIRA (Ghost)"
 # =============================================================================
 echo "--- Phase 2: Setting save state ---"
 
-u3edit save edit "$GAME_DIR" \
+ult3edit save edit "$GAME_DIR" \
     --transport foot --x 28 --y 35 \
     --sentinel 255 --location sosaria \
     --backup
 
-# Alternatively: u3edit save import "$GAME_DIR" "${DATA_DIR}/save.json" --backup
+# Alternatively: ult3edit save import "$GAME_DIR" "${DATA_DIR}/save.json" --backup
 
 echo "  Party placed at (28,35) on Sosaria, on foot"
 
@@ -108,29 +108,29 @@ echo "--- Phase 3: Rebalancing bestiary ---"
 
 # Toughen grassland encounters (MONA) via individual CLI edits
 MONA=$(find_file "MONA")
-u3edit bestiary edit "$MONA" --monster 0 --hp 60 --attack 35 --defense 25 --backup
-u3edit bestiary edit "$MONA" --monster 1 --hp 80 --attack 45 --defense 30
-u3edit bestiary edit "$MONA" --monster 2 --hp 45 --attack 25 --speed 30
-u3edit bestiary edit "$MONA" --monster 3 --hp 120 --attack 60 --defense 40 --boss
-u3edit bestiary edit "$MONA" --monster 4 --hp 200 --attack 80 --defense 55 --boss
-u3edit bestiary edit "$MONA" --monster 5 --hp 150 --attack 50 --speed 35 --poison
-u3edit bestiary edit "$MONA" --monster 6 --hp 100 --attack 40 --speed 40 --sleep
-u3edit bestiary edit "$MONA" --monster 7 --hp 250 --attack 90 --defense 60 --boss
+ult3edit bestiary edit "$MONA" --monster 0 --hp 60 --attack 35 --defense 25 --backup
+ult3edit bestiary edit "$MONA" --monster 1 --hp 80 --attack 45 --defense 30
+ult3edit bestiary edit "$MONA" --monster 2 --hp 45 --attack 25 --speed 30
+ult3edit bestiary edit "$MONA" --monster 3 --hp 120 --attack 60 --defense 40 --boss
+ult3edit bestiary edit "$MONA" --monster 4 --hp 200 --attack 80 --defense 55 --boss
+ult3edit bestiary edit "$MONA" --monster 5 --hp 150 --attack 50 --speed 35 --poison
+ult3edit bestiary edit "$MONA" --monster 6 --hp 100 --attack 40 --speed 40 --sleep
+ult3edit bestiary edit "$MONA" --monster 7 --hp 250 --attack 90 --defense 60 --boss
 
 # Bulk rebalance other encounter files via JSON import
-# u3edit bestiary import "$MONA" "${DATA_DIR}/bestiary_a.json" --backup
+# ult3edit bestiary import "$MONA" "${DATA_DIR}/bestiary_a.json" --backup
 
 # Toughen forest encounters (MONC)
 MONC=$(find_file "MONC")
 if [ -f "$MONC" ]; then
-    u3edit bestiary edit "$MONC" --all --hp 80 --attack 40 --backup
+    ult3edit bestiary edit "$MONC" --all --hp 80 --attack 40 --backup
     echo "  Buffed forest encounters"
 fi
 
 # Toughen dungeon encounters (MOND)
 MOND=$(find_file "MOND")
 if [ -f "$MOND" ]; then
-    u3edit bestiary edit "$MOND" --all --hp 120 --attack 60 --defense 35 --backup
+    ult3edit bestiary edit "$MOND" --all --hp 120 --attack 60 --defense 35 --backup
     echo "  Buffed dungeon encounters"
 fi
 
@@ -144,25 +144,25 @@ echo "--- Phase 4: Redesigning combat battlefields ---"
 # Redesign grassland battlefield with lava hazards (CLI tile-by-tile)
 CONG=$(find_file "CONG")
 if [ -f "$CONG" ]; then
-    u3edit combat edit "$CONG" --tile 1 1 0x84 --backup    # Lava at (1,1)
-    u3edit combat edit "$CONG" --tile 9 1 0x84              # Lava at (9,1)
-    u3edit combat edit "$CONG" --tile 3 3 0x84              # Lava at (3,3)
-    u3edit combat edit "$CONG" --tile 7 3 0x84              # Lava at (7,3)
-    u3edit combat edit "$CONG" --tile 5 5 0x84              # Lava at center
-    u3edit combat edit "$CONG" --tile 3 7 0x84              # Lava at (3,7)
-    u3edit combat edit "$CONG" --tile 7 7 0x84              # Lava at (7,7)
-    u3edit combat edit "$CONG" --tile 1 9 0x84              # Lava at (1,9)
-    u3edit combat edit "$CONG" --tile 9 9 0x84              # Lava at (9,9)
+    ult3edit combat edit "$CONG" --tile 1 1 0x84 --backup    # Lava at (1,1)
+    ult3edit combat edit "$CONG" --tile 9 1 0x84              # Lava at (9,1)
+    ult3edit combat edit "$CONG" --tile 3 3 0x84              # Lava at (3,3)
+    ult3edit combat edit "$CONG" --tile 7 3 0x84              # Lava at (7,3)
+    ult3edit combat edit "$CONG" --tile 5 5 0x84              # Lava at center
+    ult3edit combat edit "$CONG" --tile 3 7 0x84              # Lava at (3,7)
+    ult3edit combat edit "$CONG" --tile 7 7 0x84              # Lava at (7,7)
+    ult3edit combat edit "$CONG" --tile 1 9 0x84              # Lava at (1,9)
+    ult3edit combat edit "$CONG" --tile 9 9 0x84              # Lava at (9,9)
     # Reposition monsters for ambush formation
-    u3edit combat edit "$CONG" --monster-pos 0 3 2
-    u3edit combat edit "$CONG" --monster-pos 1 7 2
-    u3edit combat edit "$CONG" --monster-pos 2 5 4
-    u3edit combat edit "$CONG" --monster-pos 3 5 6
+    ult3edit combat edit "$CONG" --monster-pos 0 3 2
+    ult3edit combat edit "$CONG" --monster-pos 1 7 2
+    ult3edit combat edit "$CONG" --monster-pos 2 5 4
+    ult3edit combat edit "$CONG" --monster-pos 3 5 6
     echo "  Redesigned grassland battlefield (lava hazards + ambush)"
 fi
 
 # Import a full battlefield design from JSON (demonstrates JSON import)
-# u3edit combat import "$CONG" "${DATA_DIR}/combat_g.json" --backup
+# ult3edit combat import "$CONG" "${DATA_DIR}/combat_g.json" --backup
 
 # =============================================================================
 # Phase 5: MAPS — Corrupt the overworld
@@ -172,18 +172,18 @@ echo "--- Phase 5: Corrupting the overworld ---"
 MAPA=$(find_file "MAPA")
 
 # Replace some grass with brush (thorns spreading across the land)
-u3edit map replace "$MAPA" --from 0x08 --to 0x04 --backup  # Brush→Grass first
+ult3edit map replace "$MAPA" --from 0x08 --to 0x04 --backup  # Brush→Grass first
 # Seed corruption: add lava pools to the overworld
-u3edit map set "$MAPA" --x 30 --y 30 --tile 0x84  # Lava pool near center
-u3edit map set "$MAPA" --x 31 --y 30 --tile 0x84
-u3edit map set "$MAPA" --x 30 --y 31 --tile 0x84
-u3edit map set "$MAPA" --x 31 --y 31 --tile 0x84
+ult3edit map set "$MAPA" --x 30 --y 30 --tile 0x84  # Lava pool near center
+ult3edit map set "$MAPA" --x 31 --y 30 --tile 0x84
+ult3edit map set "$MAPA" --x 30 --y 31 --tile 0x84
+ult3edit map set "$MAPA" --x 31 --y 31 --tile 0x84
 
 # Create a void rift zone (force fields forming a barrier)
-u3edit map fill "$MAPA" --x1 20 --y1 20 --x2 22 --y2 22 --tile 0x80  # Force field ring
+ult3edit map fill "$MAPA" --x1 20 --y1 20 --x2 22 --y2 22 --tile 0x80  # Force field ring
 
 # Find all existing dungeon entrances (for reference)
-u3edit map find "$MAPA" --tile 0x14 || true
+ult3edit map find "$MAPA" --tile 0x14 || true
 
 echo "  Added corruption zones, lava pools, and void rifts to overworld"
 
@@ -191,15 +191,15 @@ echo "  Added corruption zones, lava pools, and void rifts to overworld"
 MAPM=$(find_file "MAPM")
 if [ -f "$MAPM" ]; then
     # Add lava hazards to dungeon level 1
-    u3edit map set "$MAPM" --x 5 --y 5 --tile 0x07 --level 0   # Lava in dungeon
-    u3edit map set "$MAPM" --x 10 --y 5 --tile 0x07 --level 0
+    ult3edit map set "$MAPM" --x 5 --y 5 --tile 0x07 --level 0   # Lava in dungeon
+    ult3edit map set "$MAPM" --x 10 --y 5 --tile 0x07 --level 0
     echo "  Added hazards to dungeon level 1"
 fi
 
 # For full map redesign, use JSON import:
-# u3edit map view "$MAPA" --json -o overworld.json
+# ult3edit map view "$MAPA" --json -o overworld.json
 # (edit overworld.json externally)
-# u3edit map import "$MAPA" overworld.json --backup
+# ult3edit map import "$MAPA" overworld.json --backup
 
 # =============================================================================
 # Phase 6: SPECIAL LOCATIONS — Redesign shrines and fountains
@@ -209,20 +209,20 @@ echo "--- Phase 6: Modifying special locations ---"
 SHRN=$(find_file "SHRN")
 if [ -f "$SHRN" ]; then
     # Add force fields around shrine center
-    u3edit special edit "$SHRN" --tile 4 4 0x80 --backup
-    u3edit special edit "$SHRN" --tile 6 4 0x80
-    u3edit special edit "$SHRN" --tile 4 6 0x80
-    u3edit special edit "$SHRN" --tile 6 6 0x80
+    ult3edit special edit "$SHRN" --tile 4 4 0x80 --backup
+    ult3edit special edit "$SHRN" --tile 6 4 0x80
+    ult3edit special edit "$SHRN" --tile 4 6 0x80
+    ult3edit special edit "$SHRN" --tile 6 6 0x80
     echo "  Fortified shrines with null fields"
 fi
 
 FNTN=$(find_file "FNTN")
 if [ -f "$FNTN" ]; then
     # Corrupt fountain with lava borders
-    u3edit special edit "$FNTN" --tile 3 3 0x84 --backup
-    u3edit special edit "$FNTN" --tile 7 3 0x84
-    u3edit special edit "$FNTN" --tile 3 7 0x84
-    u3edit special edit "$FNTN" --tile 7 7 0x84
+    ult3edit special edit "$FNTN" --tile 3 3 0x84 --backup
+    ult3edit special edit "$FNTN" --tile 7 3 0x84
+    ult3edit special edit "$FNTN" --tile 3 7 0x84
+    ult3edit special edit "$FNTN" --tile 7 7 0x84
     echo "  Corrupted fountains with ichor pools"
 fi
 
@@ -236,21 +236,21 @@ for letter in A B C D E F G H I J K L M N O P Q R S; do
     TLK=$(find_file "TLK${letter}")
     if [ -f "$TLK" ]; then
         # Replace thematic terms (case-insensitive)
-        u3edit tlk edit "$TLK" --find "EXODUS" --replace "THE VOIDBORN" \
+        ult3edit tlk edit "$TLK" --find "EXODUS" --replace "THE VOIDBORN" \
             --ignore-case --backup 2>/dev/null || true
-        u3edit tlk edit "$TLK" --find "SOSARIA" --replace "THE ASHEN REALM" \
+        ult3edit tlk edit "$TLK" --find "SOSARIA" --replace "THE ASHEN REALM" \
             --ignore-case 2>/dev/null || true
-        u3edit tlk edit "$TLK" --find "LORD BRITISH" --replace "THE PROPHET" \
+        ult3edit tlk edit "$TLK" --find "LORD BRITISH" --replace "THE PROPHET" \
             --ignore-case 2>/dev/null || true
-        u3edit tlk edit "$TLK" --find "BRITANNIA" --replace "THE WASTELAND" \
+        ult3edit tlk edit "$TLK" --find "BRITANNIA" --replace "THE WASTELAND" \
             --ignore-case 2>/dev/null || true
-        u3edit tlk edit "$TLK" --find "CASTLE" --replace "BASTION" \
+        ult3edit tlk edit "$TLK" --find "CASTLE" --replace "BASTION" \
             --ignore-case 2>/dev/null || true
-        u3edit tlk edit "$TLK" --find "DUNGEON" --replace "ABYSS" \
+        ult3edit tlk edit "$TLK" --find "DUNGEON" --replace "ABYSS" \
             --ignore-case 2>/dev/null || true
-        u3edit tlk edit "$TLK" --find "MOONGATE" --replace "RIFT" \
+        ult3edit tlk edit "$TLK" --find "MOONGATE" --replace "RIFT" \
             --ignore-case 2>/dev/null || true
-        u3edit tlk edit "$TLK" --find "MARKS" --replace "SIGILS" \
+        ult3edit tlk edit "$TLK" --find "MARKS" --replace "SIGILS" \
             --ignore-case 2>/dev/null || true
     fi
 done
@@ -258,7 +258,7 @@ done
 # Edit specific key dialog records (Lord British's castle = TLKB)
 TLKB=$(find_file "TLKB")
 if [ -f "$TLKB" ]; then
-    u3edit tlk edit "$TLKB" --record 0 \
+    ult3edit tlk edit "$TLKB" --record 0 \
         --text "THE VOID CONSUMES ALL.\nSEEK THE SIGILS BEFORE\nREALITY COLLAPSES." \
         2>/dev/null || true
 fi
@@ -266,9 +266,9 @@ fi
 echo "  Replaced dialog themes across all TLK files"
 
 # For full dialog rewrite, use extract/build:
-# u3edit tlk extract "$TLKB" dialog_b.txt
+# ult3edit tlk extract "$TLKB" dialog_b.txt
 # (edit dialog_b.txt — records separated by --- lines)
-# u3edit tlk build dialog_b.txt "$TLKB" --backup
+# ult3edit tlk build dialog_b.txt "$TLKB" --backup
 
 # =============================================================================
 # Phase 8: GAME TEXT — Rewrite title/prompt strings
@@ -277,9 +277,9 @@ echo "--- Phase 8: Editing game text ---"
 
 TEXT=$(find_file "TEXT")
 if [ -f "$TEXT" ]; then
-    u3edit text edit "$TEXT" --record 0 --text "EXODUS: VOIDBORN" --backup \
+    ult3edit text edit "$TEXT" --record 0 --text "EXODUS: VOIDBORN" --backup \
         2>/dev/null || true
-    u3edit text edit "$TEXT" --record 1 --text "A WORLD CONSUMED" \
+    ult3edit text edit "$TEXT" --record 1 --text "A WORLD CONSUMED" \
         2>/dev/null || true
     echo "  Updated title text"
 fi
@@ -296,14 +296,14 @@ if [ -f "$ULT3" ]; then
 
     # Relocate moongates to form a protective ring around the void
     # 8 phases with new X coordinates (decimal 10,20,30,40,50,30,20,10)
-    u3edit patch edit "$ULT3" --region moongate-x \
+    ult3edit patch edit "$ULT3" --region moongate-x \
         --data "0A 14 1E 28 32 1E 14 0A"
     # 8 phases with new Y coordinates (decimal 10,10,10,30,50,50,50,30)
-    u3edit patch edit "$ULT3" --region moongate-y \
+    ult3edit patch edit "$ULT3" --region moongate-y \
         --data "0A 0A 0A 1E 32 32 32 1E"
 
     # Increase food depletion rate (harsher survival: $02 = twice as fast)
-    u3edit patch edit "$ULT3" --region food-rate --data "02"
+    ult3edit patch edit "$ULT3" --region food-rate --data "02"
 
     echo "  Relocated moongates to void ring pattern"
     echo "  Doubled food depletion rate"
@@ -319,8 +319,8 @@ echo "--- Phase 10: Editing shop overlay text ---"
 # JSR $46BA patterns, then matches by vanilla text — no hardcoded offsets needed.
 #
 # For manual editing of individual strings:
-#   u3edit shapes view SHP0 --strings          # List discovered strings
-#   u3edit shapes edit-string SHP0 --offset N --text "NEW TEXT"
+#   ult3edit shapes view SHP0 --strings          # List discovered strings
+#   ult3edit shapes edit-string SHP0 --offset N --text "NEW TEXT"
 echo "  (Handled by shop_apply.py in Phase 11)"
 
 # =============================================================================
@@ -335,7 +335,7 @@ if [ -d "$SOURCES_DIR" ]; then
         MON=$(find_file "MON${MON_UPPER}")
         JSON="${SOURCES_DIR}/bestiary_${letter}.json"
         if [ -f "$MON" ] && [ -f "$JSON" ]; then
-            u3edit bestiary import "$MON" "$JSON" 2>/dev/null || true
+            ult3edit bestiary import "$MON" "$JSON" 2>/dev/null || true
         fi
     done
     echo "  Imported bestiary stats from 13 JSON sources"
@@ -346,7 +346,7 @@ if [ -d "$SOURCES_DIR" ]; then
         CON=$(find_file "CON${CON_UPPER}")
         JSON="${SOURCES_DIR}/combat_${letter}.json"
         if [ -f "$CON" ] && [ -f "$JSON" ]; then
-            u3edit combat import "$CON" "$JSON" 2>/dev/null || true
+            ult3edit combat import "$CON" "$JSON" 2>/dev/null || true
         fi
     done
     echo "  Imported combat maps from 9 JSON sources"
@@ -357,7 +357,7 @@ if [ -d "$SOURCES_DIR" ]; then
         FILE=$(find_file "$NAME_UPPER")
         JSON="${SOURCES_DIR}/special_${name}.json"
         if [ -f "$FILE" ] && [ -f "$JSON" ]; then
-            u3edit special import "$FILE" "$JSON" 2>/dev/null || true
+            ult3edit special import "$FILE" "$JSON" 2>/dev/null || true
         fi
     done
     echo "  Imported special locations from JSON sources"
@@ -368,7 +368,7 @@ if [ -d "$SOURCES_DIR" ]; then
         TLK=$(find_file "TLK${TLK_UPPER}")
         SRC="${SOURCES_DIR}/tlk${letter}.txt"
         if [ -f "$TLK" ] && [ -f "$SRC" ]; then
-            u3edit tlk build "$SRC" "$TLK" 2>/dev/null || true
+            ult3edit tlk build "$SRC" "$TLK" 2>/dev/null || true
         fi
     done
     echo "  Built dialog from 19 text sources"
@@ -380,27 +380,27 @@ if [ -d "$SOURCES_DIR" ]; then
         # Read title records from JSON and apply via text edit
         TITLE0=$(python3 -c "import json; d=json.load(open('${TITLE_JSON}')); print(d['records'][0]['text'])")
         TITLE1=$(python3 -c "import json; d=json.load(open('${TITLE_JSON}')); print(d['records'][1]['text'])")
-        u3edit text edit "$TEXT" --record 0 --text "$TITLE0" 2>/dev/null || true
-        u3edit text edit "$TEXT" --record 1 --text "$TITLE1" 2>/dev/null || true
+        ult3edit text edit "$TEXT" --record 0 --text "$TITLE0" 2>/dev/null || true
+        ult3edit text edit "$TEXT" --record 1 --text "$TITLE1" 2>/dev/null || true
         echo "  Applied title screen text"
     fi
 
-    # Compile and import tile graphics (via u3edit shapes compile)
+    # Compile and import tile graphics (via ult3edit shapes compile)
     TILES_SRC="${SOURCES_DIR}/tiles.tiles"
     SHPS=$(find_file "SHPS")
     if [ -f "$TILES_SRC" ] && [ -f "$SHPS" ]; then
         mkdir -p "${SCRIPT_DIR}/build"
-        u3edit shapes compile "$TILES_SRC" --format json \
+        ult3edit shapes compile "$TILES_SRC" --format json \
             -o "${SCRIPT_DIR}/build/tiles.json" 2>/dev/null
-        u3edit shapes import "$SHPS" "${SCRIPT_DIR}/build/tiles.json" 2>/dev/null || true
+        ult3edit shapes import "$SHPS" "${SCRIPT_DIR}/build/tiles.json" 2>/dev/null || true
         echo "  Compiled and imported tile graphics (256 tiles)"
     fi
 
-    # Compile and import overworld map (via u3edit map compile)
+    # Compile and import overworld map (via ult3edit map compile)
     MAPA_SRC="${SOURCES_DIR}/mapa.map"
     MAPA=$(find_file "MAPA")
     if [ -f "$MAPA_SRC" ] && [ -f "$MAPA" ]; then
-        u3edit map compile "$MAPA_SRC" -o "$MAPA" 2>/dev/null || true
+        ult3edit map compile "$MAPA_SRC" -o "$MAPA" 2>/dev/null || true
         echo "  Compiled and imported overworld map"
     fi
 
@@ -410,7 +410,7 @@ if [ -d "$SOURCES_DIR" ]; then
         MAP_SRC="${SOURCES_DIR}/map${letter}.map"
         MAP_FILE=$(find_file "MAP${MAP_UPPER}")
         if [ -f "$MAP_SRC" ] && [ -f "$MAP_FILE" ]; then
-            u3edit map compile "$MAP_SRC" -o "$MAP_FILE" 2>/dev/null || true
+            ult3edit map compile "$MAP_SRC" -o "$MAP_FILE" 2>/dev/null || true
         fi
     done
     echo "  Compiled and imported 12 surface maps"
@@ -421,19 +421,19 @@ if [ -d "$SOURCES_DIR" ]; then
         MAP_SRC="${SOURCES_DIR}/map${letter}.map"
         MAP_FILE=$(find_file "MAP${MAP_UPPER}")
         if [ -f "$MAP_SRC" ] && [ -f "$MAP_FILE" ]; then
-            u3edit map compile "$MAP_SRC" --dungeon -o "$MAP_FILE" 2>/dev/null || true
+            ult3edit map compile "$MAP_SRC" --dungeon -o "$MAP_FILE" 2>/dev/null || true
         fi
     done
     echo "  Compiled and imported 7 dungeon maps"
 
-    # Compile and apply name table (via u3edit patch compile-names)
+    # Compile and apply name table (via ult3edit patch compile-names)
     NAMES_SRC="${SOURCES_DIR}/names.names"
     ULT3=$(find_file "ULT3")
     if [ -f "$NAMES_SRC" ] && [ -f "$ULT3" ]; then
         mkdir -p "${SCRIPT_DIR}/build"
-        u3edit patch compile-names "$NAMES_SRC" \
+        ult3edit patch compile-names "$NAMES_SRC" \
             -o "${SCRIPT_DIR}/build/names.json" 2>/dev/null
-        u3edit patch import "$ULT3" "${SCRIPT_DIR}/build/names.json" 2>/dev/null || true
+        ult3edit patch import "$ULT3" "${SCRIPT_DIR}/build/names.json" 2>/dev/null || true
         echo "  Compiled and applied Voidborn name table"
     fi
 
@@ -450,7 +450,7 @@ if [ -d "$SOURCES_DIR" ]; then
         SND_FILE=$(find_file "$SND_UPPER")
         JSON="${SOURCES_DIR}/${snd}.json"
         if [ -f "$SND_FILE" ] && [ -f "$JSON" ]; then
-            u3edit sound import "$SND_FILE" "$JSON" 2>/dev/null || true
+            ult3edit sound import "$SND_FILE" "$JSON" 2>/dev/null || true
         fi
     done
     echo "  Imported sound data from 3 JSON sources"
@@ -459,7 +459,7 @@ if [ -d "$SOURCES_DIR" ]; then
     DDRW_FILE=$(find_file "DDRW")
     DDRW_JSON="${SOURCES_DIR}/ddrw.json"
     if [ -f "$DDRW_FILE" ] && [ -f "$DDRW_JSON" ]; then
-        u3edit ddrw import "$DDRW_FILE" "$DDRW_JSON" 2>/dev/null || true
+        ult3edit ddrw import "$DDRW_FILE" "$DDRW_JSON" 2>/dev/null || true
         echo "  Imported dungeon drawing data"
     fi
 
@@ -478,7 +478,7 @@ if [ -d "$SOURCES_DIR" ]; then
         echo "  Applied engine inline string patches via reassembly"
     elif [ -f "$BIN_PATCHES" ] && [ -f "$ULT3" ]; then
         echo "  Applying engine string patches (binary, in-place)..."
-        u3edit patch strings-import "$ULT3" "$BIN_PATCHES" \
+        ult3edit patch strings-import "$ULT3" "$BIN_PATCHES" \
             --backup 2>/dev/null || true
         echo "  Applied engine inline string patches via binary patcher"
     fi

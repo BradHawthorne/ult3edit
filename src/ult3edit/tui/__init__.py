@@ -1,4 +1,4 @@
-"""TUI editors for u3edit. Requires prompt_toolkit (install with pip install u3edit[tui])."""
+"""TUI editors for ult3edit. Requires prompt_toolkit (install with pip install ult3edit[tui])."""
 
 
 def require_prompt_toolkit():
@@ -10,7 +10,7 @@ def require_prompt_toolkit():
         import sys
         print(
             "Error: TUI editors require prompt_toolkit.\n"
-            "Install with: pip install u3edit[tui]",
+            "Install with: pip install ult3edit[tui]",
             file=sys.stderr,
         )
         sys.exit(1)

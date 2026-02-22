@@ -5,7 +5,7 @@ import json
 import os
 import pytest
 
-from u3edit.diff import (
+from ult3edit.diff import (
     FieldDiff, EntityDiff, FileDiff, GameDiff,
     diff_dicts, _diff_lists, _diff_tile_grid,
     diff_roster, diff_bestiary, diff_map, diff_special,
@@ -13,13 +13,13 @@ from u3edit.diff import (
     detect_file_type, diff_file, diff_directories,
     format_text, format_summary, to_json, cmd_diff,
 )
-from u3edit.constants import (
+from ult3edit.constants import (
     CHAR_RECORD_SIZE, ROSTER_FILE_SIZE, CHAR_STR, CHAR_HP_HI, CHAR_HP_LO,
     MON_FILE_SIZE, MON_MONSTERS_PER_FILE,
     PRTY_FILE_SIZE, PLRS_FILE_SIZE,
     SPECIAL_FILE_SIZE,
 )
-from u3edit.bcd import int_to_bcd, int_to_bcd16
+from ult3edit.bcd import int_to_bcd, int_to_bcd16
 
 
 # =============================================================================

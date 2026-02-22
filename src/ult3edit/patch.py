@@ -466,7 +466,7 @@ def _extract_inline_strings(data: bytes, org: int = 0):
     """Extract JSR $46BA inline strings from binary data.
 
     Embedded implementation — same algorithm as engine/tools/string_catalog.py
-    but integrated into the u3edit package (no external dependency).
+    but integrated into the ult3edit package (no external dependency).
     """
     strings = []
     i = 0
@@ -987,7 +987,7 @@ def dispatch(args) -> None:
     elif cmd == 'validate-names':
         cmd_validate_names(args)
     else:
-        print("Usage: u3edit patch "
+        print("Usage: ult3edit patch "
               "{view|edit|dump|import|strings|strings-edit|strings-import|"
               "compile-names|decompile-names|validate-names} ...",
               file=sys.stderr)

@@ -2,7 +2,7 @@
 
 import pytest
 
-from u3edit.tui.form_editor import FormField, FormEditorTab
+from ult3edit.tui.form_editor import FormField, FormEditorTab
 
 
 class TestFormField:
@@ -99,14 +99,14 @@ class TestFormEditorTab:
 
 class TestRosterEditor:
     def test_make_roster_tab(self, sample_roster_bytes):
-        from u3edit.tui.roster_editor import make_roster_tab
+        from ult3edit.tui.roster_editor import make_roster_tab
         saved = []
         tab = make_roster_tab(sample_roster_bytes, lambda d: saved.append(d))
         assert tab.name == 'Roster'
         assert len(tab.records) == 20
 
     def test_roster_field_editing(self, sample_roster_bytes):
-        from u3edit.tui.roster_editor import make_roster_tab, _character_fields
+        from ult3edit.tui.roster_editor import make_roster_tab, _character_fields
         tab = make_roster_tab(sample_roster_bytes, lambda d: None)
         # First character should be non-empty
         char = tab.records[0]
@@ -121,8 +121,8 @@ class TestRosterEditor:
 
     def test_roster_field_getters_no_crash(self, sample_roster_bytes):
         """All field getters should work without AttributeError."""
-        from u3edit.tui.roster_editor import _character_fields
-        from u3edit.roster import Character
+        from ult3edit.tui.roster_editor import _character_fields
+        from ult3edit.roster import Character
         char = Character(sample_roster_bytes[:64])
         fields = _character_fields(char)
         for field in fields:
@@ -130,7 +130,7 @@ class TestRosterEditor:
             assert val is not None
 
     def test_roster_save_roundtrip(self, sample_roster_bytes):
-        from u3edit.tui.roster_editor import make_roster_tab
+        from ult3edit.tui.roster_editor import make_roster_tab
         saved = []
         tab = make_roster_tab(sample_roster_bytes, lambda d: saved.append(d))
         tab.dirty = True
@@ -141,27 +141,27 @@ class TestRosterEditor:
 
 class TestBestiaryEditor:
     def test_make_bestiary_tab(self, sample_mon_bytes):
-        from u3edit.tui.bestiary_editor import make_bestiary_tab
+        from ult3edit.tui.bestiary_editor import make_bestiary_tab
         saved = []
         tab = make_bestiary_tab(sample_mon_bytes, 'A', lambda d: saved.append(d))
         assert tab.name == 'MONA'
         assert len(tab.records) == 16
 
     def test_bestiary_roundtrip(self, sample_mon_bytes):
-        from u3edit.tui.bestiary_editor import make_bestiary_tab
+        from ult3edit.tui.bestiary_editor import make_bestiary_tab
         tab = make_bestiary_tab(sample_mon_bytes, 'A', lambda d: None)
         data = tab.get_save_data()
         assert len(data) == 256
 
     def test_bestiary_roundtrip_preserves_data(self, sample_mon_bytes):
         """Round-trip should preserve monster attributes."""
-        from u3edit.tui.bestiary_editor import make_bestiary_tab
+        from ult3edit.tui.bestiary_editor import make_bestiary_tab
         tab = make_bestiary_tab(sample_mon_bytes, 'A', lambda d: None)
         data = tab.get_save_data()
         assert data == sample_mon_bytes
 
     def test_byte_clamp(self):
-        from u3edit.tui.bestiary_editor import _byte_clamp
+        from ult3edit.tui.bestiary_editor import _byte_clamp
         assert _byte_clamp('42') == 42
         assert _byte_clamp('0x48') == 0x48
         assert _byte_clamp('$48') == 0x48
@@ -171,7 +171,7 @@ class TestBestiaryEditor:
 
     def test_bestiary_field_getters(self, sample_mon_bytes):
         """All field getters should work without crash."""
-        from u3edit.tui.bestiary_editor import make_bestiary_tab, _monster_fields
+        from ult3edit.tui.bestiary_editor import make_bestiary_tab, _monster_fields
         tab = make_bestiary_tab(sample_mon_bytes, 'A', lambda d: None)
         monster = tab.records[0]
         fields = _monster_fields(monster)
@@ -182,14 +182,14 @@ class TestBestiaryEditor:
 
 class TestPartyEditor:
     def test_make_party_tab(self, sample_prty_bytes):
-        from u3edit.tui.party_editor import make_party_tab
+        from ult3edit.tui.party_editor import make_party_tab
         saved = []
         tab = make_party_tab(sample_prty_bytes, lambda d: saved.append(d))
         assert tab.name == 'Party'
         assert len(tab.records) == 1
 
     def test_party_fields(self, sample_prty_bytes):
-        from u3edit.tui.party_editor import make_party_tab, _party_fields
+        from ult3edit.tui.party_editor import make_party_tab, _party_fields
         tab = make_party_tab(sample_prty_bytes, lambda d: None)
         party = tab.records[0]
         fields = _party_fields(party)
@@ -201,7 +201,7 @@ class TestPartyEditor:
         assert 'Sentinel' in labels
 
     def test_party_save_roundtrip(self, sample_prty_bytes):
-        from u3edit.tui.party_editor import make_party_tab
+        from ult3edit.tui.party_editor import make_party_tab
         saved = []
         tab = make_party_tab(sample_prty_bytes, lambda d: saved.append(d))
         tab.dirty = True
@@ -213,7 +213,7 @@ class TestPartyEditor:
 
 class TestDialogEditor:
     def test_parse_records(self):
-        from u3edit.tui.dialog_editor import DialogEditor
+        from ult3edit.tui.dialog_editor import DialogEditor
         # Build a simple TLK-style binary: two records
         rec1 = bytes([0xC8, 0xC5, 0xCC, 0xCC, 0xCF, 0x00])  # "HELLO\0"
         rec2 = bytes([0xD7, 0xCF, 0xD2, 0xCC, 0xC4, 0x00])  # "WORLD\0"
@@ -224,7 +224,7 @@ class TestDialogEditor:
         assert editor.records[1] == ['WORLD']
 
     def test_dirty_tracking(self):
-        from u3edit.tui.dialog_editor import DialogEditor
+        from ult3edit.tui.dialog_editor import DialogEditor
         data = bytes([0xC8, 0xC9, 0x00])  # "HI\0"
         editor = DialogEditor('/tmp/test', data)
         assert not editor.is_dirty
@@ -232,7 +232,7 @@ class TestDialogEditor:
         assert editor.is_dirty
 
     def test_save_encodes_and_calls_callback(self):
-        from u3edit.tui.dialog_editor import DialogEditor
+        from ult3edit.tui.dialog_editor import DialogEditor
         rec1 = bytes([0xC8, 0xC9, 0x00])  # "HI\0"
         saved = []
         editor = DialogEditor('/tmp/test', rec1, save_callback=lambda d: saved.append(d))
@@ -243,7 +243,7 @@ class TestDialogEditor:
         assert isinstance(saved[0], bytes)
 
     def test_multiline_record(self):
-        from u3edit.tui.dialog_editor import DialogEditor
+        from ult3edit.tui.dialog_editor import DialogEditor
         # "LINE1\xFFLINE2\x00" — multi-line record
         data = bytes([0xCC, 0xC9, 0xCE, 0xC5, 0xB1, 0xFF,
                       0xCC, 0xC9, 0xCE, 0xC5, 0xB2, 0x00])

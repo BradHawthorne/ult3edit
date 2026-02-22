@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-u3edit is a data toolkit for Ultima III: Exodus (Apple II, 1983). It provides CLI viewers, editors, and a unified TUI for all game data formats. Python 3.10+, no runtime dependencies. MIT license.
+ult3edit is a data toolkit for Ultima III: Exodus (Apple II, 1983). It provides CLI viewers, editors, and a unified TUI for all game data formats. Python 3.10+, no runtime dependencies. MIT license.
 
 ## Commands
 
@@ -14,24 +14,24 @@ pip install -e ".[tui]"              # Install with prompt_toolkit for TUI edito
 pytest -v                            # Run all 1552 tests
 pytest tests/test_roster.py          # Run one test module
 pytest -v tests/test_bcd.py::TestBcdToInt::test_zero  # Run single test
-u3edit roster view path/to/ROST      # CLI usage pattern
-u3edit edit game.po                  # Unified TUI editor (requires prompt_toolkit)
+ult3edit roster view path/to/ROST      # CLI usage pattern
+ult3edit edit game.po                  # Unified TUI editor (requires prompt_toolkit)
 ```
 
 ## Architecture
 
 ### Module-per-data-type pattern
 
-Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tlk, combat, save, special, text, spell, equip, shapes, sound, patch, ddrw, diff, disk). Most modules follow the standard contract:
+Each game data type lives in `src/ult3edit/{module}.py` (roster, bestiary, map, tlk, combat, save, special, text, spell, equip, shapes, sound, patch, ddrw, diff, disk). Most modules follow the standard contract:
 
 - **Data class** (e.g., `Character`, `Monster`): wraps `bytearray` with `@property` accessors
 - **`load_*(path)` / `save_*(path, obj)`**: File I/O
 - **`cmd_view(args)`**: Text or `--json --output` rendering
 - **`cmd_edit(args)`**: CLI editing with `--backup`, `--dry-run` flags
-- **`cmd_import(args)`**: Import from JSON (`u3edit <module> import <binary> <json>`)
+- **`cmd_import(args)`**: Import from JSON (`ult3edit <module> import <binary> <json>`)
 - **`register_parser(subparsers)`**: Adds CLI subcommands
 - **`dispatch(args)`**: Routes to command handlers
-- **`main()`**: Standalone entry point (also registered as `u3-{module}` console script). Must have full parity with `register_parser()` — same subcommands, args, and help text.
+- **`main()`**: Standalone entry point (also registered as `ult3-{module}` console script). Must have full parity with `register_parser()` — same subcommands, args, and help text.
 
 Exceptions: `equip` and `spell` are view-only (no `cmd_edit`/`cmd_import`). `diff` has `cmd_diff` only. `disk` has `cmd_info`/`cmd_list`/`cmd_extract`/`cmd_audit`.
 
@@ -116,10 +116,10 @@ Setters follow a **named-first, raw-fallback** pattern for total conversion scen
 
 Reusable framework for building full game replacements:
 
-- **`conversions/TEMPLATE/`**: Starter templates — `CHECKLIST.md` (every replaceable asset with u3edit command), `STORY_TEMPLATE.md` (narrative structure), `apply_template.sh` (11-phase skeleton script)
-- **`conversions/tools/tile_compiler.py`**: Standalone tile compiler (also available as `u3edit shapes compile/decompile`).
-- **`conversions/tools/map_compiler.py`**: Standalone map compiler (also available as `u3edit map compile/decompile`).
-- **`conversions/tools/name_compiler.py`**: Standalone name table compiler (also available as `u3edit patch compile-names/decompile-names/validate-names`).
+- **`conversions/TEMPLATE/`**: Starter templates — `CHECKLIST.md` (every replaceable asset with ult3edit command), `STORY_TEMPLATE.md` (narrative structure), `apply_template.sh` (11-phase skeleton script)
+- **`conversions/tools/tile_compiler.py`**: Standalone tile compiler (also available as `ult3edit shapes compile/decompile`).
+- **`conversions/tools/map_compiler.py`**: Standalone map compiler (also available as `ult3edit map compile/decompile`).
+- **`conversions/tools/name_compiler.py`**: Standalone name table compiler (also available as `ult3edit patch compile-names/decompile-names/validate-names`).
 - **`conversions/tools/gen_maps.py`**: Programmatic map generator for guaranteed-dimension surface (64×64) and dungeon (8×16×16) maps.
 - **`conversions/tools/shop_apply.py`**: Text-matching shop overlay string replacer. Discovers inline strings via `extract_overlay_strings()` at runtime, matches by vanilla text, replaces with new text. No hardcoded offsets needed.
 - **`conversions/tools/verify.py`**: Post-conversion verification — checks file presence, sizes, and optionally compares hashes against vanilla to confirm all assets were replaced.

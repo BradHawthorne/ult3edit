@@ -4,10 +4,10 @@ import argparse
 import os
 import pytest
 
-from u3edit.tlk import (decode_record, encode_record, load_tlk_records,
+from ult3edit.tlk import (decode_record, encode_record, load_tlk_records,
                          is_text_record, cmd_edit)
-from u3edit.tui.dialog_editor import DialogEditor
-from u3edit.constants import TLK_RECORD_END
+from ult3edit.tui.dialog_editor import DialogEditor
+from ult3edit.constants import TLK_RECORD_END
 
 
 class TestDecodeRecord:

@@ -58,7 +58,7 @@ def dispatch(args) -> None:
     if args.spell_command == 'view':
         cmd_view(args)
     else:
-        print("Usage: u3edit spell view [--wizard-only|--cleric-only]", file=sys.stderr)
+        print("Usage: ult3edit spell view [--wizard-only|--cleric-only]", file=sys.stderr)
 
 
 def main() -> None:

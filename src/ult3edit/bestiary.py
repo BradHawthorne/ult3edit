@@ -584,7 +584,7 @@ def dispatch(args) -> None:
     elif args.bestiary_command == 'import':
         cmd_import(args)
     else:
-        print("Usage: u3edit bestiary {view|dump|edit|import} ...", file=sys.stderr)
+        print("Usage: ult3edit bestiary {view|dump|edit|import} ...", file=sys.stderr)
 
 
 def main() -> None:

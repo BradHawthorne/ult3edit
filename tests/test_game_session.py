@@ -3,8 +3,8 @@
 import os
 import pytest
 
-from u3edit.disk import DiskContext
-from u3edit.tui.game_session import GameSession
+from ult3edit.disk import DiskContext
+from ult3edit.tui.game_session import GameSession
 
 
 class MockCtx:

@@ -199,7 +199,7 @@ def compile_to_json(tiles):
 
 
 def compile_to_script(tiles, shps_path='SHPS'):
-    """Convert parsed tiles to a shell script of u3edit commands.
+    """Convert parsed tiles to a shell script of ult3edit commands.
 
     Args:
         tiles: list of (index, bytes) tuples
@@ -216,7 +216,7 @@ def compile_to_script(tiles, shps_path='SHPS'):
         hex_str = ' '.join(f'{b:02X}' for b in glyph_bytes)
         backup = ' --backup' if i == 0 else ''
         lines.append(
-            f'u3edit shapes edit "$SHPS" --glyph {idx} '
+            f'ult3edit shapes edit "$SHPS" --glyph {idx} '
             f'--data "{hex_str}"{backup}'
         )
     return '\n'.join(lines) + '\n'
@@ -252,7 +252,7 @@ def cmd_decompile(args):
     # Try to load tile names from constants
     tile_names = None
     try:
-        from u3edit.constants import TILES
+        from ult3edit.constants import TILES
         tile_names = {}
         for tile_id, (char, name) in TILES.items():
             # Each tile ID covers 4 animation frames

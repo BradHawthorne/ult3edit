@@ -4,8 +4,8 @@ import argparse
 import os
 import pytest
 
-from u3edit.save import PartyState, cmd_edit, validate_party_state
-from u3edit.constants import (
+from ult3edit.save import PartyState, cmd_edit, validate_party_state
+from ult3edit.constants import (
     PRTY_FILE_SIZE, PRTY_OFF_TRANSPORT, PRTY_OFF_PARTY_SIZE,
     PRTY_OFF_LOCATION, PRTY_OFF_SAVED_X, PRTY_OFF_SENTINEL,
     PRTY_OFF_SLOT_IDS,
@@ -175,7 +175,7 @@ class TestPlrsImport:
 
     def _setup_game_dir(self, tmp_dir, sample_prty_bytes, sample_character_bytes):
         """Write PRTY and PLRS files to tmp_dir."""
-        from u3edit.constants import CHAR_RECORD_SIZE, PLRS_FILE_SIZE
+        from ult3edit.constants import CHAR_RECORD_SIZE, PLRS_FILE_SIZE
         prty_path = os.path.join(tmp_dir, 'PRTY#060000')
         with open(prty_path, 'wb') as f:
             f.write(sample_prty_bytes)
@@ -190,9 +190,9 @@ class TestPlrsImport:
     def test_import_plrs_name(self, tmp_dir, sample_prty_bytes, sample_character_bytes):
         """Import should update character name in PLRS."""
         import json, types
-        from u3edit.save import cmd_import as save_import
-        from u3edit.roster import Character
-        from u3edit.constants import CHAR_RECORD_SIZE
+        from ult3edit.save import cmd_import as save_import
+        from ult3edit.roster import Character
+        from ult3edit.constants import CHAR_RECORD_SIZE
         plrs_path = self._setup_game_dir(tmp_dir, sample_prty_bytes, sample_character_bytes)
         jdata = {'active_characters': [{'name': 'WIZARD'}]}
         json_path = os.path.join(tmp_dir, 'save.json')
@@ -211,9 +211,9 @@ class TestPlrsImport:
     def test_import_plrs_stats(self, tmp_dir, sample_prty_bytes, sample_character_bytes):
         """Import should update character stats in PLRS."""
         import json, types
-        from u3edit.save import cmd_import as save_import
-        from u3edit.roster import Character
-        from u3edit.constants import CHAR_RECORD_SIZE
+        from ult3edit.save import cmd_import as save_import
+        from ult3edit.roster import Character
+        from ult3edit.constants import CHAR_RECORD_SIZE
         plrs_path = self._setup_game_dir(tmp_dir, sample_prty_bytes, sample_character_bytes)
         jdata = {'active_characters': [{'stats': {'str': 99, 'dex': 75}, 'gold': 5000}]}
         json_path = os.path.join(tmp_dir, 'save.json')
@@ -234,7 +234,7 @@ class TestPlrsImport:
     def test_import_plrs_dry_run(self, tmp_dir, sample_prty_bytes, sample_character_bytes):
         """Dry run should not write PLRS changes."""
         import json, types
-        from u3edit.save import cmd_import as save_import
+        from ult3edit.save import cmd_import as save_import
         plrs_path = self._setup_game_dir(tmp_dir, sample_prty_bytes, sample_character_bytes)
         with open(plrs_path, 'rb') as f:
             original = f.read()
@@ -254,7 +254,7 @@ class TestPlrsImport:
     def test_import_plrs_missing_file(self, tmp_dir, sample_prty_bytes):
         """Missing PLRS file should skip gracefully."""
         import json, types
-        from u3edit.save import cmd_import as save_import
+        from ult3edit.save import cmd_import as save_import
         # Only write PRTY, no PLRS
         prty_path = os.path.join(tmp_dir, 'PRTY#060000')
         with open(prty_path, 'wb') as f:
@@ -273,9 +273,9 @@ class TestPlrsImport:
     def test_import_plrs_multiple_slots(self, tmp_dir, sample_prty_bytes, sample_character_bytes):
         """Import should update multiple PLRS slots."""
         import json, types
-        from u3edit.save import cmd_import as save_import
-        from u3edit.roster import Character
-        from u3edit.constants import CHAR_RECORD_SIZE
+        from ult3edit.save import cmd_import as save_import
+        from ult3edit.roster import Character
+        from ult3edit.constants import CHAR_RECORD_SIZE
         plrs_path = self._setup_game_dir(tmp_dir, sample_prty_bytes, sample_character_bytes)
         jdata = {'active_characters': [
             {'name': 'ALPHA', 'hp': 100},

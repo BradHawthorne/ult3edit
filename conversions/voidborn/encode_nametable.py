@@ -3,7 +3,7 @@
 
 The ULT3 name-table is 921 bytes of null-terminated high-ASCII strings at
 offset $397A. This script encodes all replacement names and outputs the hex
-string suitable for: u3edit patch edit ULT3 --region name-table --data <HEX>
+string suitable for: ult3edit patch edit ULT3 --region name-table --data <HEX>
 
 The last ~25 bytes of the vanilla name-table contain "BLOAD DDRW" and a
 code fragment used by the disk loader. This script preserves them by reading
@@ -18,10 +18,10 @@ Usage:
 import sys
 import os
 
-# Add project root to path for u3edit imports
+# Add project root to path for ult3edit imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
-from u3edit.patch import encode_text_region, parse_text_region
+from ult3edit.patch import encode_text_region, parse_text_region
 
 MAX_LENGTH = 921
 NAME_TABLE_OFFSET = 0x397A
@@ -238,11 +238,11 @@ def main():
     hex_str = full.hex().upper()
 
     if len(sys.argv) >= 2 and sys.argv[1] == '--apply':
-        # Apply directly using u3edit CLI
+        # Apply directly using ult3edit CLI
         import subprocess
         ult3_path = sys.argv[2]
         cmd = [
-            sys.executable, '-m', 'u3edit.patch',
+            sys.executable, '-m', 'ult3edit.patch',
             'edit', ult3_path,
             '--region', 'name-table',
             '--data', hex_str,

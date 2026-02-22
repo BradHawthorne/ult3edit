@@ -1,6 +1,6 @@
 """Tests for spell reference tool."""
 
-from u3edit.constants import WIZARD_SPELLS, CLERIC_SPELLS
+from ult3edit.constants import WIZARD_SPELLS, CLERIC_SPELLS
 
 
 class TestSpellLists:

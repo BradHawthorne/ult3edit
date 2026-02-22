@@ -3,8 +3,8 @@
 import os
 import pytest
 
-from u3edit.text import load_text_records
-from u3edit.tui.text_editor import parse_text_records, rebuild_text_data
+from ult3edit.text import load_text_records
+from ult3edit.tui.text_editor import parse_text_records, rebuild_text_data
 
 
 class TestLoadTextRecords:

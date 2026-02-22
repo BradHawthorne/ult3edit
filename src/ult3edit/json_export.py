@@ -1,4 +1,4 @@
-"""Shared JSON export utility for u3edit tools."""
+"""Shared JSON export utility for ult3edit tools."""
 
 import json
 import sys

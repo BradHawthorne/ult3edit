@@ -3,7 +3,7 @@
 
 Converts human-readable .names text files to/from the 921-byte name table
 in the ULT3 engine binary. Text-first pipeline: edit names in a text file,
-compile to hex or JSON, apply via u3edit patch.
+compile to hex or JSON, apply via ult3edit patch.
 
 Source format (.names file):
     # Group: Terrain
@@ -31,12 +31,12 @@ import json
 import os
 import sys
 
-# Add project root for u3edit imports
+# Add project root for ult3edit imports
 _project_root = os.path.join(os.path.dirname(__file__), '..', '..', 'src')
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-from u3edit.patch import parse_text_region, encode_text_region
+from ult3edit.patch import parse_text_region, encode_text_region
 
 NAME_TABLE_OFFSET = 0x397A
 NAME_TABLE_SIZE = 921

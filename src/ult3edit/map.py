@@ -696,7 +696,7 @@ def dispatch(args) -> None:
     elif cmd == 'decompile':
         cmd_decompile(args)
     else:
-        print("Usage: u3edit map "
+        print("Usage: ult3edit map "
               "{view|overview|legend|edit|set|fill|replace|find|import|"
               "compile|decompile} ...", file=sys.stderr)
 

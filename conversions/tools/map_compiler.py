@@ -9,7 +9,7 @@ Source format (.map files):
 
 Uses display characters from the TILES / DUNGEON_TILES tables in constants.py.
 
-Compile: text-art -> JSON for `u3edit map import`
+Compile: text-art -> JSON for `ult3edit map import`
 Decompile: binary map -> text-art for editing
 """
 
@@ -34,7 +34,7 @@ DUNGEON_SIZE = DUNGEON_LEVEL_SIZE * DUNGEON_LEVELS  # 2048
 def _load_tile_tables():
     """Load tile character tables from constants.py or use built-in defaults."""
     try:
-        from u3edit.constants import (
+        from ult3edit.constants import (
             TILE_CHARS_REVERSE, DUNGEON_TILE_CHARS_REVERSE,
             TILES, DUNGEON_TILES,
         )
@@ -136,7 +136,7 @@ def parse_map_file(text, is_dungeon=False):
 
 
 def grid_to_json(grid, is_dungeon=False):
-    """Convert parsed grid to JSON for `u3edit map import`.
+    """Convert parsed grid to JSON for `ult3edit map import`.
 
     Args:
         grid: Overworld grid (list of rows) or dungeon levels (list of levels)

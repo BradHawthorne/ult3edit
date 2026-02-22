@@ -129,26 +129,26 @@ The driver maps pitch indices ($01-$3F) to note names across 4+ octaves:
 
 ### Viewing current music data
 ```bash
-u3edit sound view MBS              # Hex dump + auto music stream analysis
-u3edit sound view MBS --json -o mbs.json   # Export as JSON
+ult3edit sound view MBS              # Hex dump + auto music stream analysis
+ult3edit sound view MBS --json -o mbs.json   # Export as JSON
 ```
 
 ### Patching individual bytes
 ```bash
 # Change a single note (e.g., at offset $0100)
-u3edit sound edit MBS --offset 0x0100 --data "0A"
+ult3edit sound edit MBS --offset 0x0100 --data "0A"
 
 # Change a sequence of notes
-u3edit sound edit MBS --offset 0x0100 --data "0A 0C 0E 10 12"
+ult3edit sound edit MBS --offset 0x0100 --data "0A 0C 0E 10 12"
 ```
 
 ### Bulk replacement via JSON
 ```bash
 # Export current state
-u3edit sound view MBS --json -o mbs_current.json
+ult3edit sound view MBS --json -o mbs_current.json
 
 # Modify JSON, then import
-u3edit sound import MBS mbs_modified.json --backup
+ult3edit sound import MBS mbs_modified.json --backup
 ```
 
 ## External Tools
@@ -174,5 +174,5 @@ The 5456-byte MBS file contains:
 | $0000+ | varies | Music stream data (notes, opcodes, control) |
 
 The exact layout of music streams within the file depends on the number and
-length of songs. Use `u3edit sound view MBS` to identify stream boundaries
+length of songs. Use `ult3edit sound view MBS` to identify stream boundaries
 by looking for END ($82) and JUMP ($81) opcodes.

@@ -1,6 +1,6 @@
 """Tests for TextEditor record parsing and rebuilding (no terminal needed)."""
 
-from u3edit.tui.text_editor import parse_text_records, rebuild_text_data, TextRecord
+from ult3edit.tui.text_editor import parse_text_records, rebuild_text_data, TextRecord
 
 
 class TestParseRecords:
@@ -39,7 +39,7 @@ class TestRebuild:
             orig_slice = sample_text_bytes[rec.offset:rec.offset + rec.max_len]
             rebuilt_slice = rebuilt[rec.offset:rec.offset + rec.max_len]
             # Compare decoded text (encoding uppercases)
-            from u3edit.fileutil import decode_high_ascii
+            from ult3edit.fileutil import decode_high_ascii
             assert decode_high_ascii(rebuilt_slice) == decode_high_ascii(bytes(orig_slice))
 
     def test_edit_preserves_offsets(self, sample_text_bytes):
@@ -56,13 +56,13 @@ class TestRebuild:
 
 class TestSaveState:
     def test_party_size_setter(self, sample_prty_bytes):
-        from u3edit.save import PartyState
+        from ult3edit.save import PartyState
         party = PartyState(sample_prty_bytes)
         party.party_size = 3
         assert party.party_size == 3
 
     def test_party_size_clamps(self, sample_prty_bytes):
-        from u3edit.save import PartyState
+        from ult3edit.save import PartyState
         party = PartyState(sample_prty_bytes)
         party.party_size = 10
         assert party.party_size == 4
@@ -70,13 +70,13 @@ class TestSaveState:
         assert party.party_size == 0
 
     def test_slot_ids_setter(self, sample_prty_bytes):
-        from u3edit.save import PartyState
+        from ult3edit.save import PartyState
         party = PartyState(sample_prty_bytes)
         party.slot_ids = [5, 6, 7, 8]
         assert party.slot_ids == [5, 6, 7, 8]
 
     def test_slot_ids_clamps(self, sample_prty_bytes):
-        from u3edit.save import PartyState
+        from ult3edit.save import PartyState
         party = PartyState(sample_prty_bytes)
         party.slot_ids = [0, 19, 25, -1]
         assert party.slot_ids == [0, 19, 19, 0]

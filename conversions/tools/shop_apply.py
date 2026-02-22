@@ -19,10 +19,10 @@ import os
 import shutil
 import sys
 
-# Add src to path so we can import u3edit
+# Add src to path so we can import ult3edit
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
-from u3edit.shapes import (
+from ult3edit.shapes import (
     extract_overlay_strings,
     replace_overlay_string,
 )

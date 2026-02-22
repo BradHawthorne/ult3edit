@@ -176,7 +176,7 @@ class UnifiedApp:
             dirty_count = sum(1 for t in app_ref.tabs if t.is_dirty)
             dirty_text = f' ({dirty_count} modified)' if dirty_count else ''
             return [
-                ('class:status', f' u3edit: {img}'),
+                ('class:status', f' ult3edit: {img}'),
                 ('class:status-dirty' if dirty_count else 'class:status', dirty_text),
                 ('class:status', f' | Tab {app_ref.active_tab_index + 1}/{len(app_ref.tabs)}'),
             ]

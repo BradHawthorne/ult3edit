@@ -1,5 +1,5 @@
 [project]
-name = "u3edit"
+name = "ult3edit"
 version = "1.11.0"
 description = "Ultima III: Exodus - Data file toolkit for Apple II archaeology"
 readme = "README.md"
@@ -26,30 +26,30 @@ dev = ["pytest>=7.0"]
 tui = ["prompt_toolkit>=3.0"]
 
 [project.scripts]
-u3edit = "u3edit.cli:main"
-u3-roster = "u3edit.roster:main"
-u3-bestiary = "u3edit.bestiary:main"
-u3-map = "u3edit.map:main"
-u3-tlk = "u3edit.tlk:main"
-u3-combat = "u3edit.combat:main"
-u3-save = "u3edit.save:main"
-u3-special = "u3edit.special:main"
-u3-text = "u3edit.text:main"
-u3-spell = "u3edit.spell:main"
-u3-equip = "u3edit.equip:main"
-u3-disk = "u3edit.disk:main"
-u3-shapes = "u3edit.shapes:main"
-u3-sound = "u3edit.sound:main"
-u3-patch = "u3edit.patch:main"
-u3-ddrw = "u3edit.ddrw:main"
-u3-diff = "u3edit.diff:main"
+ult3edit = "ult3edit.cli:main"
+ult3-roster = "ult3edit.roster:main"
+ult3-bestiary = "ult3edit.bestiary:main"
+ult3-map = "ult3edit.map:main"
+ult3-tlk = "ult3edit.tlk:main"
+ult3-combat = "ult3edit.combat:main"
+ult3-save = "ult3edit.save:main"
+ult3-special = "ult3edit.special:main"
+ult3-text = "ult3edit.text:main"
+ult3-spell = "ult3edit.spell:main"
+ult3-equip = "ult3edit.equip:main"
+ult3-disk = "ult3edit.disk:main"
+ult3-shapes = "ult3edit.shapes:main"
+ult3-sound = "ult3edit.sound:main"
+ult3-patch = "ult3edit.patch:main"
+ult3-ddrw = "ult3edit.ddrw:main"
+ult3-diff = "ult3edit.diff:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/u3edit"]
+packages = ["src/ult3edit"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

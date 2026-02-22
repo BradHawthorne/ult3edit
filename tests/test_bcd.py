@@ -1,6 +1,6 @@
 """Tests for BCD encode/decode."""
 
-from u3edit.bcd import bcd_to_int, bcd16_to_int, int_to_bcd, int_to_bcd16, is_valid_bcd
+from ult3edit.bcd import bcd_to_int, bcd16_to_int, int_to_bcd, int_to_bcd16, is_valid_bcd
 
 
 class TestBcdToInt:

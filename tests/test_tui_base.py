@@ -1,6 +1,6 @@
 """Tests for EditorState logic (no terminal or prompt_toolkit needed)."""
 
-from u3edit.tui.base import EditorState
+from ult3edit.tui.base import EditorState
 
 
 class TestTileAccess:

@@ -6,8 +6,8 @@ import types
 
 import pytest
 
-from u3edit.special import render_special_map, cmd_edit, cmd_import, _has_cli_edit_args
-from u3edit.constants import SPECIAL_MAP_WIDTH, SPECIAL_MAP_HEIGHT, SPECIAL_FILE_SIZE
+from ult3edit.special import render_special_map, cmd_edit, cmd_import, _has_cli_edit_args
+from ult3edit.constants import SPECIAL_MAP_WIDTH, SPECIAL_MAP_HEIGHT, SPECIAL_FILE_SIZE
 
 
 class TestRenderSpecialMap:

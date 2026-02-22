@@ -9,7 +9,7 @@ Copy this file into your conversion directory and track progress.
 
 ## Prerequisites
 
-- [ ] u3edit installed (`pip install -e .`)
+- [ ] ult3edit installed (`pip install -e .`)
 - [ ] Extracted ProDOS game files in a working directory
 - [ ] Backup of original game files
 
@@ -17,7 +17,7 @@ Copy this file into your conversion directory and track progress.
 
 ## 1. Characters & Party
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] Party roster (slots 0-3) | `roster create --slot N` | Name, race, class, gender, stats |
 | [ ] Character stats (STR/DEX/INT/WIS) | `roster edit --slot N --str/--dex/--int/--wis` | BCD 0-99 |
@@ -30,7 +30,7 @@ Copy this file into your conversion directory and track progress.
 
 ## 2. Save State
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] Starting position (X, Y) | `save edit --x N --y N` | 0-63 |
 | [ ] Transport mode | `save edit --transport foot/horse/ship` | Or raw hex |
@@ -44,7 +44,7 @@ Copy this file into your conversion directory and track progress.
 
 13 encounter files (MON A-L, Z), 16 monsters each.
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] MONA — Grassland encounters | `bestiary edit MONA --monster N` | HP/ATK/DEF/SPD/flags |
 | [ ] MONB — Forest encounters | `bestiary edit MONB --monster N` | |
@@ -66,7 +66,7 @@ Copy this file into your conversion directory and track progress.
 
 9 battlefield layouts (CON files), 11x11 tile grid + positions.
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] CONA — LB Castle battlefield | `combat edit CONA --tile X Y VAL` | |
 | [ ] CONB — Castle of Death battlefield | `combat edit CONB --tile X Y VAL` | |
@@ -85,7 +85,7 @@ Copy this file into your conversion directory and track progress.
 
 13 surface maps (64x64 tiles each).
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] MAPA — Sosaria (main overworld) | `map set/fill/replace/import` | 64x64 |
 | [ ] MAPB — Lord British Castle | `map set/fill/replace/import` | 64x64 |
@@ -99,7 +99,7 @@ Copy this file into your conversion directory and track progress.
 
 7 dungeons, 16x16 tiles per level, 8 levels each.
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] MAPM — Dungeon of Fire | `map set/fill/replace/import --level N` | 8 levels |
 | [ ] MAPN — Dungeon of Doom | `map set/fill/replace/import --level N` | |
@@ -113,7 +113,7 @@ Copy this file into your conversion directory and track progress.
 
 4 special location files, 11x11 tile grid each.
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] BRND — Brand Shrine | `special edit BRND --tile X Y VAL` | |
 | [ ] SHRN — Shrines | `special edit SHRN --tile X Y VAL` | |
@@ -125,7 +125,7 @@ Copy this file into your conversion directory and track progress.
 
 19 TLK files, one per location type.
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] TLKA — Lord British Castle | `tlk edit/extract/build` | |
 | [ ] TLKB — Castle of Death | `tlk edit/extract/build` | |
@@ -149,21 +149,21 @@ Copy this file into your conversion directory and track progress.
 
 **Dialog workflow** (full rewrite):
 ```bash
-u3edit tlk extract TLKA tlka.txt    # Extract to editable text
+ult3edit tlk extract TLKA tlka.txt    # Extract to editable text
 # Edit tlka.txt with any text editor
-u3edit tlk build tlka.txt TLKA      # Compile back to binary
+ult3edit tlk build tlka.txt TLKA      # Compile back to binary
 ```
 
 **Dialog workflow** (find/replace):
 ```bash
-u3edit tlk edit TLKA --find "OLD TEXT" --replace "NEW TEXT" --ignore-case
+ult3edit tlk edit TLKA --find "OLD TEXT" --replace "NEW TEXT" --ignore-case
 ```
 
 ## 9. Tile Graphics
 
 256 glyphs in SHPS (7 visible pixels wide x 8 rows, 8 bytes per glyph).
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] Terrain tiles (0x00-0x13) | `shapes edit --glyph N --data HEX` | Water, grass, forest, etc. |
 | [ ] Building tiles (0x14-0x1F) | `shapes edit --glyph N --data HEX` | Towns, castles, doors |
@@ -175,30 +175,30 @@ u3edit tlk edit TLKA --find "OLD TEXT" --replace "NEW TEXT" --ignore-case
 **Tile compiler workflow** (text-art source):
 ```bash
 # Decompile existing tiles to editable text-art
-u3edit shapes decompile SHPS --output vanilla.tiles
+ult3edit shapes decompile SHPS --output vanilla.tiles
 
 # Edit vanilla.tiles with text editor (#=on .=off, 7x8 pixel grids)
 # Compile back to binary or JSON
-u3edit shapes compile custom.tiles --output SHPS
-u3edit shapes compile custom.tiles --format json --output tiles.json
-u3edit shapes import SHPS tiles.json
+ult3edit shapes compile custom.tiles --output SHPS
+ult3edit shapes compile custom.tiles --format json --output tiles.json
+ult3edit shapes import SHPS tiles.json
 ```
 
 ## 10. Shop Overlays (SHP0-SHP7)
 
 Inline text strings in shop overlay code files.
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] SHP0 — Weapons shop text | `shapes edit-string SHP0 --offset HEX --text "..."` | |
 | [ ] SHP1 — Armor shop text | `shapes edit-string SHP1 --offset HEX --text "..."` | |
 | [ ] SHP2-SHP7 — Other shop text | `shapes edit-string SHPN --offset HEX --text "..."` | |
 
-**Find available string offsets**: `u3edit shapes view SHP0 --strings`
+**Find available string offsets**: `ult3edit shapes view SHP0 --strings`
 
 ## 11. Sound Effects
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] SOSA — Speaker sound patterns | `sound edit SOSA --offset HEX --data HEX` | 4096 bytes |
 | [ ] SOSM — Sound map table | `sound edit SOSM --offset HEX --data HEX` | 256 bytes |
@@ -206,7 +206,7 @@ Inline text strings in shop overlay code files.
 
 ## 12. Music
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] MBS — Mockingboard sequences | `sound edit MBS --offset HEX --data HEX` | 5456 bytes, AY-3-8910 |
 | [ ] Bulk import from JSON | `sound import MBS data.json` | |
@@ -215,7 +215,7 @@ See `conversions/tools/MUSIC_FORMAT.md` for the MBS byte format reference.
 
 ## 13. Engine Binary Patches
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] Name table (921 bytes) | `patch edit ULT3 --region name-table --data HEX` | All game entity names |
 | [ ] Moongate X coords (8 bytes) | `patch edit ULT3 --region moongate-x --data HEX` | 8 lunar phases |
@@ -225,27 +225,27 @@ See `conversions/tools/MUSIC_FORMAT.md` for the MBS byte format reference.
 **Name table workflow**:
 ```bash
 # Decompile current names to editable text file
-u3edit patch decompile-names ULT3 --output names.names
+ult3edit patch decompile-names ULT3 --output names.names
 
 # Edit names.names (one name per line, # comments for groups)
 # Validate budget (891 usable bytes)
-u3edit patch validate-names names.names
+ult3edit patch validate-names names.names
 
 # Compile to JSON and apply
-u3edit patch compile-names names.names --output names.json
-u3edit patch import ULT3 names.json
+ult3edit patch compile-names names.names --output names.json
+ult3edit patch import ULT3 names.json
 ```
 
 ## 14. Title Screen Text
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] Game title (record 0) | `text edit TEXT --record 0 --text "YOUR TITLE"` | |
 | [ ] Subtitle (record 1) | `text edit TEXT --record 1 --text "YOUR SUBTITLE"` | |
 
 ## 15. Dungeon Rendering
 
-| Item | u3edit Command | Notes |
+| Item | ult3edit Command | Notes |
 |------|----------------|-------|
 | [ ] DDRW perspective data | `ddrw edit DDRW --offset HEX --data HEX` | 1792 bytes total |
 | [ ] Bulk import from JSON | `ddrw import DDRW data.json` | |
@@ -260,10 +260,10 @@ After applying all modifications:
 # Verify all files are modified from vanilla
 python conversions/tools/verify.py /path/to/GAME/
 
-# Run u3edit validation on key files
-u3edit roster view ROST --validate
-u3edit save view DIR --validate
-u3edit combat view CONG --validate
+# Run ult3edit validation on key files
+ult3edit roster view ROST --validate
+ult3edit save view DIR --validate
+ult3edit combat view CONG --validate
 ```
 
 ---

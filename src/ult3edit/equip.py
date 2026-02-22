@@ -71,7 +71,7 @@ def dispatch(args) -> None:
     if args.equip_command == 'view':
         cmd_view(args)
     else:
-        print("Usage: u3edit equip view", file=sys.stderr)
+        print("Usage: ult3edit equip view", file=sys.stderr)
 
 
 def main() -> None:

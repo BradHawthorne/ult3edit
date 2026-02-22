@@ -8,7 +8,7 @@ import sys
 class TestCLI:
     def test_help(self):
         result = subprocess.run(
-            [sys.executable, '-m', 'u3edit', '--help'],
+            [sys.executable, '-m', 'ult3edit', '--help'],
             capture_output=True, text=True
         )
         assert result.returncode == 0
@@ -20,15 +20,15 @@ class TestCLI:
 
     def test_version(self):
         result = subprocess.run(
-            [sys.executable, '-m', 'u3edit', '--version'],
+            [sys.executable, '-m', 'ult3edit', '--version'],
             capture_output=True, text=True
         )
         assert result.returncode == 0
-        assert 'u3edit' in result.stdout
+        assert 'ult3edit' in result.stdout
 
     def test_no_args_shows_help(self):
         result = subprocess.run(
-            [sys.executable, '-m', 'u3edit'],
+            [sys.executable, '-m', 'ult3edit'],
             capture_output=True, text=True
         )
         assert result.returncode == 0
@@ -36,7 +36,7 @@ class TestCLI:
 
     def test_spell_view(self):
         result = subprocess.run(
-            [sys.executable, '-m', 'u3edit', 'spell', 'view'],
+            [sys.executable, '-m', 'ult3edit', 'spell', 'view'],
             capture_output=True, text=True
         )
         assert result.returncode == 0
@@ -45,7 +45,7 @@ class TestCLI:
 
     def test_equip_view(self):
         result = subprocess.run(
-            [sys.executable, '-m', 'u3edit', 'equip', 'view'],
+            [sys.executable, '-m', 'ult3edit', 'equip', 'view'],
             capture_output=True, text=True
         )
         assert result.returncode == 0
@@ -54,7 +54,7 @@ class TestCLI:
 
     def test_spell_json(self):
         result = subprocess.run(
-            [sys.executable, '-m', 'u3edit', 'spell', 'view', '--json'],
+            [sys.executable, '-m', 'ult3edit', 'spell', 'view', '--json'],
             capture_output=True, text=True
         )
         assert result.returncode == 0
@@ -64,7 +64,7 @@ class TestCLI:
 
     def test_equip_json(self):
         result = subprocess.run(
-            [sys.executable, '-m', 'u3edit', 'equip', 'view', '--json'],
+            [sys.executable, '-m', 'ult3edit', 'equip', 'view', '--json'],
             capture_output=True, text=True
         )
         assert result.returncode == 0
@@ -74,7 +74,7 @@ class TestCLI:
 
     def test_all_subcommands_in_help(self):
         result = subprocess.run(
-            [sys.executable, '-m', 'u3edit', '--help'],
+            [sys.executable, '-m', 'ult3edit', '--help'],
             capture_output=True, text=True
         )
         assert result.returncode == 0
@@ -85,7 +85,7 @@ class TestCLI:
 
     def test_edit_missing_image(self):
         result = subprocess.run(
-            [sys.executable, '-m', 'u3edit', 'edit', '/nonexistent/fake.po'],
+            [sys.executable, '-m', 'ult3edit', 'edit', '/nonexistent/fake.po'],
             capture_output=True, text=True
         )
         assert result.returncode != 0

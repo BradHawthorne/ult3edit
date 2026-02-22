@@ -496,7 +496,7 @@ def dispatch(args) -> None:
     elif cmd == 'import':
         cmd_import(args)
     else:
-        print("Usage: u3edit combat {view|edit|import} ...", file=sys.stderr)
+        print("Usage: ult3edit combat {view|edit|import} ...", file=sys.stderr)
 
 
 def main() -> None:

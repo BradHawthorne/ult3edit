@@ -1,4 +1,4 @@
-# u3edit
+# ult3edit
 
 A complete data toolkit for **Ultima III: Exodus** (Apple II, 1983).
 
@@ -22,37 +22,37 @@ Requires Python 3.10+. No runtime dependencies.
 
 ```bash
 # Interactive TUI editor (requires prompt_toolkit)
-u3edit edit game.po
+ult3edit edit game.po
 
 # View characters
-u3edit roster view path/to/GAME/ROST#069500
+ult3edit roster view path/to/GAME/ROST#069500
 
 # View all monsters
-u3edit bestiary view path/to/GAME/
+ult3edit bestiary view path/to/GAME/
 
 # View the overworld map
-u3edit map view path/to/GAME/MAPA#061000
+ult3edit map view path/to/GAME/MAPA#061000
 
 # Overview of all maps with preview
-u3edit map overview path/to/GAME/ --preview
+ult3edit map overview path/to/GAME/ --preview
 
 # View NPC dialog
-u3edit tlk view path/to/GAME/
+ult3edit tlk view path/to/GAME/
 
 # View combat battlefields
-u3edit combat view path/to/GAME/
+ult3edit combat view path/to/GAME/
 
 # View save state
-u3edit save view path/to/GAME/
+ult3edit save view path/to/GAME/
 
 # Spell reference
-u3edit spell view
+ult3edit spell view
 
 # Equipment stats and class restrictions
-u3edit equip view
+ult3edit equip view
 
 # Export anything to JSON
-u3edit roster view path/to/ROST#069500 --json -o roster.json
+ult3edit roster view path/to/ROST#069500 --json -o roster.json
 ```
 
 ## Unified TUI Editor
@@ -63,10 +63,10 @@ The interactive text-based editor provides a tabbed interface for editing all ga
 pip install -e ".[tui]"
 
 # Edit a ProDOS disk image directly
-u3edit edit game.po
+ult3edit edit game.po
 
 # Edit extracted files in a directory
-u3edit edit path/to/GAME/
+ult3edit edit path/to/GAME/
 ```
 
 The TUI supports tile painting for maps, form editing for character stats (including sub-morsels, in-party, marks, and cards) and monster attributes, party state (including location type and sentinel), and in-place dialog editing. Changes are written back to the disk image or directory on save.
@@ -86,11 +86,11 @@ The TUI supports tile painting for maps, form editing for character stats (inclu
 
 ## Disk Image Support
 
-If you have [diskiigs](https://github.com/BradHawthorne/rosetta) on your PATH (or set `DISKIIGS_PATH`), u3edit can work directly with ProDOS disk images:
+If you have [diskiigs](https://github.com/BradHawthorne/rosetta) on your PATH (or set `DISKIIGS_PATH`), ult3edit can work directly with ProDOS disk images:
 
 ```bash
-u3edit disk info game.po
-u3edit disk list game.po
+ult3edit disk info game.po
+ult3edit disk list game.po
 ```
 
 ## Tools
@@ -114,142 +114,142 @@ u3edit disk list game.po
 | `diff` | Game data comparison tool | (compares two files or directories) |
 | `disk` | ProDOS disk image operations | `info`, `list`, `extract`, `audit` |
 
-Each tool is also available standalone: `u3-roster`, `u3-bestiary`, `u3-map`, etc.
+Each tool is also available standalone: `ult3-roster`, `ult3-bestiary`, `ult3-map`, etc.
 
 ## Editing Characters
 
 ```bash
 # Edit a character's stats
-u3edit roster edit ROST#069500 --slot 0 --str 99 --hp 9999 --gold 9999
+ult3edit roster edit ROST#069500 --slot 0 --str 99 --hp 9999 --gold 9999
 
 # Give all marks and cards
-u3edit roster edit ROST#069500 --slot 0 --marks "Kings,Snake,Fire,Force" --cards "Death,Sol,Love,Moons"
+ult3edit roster edit ROST#069500 --slot 0 --marks "Kings,Snake,Fire,Force" --cards "Death,Sol,Love,Moons"
 
 # Bulk edit all characters at once
-u3edit roster edit ROST#069500 --all --gold 9999 --food 9999
+ult3edit roster edit ROST#069500 --all --gold 9999 --food 9999
 
 # Create a new character
-u3edit roster create ROST#069500 --slot 5 --name "WIZARD" --race E --class W --gender F
+ult3edit roster create ROST#069500 --slot 5 --name "WIZARD" --race E --class W --gender F
 
 # Validate roster for game-rule violations
-u3edit roster view ROST#069500 --validate
+ult3edit roster view ROST#069500 --validate
 
 # Check endgame readiness
-u3edit roster check-progress ROST#069500
+ult3edit roster check-progress ROST#069500
 
 # Toggle party membership
-u3edit roster edit ROST#069500 --slot 0 --in-party
-u3edit roster edit ROST#069500 --slot 0 --not-in-party
+ult3edit roster edit ROST#069500 --slot 0 --in-party
+ult3edit roster edit ROST#069500 --slot 0 --not-in-party
 
 # Set sub-morsels (food fraction)
-u3edit roster edit ROST#069500 --slot 0 --sub-morsels 50
+ult3edit roster edit ROST#069500 --slot 0 --sub-morsels 50
 ```
 
 ## Editing Monsters
 
 ```bash
 # Make monster #0 in MONA tougher
-u3edit bestiary edit MONA#069900 --monster 0 --hp 200 --attack 80
+ult3edit bestiary edit MONA#069900 --monster 0 --hp 200 --attack 80
 ```
 
 ## Editing Maps
 
 ```bash
 # Set a single tile
-u3edit map set MAPA#061000 --x 10 --y 20 --tile 0x04
+ult3edit map set MAPA#061000 --x 10 --y 20 --tile 0x04
 
 # Fill a rectangular region with grass
-u3edit map fill MAPA#061000 --x1 0 --y1 0 --x2 5 --y2 5 --tile 0x04
+ult3edit map fill MAPA#061000 --x1 0 --y1 0 --x2 5 --y2 5 --tile 0x04
 
 # Replace all water tiles with grass
-u3edit map replace MAPA#061000 --from 0x00 --to 0x04
+ult3edit map replace MAPA#061000 --from 0x00 --to 0x04
 
 # Find all town tiles
-u3edit map find MAPA#061000 --tile 0x18
+ult3edit map find MAPA#061000 --tile 0x18
 
 # Dungeon editing (specify level 0-7)
-u3edit map set MAPM#061000 --x 5 --y 5 --tile 0x02 --level 3
+ult3edit map set MAPM#061000 --x 5 --y 5 --tile 0x02 --level 3
 ```
 
 ## Editing Combat Battlefields
 
 ```bash
 # Set a tile in a combat map
-u3edit combat edit CONA#069900 --tile 5 5 0x04
+ult3edit combat edit CONA#069900 --tile 5 5 0x04
 
 # Move monster 0 start position
-u3edit combat edit CONA#069900 --monster-pos 0 7 3
+ult3edit combat edit CONA#069900 --monster-pos 0 7 3
 
 # Move PC 0 start position
-u3edit combat edit CONA#069900 --pc-pos 0 2 8
+ult3edit combat edit CONA#069900 --pc-pos 0 2 8
 
 # Validate combat map for issues
-u3edit combat view CONA#069900 --validate
+ult3edit combat view CONA#069900 --validate
 ```
 
 ## Editing Special Locations
 
 ```bash
 # Set a tile in a special location (shrine, fountain, etc.)
-u3edit special edit SHRN#069900 --tile 5 5 0x8C
+ult3edit special edit SHRN#069900 --tile 5 5 0x8C
 ```
 
 ## Searching Dialog
 
 ```bash
 # Search all TLK files for a keyword
-u3edit tlk search path/to/GAME/ "exodus"
+ult3edit tlk search path/to/GAME/ "exodus"
 
 # Regex search
-u3edit tlk search path/to/GAME/ "exo.*us" --regex
+ult3edit tlk search path/to/GAME/ "exo.*us" --regex
 
 # Export search results as JSON
-u3edit tlk search path/to/GAME/ "mark" --json -o results.json
+ult3edit tlk search path/to/GAME/ "mark" --json -o results.json
 ```
 
 ## Find and Replace in Dialog
 
 ```bash
 # Replace text across all records in a TLK file
-u3edit tlk edit TLKA#060000 --find "EXODUS" --replace "DARKNESS"
+ult3edit tlk edit TLKA#060000 --find "EXODUS" --replace "DARKNESS"
 
 # Case-insensitive find and replace
-u3edit tlk edit TLKA#060000 --find "exodus" --replace "DARKNESS" --ignore-case
+ult3edit tlk edit TLKA#060000 --find "exodus" --replace "DARKNESS" --ignore-case
 
 # Preview replacements without writing
-u3edit tlk edit TLKA#060000 --find "EXODUS" --replace "DARKNESS" --dry-run
+ult3edit tlk edit TLKA#060000 --find "EXODUS" --replace "DARKNESS" --dry-run
 ```
 
 ## Editing Game Text
 
 ```bash
 # Edit a text record by index
-u3edit text edit TEXT#061000 --record 0 --text "NEW TITLE"
+ult3edit text edit TEXT#061000 --record 0 --text "NEW TITLE"
 
 # Preview without writing
-u3edit text edit TEXT#061000 --record 0 --text "NEW TITLE" --dry-run
+ult3edit text edit TEXT#061000 --record 0 --text "NEW TITLE" --dry-run
 ```
 
 ## Editing Save State
 
 ```bash
 # Teleport the party
-u3edit save edit path/to/GAME/ --x 32 --y 32 --transport horse
+ult3edit save edit path/to/GAME/ --x 32 --y 32 --transport horse
 
 # Set location type
-u3edit save edit path/to/GAME/ --location dungeon
+ult3edit save edit path/to/GAME/ --location dungeon
 
 # Edit active party characters (all character fields supported)
-u3edit save edit path/to/GAME/ --plrs-slot 0 --hp 9999 --gold 9999
-u3edit save edit path/to/GAME/ --plrs-slot 0 --str 99 --status G --race E --class W
-u3edit save edit path/to/GAME/ --plrs-slot 0 --gems 50 --keys 25 --weapon 5 --armor 3
+ult3edit save edit path/to/GAME/ --plrs-slot 0 --hp 9999 --gold 9999
+ult3edit save edit path/to/GAME/ --plrs-slot 0 --str 99 --status G --race E --class W
+ult3edit save edit path/to/GAME/ --plrs-slot 0 --gems 50 --keys 25 --weapon 5 --armor 3
 
 # Set party sentinel (0xFF=active, 0x00=inactive)
-u3edit save edit path/to/GAME/ --sentinel 255
+ult3edit save edit path/to/GAME/ --sentinel 255
 
 # Transport and location accept names or raw hex (for total conversions)
-u3edit save edit path/to/GAME/ --transport 0x0A
-u3edit save edit path/to/GAME/ --location 0x80
+ult3edit save edit path/to/GAME/ --transport 0x0A
+ult3edit save edit path/to/GAME/ --location 0x80
 ```
 
 ## JSON Import/Export
@@ -258,18 +258,18 @@ All editable data types support round-trip JSON:
 
 ```bash
 # Export to JSON
-u3edit roster view ROST#069500 --json -o roster.json
+ult3edit roster view ROST#069500 --json -o roster.json
 
 # Edit the JSON externally, then import back
-u3edit roster import ROST#069500 roster.json --backup
+ult3edit roster import ROST#069500 roster.json --backup
 
 # Same pattern for all modules
-u3edit bestiary view MONA#069900 --json -o monsters.json
-u3edit bestiary import MONA#069900 monsters.json --backup
+ult3edit bestiary view MONA#069900 --json -o monsters.json
+ult3edit bestiary import MONA#069900 monsters.json --backup
 
 # Maps use full tile names for round-trip fidelity
-u3edit map view MAPA#061000 --json -o map.json
-u3edit map import MAPA#061000 map.json --backup
+ult3edit map view MAPA#061000 --json -o map.json
+ult3edit map import MAPA#061000 map.json --backup
 ```
 
 All JSON exports use human-readable tile names (e.g., "Grass", "Water", "Town") that round-trip correctly on import.
@@ -278,20 +278,20 @@ All JSON exports use human-readable tile names (e.g., "Grass", "Water", "Town") 
 
 ```bash
 # Preview changes without writing (dry run)
-u3edit roster edit ROST#069500 --slot 0 --hp 9999 --dry-run
+ult3edit roster edit ROST#069500 --slot 0 --hp 9999 --dry-run
 
 # Create a .bak backup before overwriting
-u3edit roster edit ROST#069500 --slot 0 --hp 9999 --backup
+ult3edit roster edit ROST#069500 --slot 0 --hp 9999 --backup
 
 # Validate data integrity (roster, bestiary, save, combat)
-u3edit roster view ROST#069500 --validate
-u3edit bestiary view MONA#069900 --validate
-u3edit save view path/to/GAME/ --validate
-u3edit combat view CONA#069900 --validate
+ult3edit roster view ROST#069500 --validate
+ult3edit bestiary view MONA#069900 --validate
+ult3edit save view path/to/GAME/ --validate
+ult3edit combat view CONA#069900 --validate
 
 # Validate after editing (bestiary, combat)
-u3edit bestiary edit MONA#069900 --monster 0 --hp 200 --validate
-u3edit combat edit CONA#069900 --tile 5 5 0x04 --validate
+ult3edit bestiary edit MONA#069900 --monster 0 --hp 200 --validate
+ult3edit combat edit CONA#069900 --tile 5 5 0x04 --validate
 ```
 
 `--backup` and `--dry-run` are available on all edit and import commands.
@@ -302,11 +302,11 @@ Enum-like setters (status, race, class, gender, transport, location, equipment) 
 
 ```bash
 # Named values (friendly)
-u3edit roster edit ROST --slot 0 --status G --race H --class F
+ult3edit roster edit ROST --slot 0 --status G --race H --class F
 
 # Raw int/hex values (for mods with custom values beyond vanilla)
-u3edit roster edit ROST --slot 0 --status 0x47 --race 0x58
-u3edit save edit path/to/GAME/ --transport 0x0A --location 0x80
+ult3edit roster edit ROST --slot 0 --status 0x47 --race 0x58
+ult3edit save edit path/to/GAME/ --transport 0x0A --location 0x80
 ```
 
 Equipment indices accept the full byte range (0-255), not just vanilla game limits. Validation via `--validate` is advisory (warnings, not errors).
@@ -315,22 +315,22 @@ Equipment indices accept the full byte range (0-255), not just vanilla game limi
 
 ```bash
 # View all tile glyphs in SHPS character set
-u3edit shapes view path/to/GAME/
+ult3edit shapes view path/to/GAME/
 
 # View a specific tile (by tile ID)
-u3edit shapes view SHPS#060800 --tile 0
+ult3edit shapes view SHPS#060800 --tile 0
 
 # Export all glyphs as PNG files (scaled 4x)
-u3edit shapes export SHPS#060800 --output-dir tiles/ --scale 4 --sheet
+ult3edit shapes export SHPS#060800 --output-dir tiles/ --scale 4 --sheet
 
 # Edit a glyph's raw bytes
-u3edit shapes edit SHPS#060800 --glyph 0 --data "55 2A 55 2A 55 2A 55 2A"
+ult3edit shapes edit SHPS#060800 --glyph 0 --data "55 2A 55 2A 55 2A 55 2A"
 
 # Edit an inline string in SHP overlay files
-u3edit shapes edit-string SHP#060800 --offset 0x100 --text "NEW TEXT"
+ult3edit shapes edit-string SHP#060800 --offset 0x100 --text "NEW TEXT"
 
 # Show file format info
-u3edit shapes info SHPS#060800
+ult3edit shapes info SHPS#060800
 ```
 
 SHPS is a 2048-byte character set (256 glyphs x 8 bytes). Tile IDs use multiples of 4 — the low 2 bits select animation frame, so each tile is 4 consecutive glyphs.
@@ -339,17 +339,17 @@ SHPS is a 2048-byte character set (256 glyphs x 8 bytes). Tile IDs use multiples
 
 ```bash
 # View all sound files in a directory
-u3edit sound view path/to/GAME/
+ult3edit sound view path/to/GAME/
 
 # View a specific sound file with hex dump
-u3edit sound view SOSA#061000
+ult3edit sound view SOSA#061000
 
 # Patch bytes in a sound file
-u3edit sound edit MBS#069a00 --offset 0x10 --data "00 42 08 0F" --backup
+ult3edit sound edit MBS#069a00 --offset 0x10 --data "00 42 08 0F" --backup
 
 # Export/import via JSON
-u3edit sound view SOSA#061000 --json -o sosa.json
-u3edit sound import SOSA#061000 sosa.json --backup
+ult3edit sound view SOSA#061000 --json -o sosa.json
+ult3edit sound import SOSA#061000 sosa.json --backup
 ```
 
 Sound-related files: SOSA (4096 bytes, overworld map state — dynamic copy of MAPA), SOSM (256 bytes, overworld monster positions), MBS (5456 bytes, Mockingboard AY-3-8910 music sequences). Note: SOSA and SOSM are save-state files despite being managed by the `sound` subcommand.
@@ -358,20 +358,20 @@ Sound-related files: SOSA (4096 bytes, overworld map state — dynamic copy of M
 
 ```bash
 # View patchable regions in ULT3 engine binary
-u3edit patch view ULT3#065000
+ult3edit patch view ULT3#065000
 
 # View a specific region (e.g., name table strings)
-u3edit patch view ULT3#065000 --region name-table
+ult3edit patch view ULT3#065000 --region name-table
 
 # Patch a data region
-u3edit patch edit ULT3#065000 --region name-table --data "D7C1D4C5D200" --backup
+ult3edit patch edit ULT3#065000 --region name-table --data "D7C1D4C5D200" --backup
 
 # Raw hex dump of any offset
-u3edit patch dump ULT3#065000 --offset 0x1566 --length 128
+ult3edit patch dump ULT3#065000 --offset 0x1566 --length 128
 
 # Export regions as JSON, edit, import back (round-trip)
-u3edit patch view ULT3#065000 --json -o regions.json
-u3edit patch import ULT3#065000 regions.json --backup
+ult3edit patch view ULT3#065000 --json -o regions.json
+ult3edit patch import ULT3#065000 regions.json --backup
 ```
 
 Targeted binary patches at CIDAR-identified offsets in the ULT3 engine binary.
@@ -382,25 +382,25 @@ ULT3 regions: `name-table` (921 bytes — terrain, monster, weapon, armor, spell
 
 ```bash
 # List all inline JSR $46BA strings
-u3edit patch strings ULT3#065000
+ult3edit patch strings ULT3#065000
 
 # Search for specific strings
-u3edit patch strings ULT3#065000 --search "CARD"
+ult3edit patch strings ULT3#065000 --search "CARD"
 
 # Export full catalog as JSON
-u3edit patch strings ULT3#065000 --json -o catalog.json
+ult3edit patch strings ULT3#065000 --json -o catalog.json
 
 # Edit a single string (by vanilla text match)
-u3edit patch strings-edit ULT3#065000 --vanilla "CARD OF DEATH" --text "SHARD OF VOID" --backup
+ult3edit patch strings-edit ULT3#065000 --vanilla "CARD OF DEATH" --text "SHARD OF VOID" --backup
 
 # Edit by index (from strings catalog)
-u3edit patch strings-edit ULT3#065000 --index 142 --text "SHARD OF VOID"
+ult3edit patch strings-edit ULT3#065000 --index 142 --text "SHARD OF VOID"
 
 # Edit by engine address
-u3edit patch strings-edit ULT3#065000 --address 0x6C48 --text "SHARD OF VOID"
+ult3edit patch strings-edit ULT3#065000 --address 0x6C48 --text "SHARD OF VOID"
 
 # Bulk import from JSON patch file
-u3edit patch strings-import ULT3#065000 patches.json --backup
+ult3edit patch strings-import ULT3#065000 patches.json --backup
 ```
 
 The ULT3 engine binary contains 245 inline text strings displayed via `JSR $46BA`. These cover quest items, combat messages, movement prompts, magic, equipment, shops, and UI text. In-place binary patching replaces strings within their original byte allocation.
@@ -426,7 +426,7 @@ bash engine/scenario_build.sh conversions/voidborn/ --apply-to /path/to/GAME/
 
 | Approach | Tool | Constraints | Requires |
 |----------|------|-------------|----------|
-| Binary (in-place) | `u3edit patch strings-edit` | Must fit original space | Python only |
+| Binary (in-place) | `ult3edit patch strings-edit` | Must fit original space | Python only |
 | Source (reassembly) | `source_patcher.py` + `asmiigs` | No length limits | asmiigs assembler |
 
 The `scenario_build.sh` script automatically selects source-level patching when `asmiigs` is available, falling back to binary patching otherwise.
@@ -447,16 +447,16 @@ See `engine/SCENARIO_TEMPLATE.md` for the engine-level scenario author guide (in
 
 ```bash
 # Compare two roster files
-u3edit diff ROST_original#069500 ROST_modified#069500
+ult3edit diff ROST_original#069500 ROST_modified#069500
 
 # Compare two game directories
-u3edit diff path/to/GAME1/ path/to/GAME2/
+ult3edit diff path/to/GAME1/ path/to/GAME2/
 
 # Summary counts only
-u3edit diff ROST1 ROST2 --summary
+ult3edit diff ROST1 ROST2 --summary
 
 # JSON output
-u3edit diff ROST1 ROST2 --json -o diff.json
+ult3edit diff ROST1 ROST2 --json -o diff.json
 ```
 
 Auto-detects file types and compares across all data formats (roster, bestiary, combat, save, maps, special, TLK).
@@ -465,22 +465,22 @@ Auto-detects file types and compares across all data formats (roster, bestiary, 
 
 ```bash
 # Show disk image info
-u3edit disk info game.po
+ult3edit disk info game.po
 
 # List files on disk image
-u3edit disk list game.po
+ult3edit disk list game.po
 
 # Extract all files
-u3edit disk extract game.po -o output_dir/
+ult3edit disk extract game.po -o output_dir/
 
 # Audit disk space usage
-u3edit disk audit game.po
+ult3edit disk audit game.po
 
 # Detailed per-file allocation
-u3edit disk audit game.po --detail
+ult3edit disk audit game.po --detail
 
 # JSON output for scripting
-u3edit disk audit game.po --json -o audit.json
+ult3edit disk audit game.po --json -o audit.json
 ```
 
 Requires [diskiigs](https://github.com/BradHawthorne/rosetta) on your PATH (or set `DISKIIGS_PATH`).
@@ -578,7 +578,7 @@ pytest -v
 
 ## Total Conversion Pipeline
 
-u3edit includes a complete framework for building total game conversions — replacing every asset (graphics, maps, dialog, monsters, sound) with original content.
+ult3edit includes a complete framework for building total game conversions — replacing every asset (graphics, maps, dialog, monsters, sound) with original content.
 
 ### Getting Started
 
@@ -599,49 +599,49 @@ cat conversions/TEMPLATE/STORY_TEMPLATE.md
 
 ```bash
 # Decompile existing tiles to editable text-art
-u3edit shapes decompile SHPS --output tiles.tiles
+ult3edit shapes decompile SHPS --output tiles.tiles
 
 # Edit tiles.tiles (7x8 pixel grids, '#'=on '.'=off)
 # Compile back to binary
-u3edit shapes compile tiles.tiles --output SHPS
+ult3edit shapes compile tiles.tiles --output SHPS
 # Or compile to JSON for shapes import
-u3edit shapes compile tiles.tiles --format json --output tiles.json
+ult3edit shapes compile tiles.tiles --format json --output tiles.json
 ```
 
 **Map Compiler** — text-art maps to game binary:
 
 ```bash
 # Decompile a map to editable text-art
-u3edit map decompile MAPA --output mapa.map
+ult3edit map decompile MAPA --output mapa.map
 
 # Edit mapa.map (single-char tiles: ~=water .=grass ^=mountain etc.)
 # Compile back to binary
-u3edit map compile mapa.map --output MAPA
+ult3edit map compile mapa.map --output MAPA
 # Dungeon maps: 8 levels x 16x16
-u3edit map compile mapm.map --dungeon --output MAPM
+ult3edit map compile mapm.map --dungeon --output MAPM
 ```
 
 **Dialog** — round-trip text editing:
 
 ```bash
-u3edit tlk extract TLKA tlka.txt    # Decompile to plain text
+ult3edit tlk extract TLKA tlka.txt    # Decompile to plain text
 # Edit tlka.txt with any editor
-u3edit tlk build tlka.txt TLKA      # Compile back to binary
+ult3edit tlk build tlka.txt TLKA      # Compile back to binary
 ```
 
 **Name Compiler** — text-first name table editor:
 
 ```bash
 # Decompile current names from engine binary
-u3edit patch decompile-names ULT3 --output names.names
+ult3edit patch decompile-names ULT3 --output names.names
 
 # Edit names.names (one name per line, # comments for groups)
 # Validate budget (891 usable bytes)
-u3edit patch validate-names names.names
+ult3edit patch validate-names names.names
 
 # Compile to JSON and apply
-u3edit patch compile-names names.names --output names.json
-u3edit patch import ULT3 names.json
+ult3edit patch compile-names names.names --output names.json
+ult3edit patch import ULT3 names.json
 ```
 
 **Verification** — confirm all assets were replaced:

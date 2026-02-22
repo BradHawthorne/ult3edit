@@ -9,8 +9,8 @@ import tempfile
 
 import pytest
 
-from u3edit.bcd import int_to_bcd, int_to_bcd16
-from u3edit.constants import (
+from ult3edit.bcd import int_to_bcd, int_to_bcd16
+from ult3edit.constants import (
     CHAR_RECORD_SIZE, ROSTER_FILE_SIZE, MON_FILE_SIZE, MON_MONSTERS_PER_FILE,
     MAP_OVERWORLD_SIZE, MAP_DUNGEON_SIZE, CON_FILE_SIZE, SPECIAL_FILE_SIZE,
     TEXT_FILE_SIZE, PRTY_FILE_SIZE, PLRS_FILE_SIZE,
@@ -24,16 +24,16 @@ from u3edit.constants import (
     PRTY_OFF_SAVED_X, PRTY_OFF_SAVED_Y,
     PRTY_LOCATION_CODES,
 )
-from u3edit.fileutil import backup_file
-from u3edit.roster import (
+from ult3edit.fileutil import backup_file
+from ult3edit.roster import (
     Character, load_roster, save_roster, validate_character, cmd_import,
     check_progress,
 )
-from u3edit.bestiary import load_mon_file, save_mon_file
-from u3edit.map import cmd_find, cmd_set
-from u3edit.tlk import load_tlk_records, encode_record, cmd_search, _match_line
-from u3edit.save import PartyState
-from u3edit.text import load_text_records
+from ult3edit.bestiary import load_mon_file, save_mon_file
+from ult3edit.map import cmd_find, cmd_set
+from ult3edit.tlk import load_tlk_records, encode_record, cmd_search, _match_line
+from ult3edit.save import PartyState
+from ult3edit.text import load_text_records
 
 
 # =============================================================================
@@ -322,7 +322,7 @@ class TestBestiaryImport:
     def test_import_dry_run(self, tmp_dir, sample_mon_bytes):
         """Import with --dry-run should not write changes."""
         import types
-        from u3edit.bestiary import cmd_import as bestiary_import
+        from ult3edit.bestiary import cmd_import as bestiary_import
         path = os.path.join(tmp_dir, 'MONA')
         with open(path, 'wb') as f:
             f.write(sample_mon_bytes)
@@ -419,7 +419,7 @@ class TestMapImportDryRun:
     def test_import_dry_run(self, tmp_dir, sample_overworld_bytes):
         """Map import with --dry-run should not write changes."""
         import types
-        from u3edit.map import cmd_import as map_import
+        from ult3edit.map import cmd_import as map_import
         path = os.path.join(tmp_dir, 'MAPA')
         with open(path, 'wb') as f:
             f.write(sample_overworld_bytes)
@@ -489,7 +489,7 @@ class TestTlkImport:
         json_data = [{'lines': rec} for rec in records]
 
         # Re-encode from JSON
-        from u3edit.tlk import encode_record
+        from ult3edit.tlk import encode_record
         out = bytearray()
         for entry in json_data:
             out.extend(encode_record(entry['lines']))
@@ -511,7 +511,7 @@ class TestTlkExtractBuild:
 
     def test_extract_build_roundtrip(self, tmp_path, sample_tlk_bytes):
         """extract → build produces identical binary."""
-        from u3edit.tlk import cmd_extract, cmd_build
+        from ult3edit.tlk import cmd_extract, cmd_build
         tlk_path = str(tmp_path / 'TLKA')
         with open(tlk_path, 'wb') as f:
             f.write(sample_tlk_bytes)
@@ -534,7 +534,7 @@ class TestTlkExtractBuild:
 
     def test_extract_format(self, tmp_path, sample_tlk_bytes):
         """Extract produces readable text with record headers and separators."""
-        from u3edit.tlk import cmd_extract
+        from ult3edit.tlk import cmd_extract
         tlk_path = str(tmp_path / 'TLKA')
         with open(tlk_path, 'wb') as f:
             f.write(sample_tlk_bytes)
@@ -553,7 +553,7 @@ class TestTlkExtractBuild:
 
     def test_build_multiline_records(self, tmp_path):
         """Build correctly encodes multi-line records with $FF line breaks."""
-        from u3edit.tlk import cmd_build
+        from ult3edit.tlk import cmd_build
         txt_path = str(tmp_path / 'tlk.txt')
         with open(txt_path, 'w') as f:
             f.write('# Record 0\nLINE ONE\nLINE TWO\n---\n# Record 1\nSINGLE\n')
@@ -691,7 +691,7 @@ class TestSaveImport:
 class TestCombatImport:
     def test_import_combat_map(self, tmp_dir, sample_con_bytes):
         """cmd_import() applies monster position changes from JSON."""
-        from u3edit.combat import cmd_import as combat_cmd_import, CombatMap
+        from ult3edit.combat import cmd_import as combat_cmd_import, CombatMap
         path = os.path.join(tmp_dir, 'CONA')
         with open(path, 'wb') as f:
             f.write(sample_con_bytes)
@@ -719,7 +719,7 @@ class TestCombatImport:
 
     def test_import_combat_tiles(self, tmp_dir, sample_con_bytes):
         """cmd_import() applies tile changes from JSON."""
-        from u3edit.combat import cmd_import as combat_cmd_import, CombatMap
+        from ult3edit.combat import cmd_import as combat_cmd_import, CombatMap
         path = os.path.join(tmp_dir, 'CONA')
         with open(path, 'wb') as f:
             f.write(sample_con_bytes)
@@ -745,7 +745,7 @@ class TestCombatImport:
 
     def test_import_combat_dry_run(self, tmp_dir, sample_con_bytes):
         """cmd_import() with dry_run does not modify file."""
-        from u3edit.combat import cmd_import as combat_cmd_import, CombatMap
+        from ult3edit.combat import cmd_import as combat_cmd_import, CombatMap
         path = os.path.join(tmp_dir, 'CONA')
         with open(path, 'wb') as f:
             f.write(sample_con_bytes)
@@ -771,7 +771,7 @@ class TestCombatImport:
 
     def test_import_combat_round_trip(self, tmp_dir, sample_con_bytes):
         """Full view→import round-trip preserves all data including padding."""
-        from u3edit.combat import cmd_import as combat_cmd_import, CombatMap
+        from ult3edit.combat import cmd_import as combat_cmd_import, CombatMap
         path = os.path.join(tmp_dir, 'CONA')
         with open(path, 'wb') as f:
             f.write(sample_con_bytes)
@@ -811,13 +811,13 @@ class TestCombatImport:
 class TestSpecialImport:
     def test_import_special_map(self, tmp_dir, sample_special_bytes):
         """cmd_import() applies tile changes from JSON."""
-        from u3edit.special import cmd_import as special_cmd_import
+        from ult3edit.special import cmd_import as special_cmd_import
         path = os.path.join(tmp_dir, 'SHRN')
         with open(path, 'wb') as f:
             f.write(sample_special_bytes)
 
         # Build JSON with a modified tile grid
-        from u3edit.constants import tile_char, SPECIAL_MAP_WIDTH, SPECIAL_MAP_HEIGHT
+        from ult3edit.constants import tile_char, SPECIAL_MAP_WIDTH, SPECIAL_MAP_HEIGHT
         tiles = []
         for y in range(SPECIAL_MAP_HEIGHT):
             row = []
@@ -845,7 +845,7 @@ class TestSpecialImport:
 
     def test_import_special_dry_run(self, tmp_dir, sample_special_bytes):
         """cmd_import() with dry_run does not modify file."""
-        from u3edit.special import cmd_import as special_cmd_import
+        from ult3edit.special import cmd_import as special_cmd_import
         path = os.path.join(tmp_dir, 'SHRN')
         with open(path, 'wb') as f:
             f.write(sample_special_bytes)
@@ -867,8 +867,8 @@ class TestSpecialImport:
 
     def test_import_special_trailing_bytes(self, tmp_dir, sample_special_bytes):
         """cmd_import() preserves trailing padding bytes from JSON."""
-        from u3edit.special import cmd_import as special_cmd_import
-        from u3edit.constants import tile_char, SPECIAL_MAP_WIDTH, SPECIAL_MAP_HEIGHT
+        from ult3edit.special import cmd_import as special_cmd_import
+        from ult3edit.constants import tile_char, SPECIAL_MAP_WIDTH, SPECIAL_MAP_HEIGHT
         path = os.path.join(tmp_dir, 'SHRN')
         with open(path, 'wb') as f:
             f.write(sample_special_bytes)
@@ -909,7 +909,7 @@ class TestSpecialImport:
 class TestTextImport:
     def test_import_text_records(self, tmp_dir, sample_text_bytes):
         """cmd_import() applies text records from JSON."""
-        from u3edit.text import cmd_import as text_cmd_import
+        from ult3edit.text import cmd_import as text_cmd_import
         path = os.path.join(tmp_dir, 'TEXT')
         with open(path, 'wb') as f:
             f.write(sample_text_bytes)
@@ -937,7 +937,7 @@ class TestTextImport:
 
     def test_import_text_dry_run(self, tmp_dir, sample_text_bytes):
         """cmd_import() with dry_run does not modify file."""
-        from u3edit.text import cmd_import as text_cmd_import
+        from ult3edit.text import cmd_import as text_cmd_import
         path = os.path.join(tmp_dir, 'TEXT')
         with open(path, 'wb') as f:
             f.write(sample_text_bytes)
@@ -972,7 +972,7 @@ class TestTextCliEdit:
     def test_edit_single_record(self, tmp_dir, sample_text_bytes):
         """Edit record 0 via CLI."""
         import types
-        from u3edit.text import cmd_edit
+        from ult3edit.text import cmd_edit
         path = self._write_text(tmp_dir, sample_text_bytes)
         out = os.path.join(tmp_dir, 'TEXT_OUT')
         args = types.SimpleNamespace(
@@ -987,7 +987,7 @@ class TestTextCliEdit:
     def test_edit_record_out_of_range(self, tmp_dir, sample_text_bytes):
         """Out-of-range record index should fail."""
         import types
-        from u3edit.text import cmd_edit
+        from ult3edit.text import cmd_edit
         path = self._write_text(tmp_dir, sample_text_bytes)
         args = types.SimpleNamespace(
             file=path, record=99, text='NOPE',
@@ -999,7 +999,7 @@ class TestTextCliEdit:
     def test_edit_dry_run(self, tmp_dir, sample_text_bytes):
         """Dry run should not write."""
         import types
-        from u3edit.text import cmd_edit
+        from ult3edit.text import cmd_edit
         path = self._write_text(tmp_dir, sample_text_bytes)
         with open(path, 'rb') as f:
             original = f.read()
@@ -1015,7 +1015,7 @@ class TestTextCliEdit:
     def test_edit_backup(self, tmp_dir, sample_text_bytes):
         """Backup should create .bak."""
         import types
-        from u3edit.text import cmd_edit
+        from ult3edit.text import cmd_edit
         path = self._write_text(tmp_dir, sample_text_bytes)
         args = types.SimpleNamespace(
             file=path, record=0, text='CHANGED',
@@ -1027,7 +1027,7 @@ class TestTextCliEdit:
     def test_edit_output_file(self, tmp_dir, sample_text_bytes):
         """Output to different file."""
         import types
-        from u3edit.text import cmd_edit
+        from ult3edit.text import cmd_edit
         path = self._write_text(tmp_dir, sample_text_bytes)
         out = os.path.join(tmp_dir, 'TEXT_OUT')
         args = types.SimpleNamespace(
@@ -1041,7 +1041,7 @@ class TestTextCliEdit:
     def test_edit_uppercases(self, tmp_dir, sample_text_bytes):
         """Text should be uppercased to match engine convention."""
         import types
-        from u3edit.text import cmd_edit
+        from ult3edit.text import cmd_edit
         path = self._write_text(tmp_dir, sample_text_bytes)
         out = os.path.join(tmp_dir, 'TEXT_OUT')
         args = types.SimpleNamespace(
@@ -1069,7 +1069,7 @@ class TestTileReverseLookups:
         assert DUNGEON_TILE_CHARS_REVERSE['D'] == 0x02  # Door
 
     def test_reverse_matches_forward(self):
-        from u3edit.constants import TILES
+        from ult3edit.constants import TILES
         for tile_id, (ch, _) in TILES.items():
             assert TILE_CHARS_REVERSE[ch] == tile_id
 
@@ -1251,7 +1251,7 @@ class TestCheckProgress:
 # Shapes module tests
 # =============================================================================
 
-from u3edit.shapes import (
+from ult3edit.shapes import (
     render_glyph_ascii, render_glyph_grid, glyph_to_dict, tile_to_dict,
     detect_format, glyph_to_pixels, render_hgr_row, write_png,
     GLYPH_SIZE, GLYPH_WIDTH, GLYPH_HEIGHT, SHPS_FILE_SIZE,
@@ -1405,7 +1405,7 @@ class TestShapesFileOps:
 # Sound module tests
 # =============================================================================
 
-from u3edit.sound import (
+from ult3edit.sound import (
     identify_sound_file, hex_dump, analyze_mbs, SOUND_FILES,
 )
 
@@ -1473,7 +1473,7 @@ class TestSound:
 # Patch module tests
 # =============================================================================
 
-from u3edit.patch import (
+from ult3edit.patch import (
     identify_binary, get_regions, parse_text_region,
     parse_coord_region, encode_text_region, encode_coord_region,
     cmd_import as patch_cmd_import, PATCHABLE_REGIONS,
@@ -1607,7 +1607,7 @@ class TestPatch:
 
     def test_all_regions_within_file_bounds(self):
         """Verify all patchable region offsets fit within their binaries."""
-        from u3edit.patch import ENGINE_BINARIES
+        from ult3edit.patch import ENGINE_BINARIES
         for binary, regions in PATCHABLE_REGIONS.items():
             size = ENGINE_BINARIES[binary]['size']
             for name, reg in regions.items():
@@ -1623,7 +1623,7 @@ class TestPatch:
 # DDRW module tests
 # =============================================================================
 
-from u3edit.ddrw import (
+from ult3edit.ddrw import (
     DDRW_FILE_SIZE, parse_vectors, parse_tile_records,
     DDRW_VECTOR_OFFSET, DDRW_VECTOR_COUNT,
     DDRW_TILE_OFFSET, DDRW_TILE_RECORD_SIZE, DDRW_TILE_RECORD_FIELDS,
@@ -1711,7 +1711,7 @@ class TestDDRW:
 
 class TestCombatLayout:
     def test_padding_and_runtime_parsed(self, sample_con_bytes):
-        from u3edit.combat import CombatMap
+        from ult3edit.combat import CombatMap
         cm = CombatMap(sample_con_bytes)
         assert len(cm.padding1) == 7
         assert len(cm.runtime_monster) == 16
@@ -1719,7 +1719,7 @@ class TestCombatLayout:
         assert len(cm.padding2) == 16
 
     def test_layout_in_dict(self, sample_con_bytes):
-        from u3edit.combat import CombatMap
+        from ult3edit.combat import CombatMap
         cm = CombatMap(sample_con_bytes)
         d = cm.to_dict()
         assert 'padding' in d
@@ -1731,8 +1731,8 @@ class TestCombatLayout:
 
     def test_padding_nonzero(self):
         """Padding with non-zero data should be preserved."""
-        from u3edit.combat import CombatMap
-        from u3edit.constants import CON_PADDING1_OFFSET
+        from ult3edit.combat import CombatMap
+        from ult3edit.constants import CON_PADDING1_OFFSET
         data = bytearray(192)
         data[CON_PADDING1_OFFSET] = 0x42
         data[CON_PADDING1_OFFSET + 1] = 0x55
@@ -1741,8 +1741,8 @@ class TestCombatLayout:
         assert cm.padding1[1] == 0x55
 
     def test_padding_render_shows_nonzero(self):
-        from u3edit.combat import CombatMap
-        from u3edit.constants import CON_PADDING1_OFFSET
+        from ult3edit.combat import CombatMap
+        from ult3edit.constants import CON_PADDING1_OFFSET
         data = bytearray(192)
         data[CON_PADDING1_OFFSET] = 0xAB
         cm = CombatMap(data)
@@ -1757,7 +1757,7 @@ class TestCombatLayout:
 
 class TestMBSStream:
     def test_parse_note(self):
-        from u3edit.sound import parse_mbs_stream
+        from ult3edit.sound import parse_mbs_stream
         data = bytes([0x10, 0x20, 0x00])  # Two notes then REST
         events = parse_mbs_stream(data)
         assert len(events) == 3
@@ -1767,21 +1767,21 @@ class TestMBSStream:
         assert events[2]['name'] == 'REST'
 
     def test_parse_end(self):
-        from u3edit.sound import parse_mbs_stream
+        from ult3edit.sound import parse_mbs_stream
         data = bytes([0x10, 0x82])  # Note then END
         events = parse_mbs_stream(data)
         assert len(events) == 2
         assert events[1]['type'] == 'END'
 
     def test_parse_tempo(self):
-        from u3edit.sound import parse_mbs_stream
+        from ult3edit.sound import parse_mbs_stream
         data = bytes([0x84, 0x20, 0x82])  # TEMPO $20 then END
         events = parse_mbs_stream(data)
         assert events[0]['type'] == 'TEMPO'
         assert events[0]['operand'] == 0x20
 
     def test_parse_write_register(self):
-        from u3edit.sound import parse_mbs_stream
+        from ult3edit.sound import parse_mbs_stream
         data = bytes([0x83, 0x08, 0x0F, 0x82])  # WRITE R8=$0F then END
         events = parse_mbs_stream(data)
         assert events[0]['type'] == 'WRITE'
@@ -1789,20 +1789,20 @@ class TestMBSStream:
         assert events[0]['reg_value'] == 0x0F
 
     def test_parse_jump(self):
-        from u3edit.sound import parse_mbs_stream
+        from ult3edit.sound import parse_mbs_stream
         data = bytes([0x81, 0x00, 0x9A, 0x82])  # JUMP $9A00 then END
         events = parse_mbs_stream(data)
         assert events[0]['type'] == 'JUMP'
         assert events[0]['target'] == 0x9A00
 
     def test_note_names(self):
-        from u3edit.sound import mbs_note_name
+        from ult3edit.sound import mbs_note_name
         assert mbs_note_name(0) == 'REST'
         assert mbs_note_name(1) == 'C1'
         assert mbs_note_name(13) == 'C2'
 
     def test_unknown_byte_stops_parsing(self):
-        from u3edit.sound import parse_mbs_stream
+        from ult3edit.sound import parse_mbs_stream
         # $40-$7F are not notes or opcodes
         data = bytes([0x10, 0x50, 0x82])
         events = parse_mbs_stream(data)
@@ -1815,12 +1815,12 @@ class TestMBSStream:
 
 class TestSpecialTrailingBytes:
     def test_trailing_bytes_extracted(self, sample_special_bytes):
-        from u3edit.special import get_trailing_bytes
+        from ult3edit.special import get_trailing_bytes
         trailing = get_trailing_bytes(sample_special_bytes)
         assert len(trailing) == 7
 
     def test_trailing_bytes_nonzero(self):
-        from u3edit.special import get_trailing_bytes, SPECIAL_META_OFFSET
+        from ult3edit.special import get_trailing_bytes, SPECIAL_META_OFFSET
         data = bytearray(128)
         data[SPECIAL_META_OFFSET] = 0x42
         data[SPECIAL_META_OFFSET + 3] = 0xFF
@@ -1829,7 +1829,7 @@ class TestSpecialTrailingBytes:
         assert trailing[3] == 0xFF
 
     def test_trailing_bytes_in_render(self):
-        from u3edit.special import render_special_map, SPECIAL_META_OFFSET
+        from ult3edit.special import render_special_map, SPECIAL_META_OFFSET
         data = bytearray(128)
         data[SPECIAL_META_OFFSET] = 0xAB
         rendered = render_special_map(data)
@@ -1837,13 +1837,13 @@ class TestSpecialTrailingBytes:
         assert 'AB' in rendered
 
     def test_trailing_bytes_not_shown_when_zero(self, sample_special_bytes):
-        from u3edit.special import render_special_map
+        from ult3edit.special import render_special_map
         rendered = render_special_map(sample_special_bytes)
         assert 'Trailing' not in rendered
 
     def test_backward_compat_alias(self):
         """get_metadata still works as backward-compat alias."""
-        from u3edit.special import get_metadata, get_trailing_bytes
+        from ult3edit.special import get_metadata, get_trailing_bytes
         assert get_metadata is get_trailing_bytes
 
 
@@ -1853,7 +1853,7 @@ class TestSpecialTrailingBytes:
 
 class TestShapesOverlay:
     def test_extract_overlay_strings(self):
-        from u3edit.shapes import extract_overlay_strings
+        from ult3edit.shapes import extract_overlay_strings
         # Build a fake overlay with JSR $46BA + inline text
         data = bytearray(64)
         # JSR $46BA at offset 0
@@ -1870,7 +1870,7 @@ class TestShapesOverlay:
         assert strings[0]['text_offset'] == 3
 
     def test_extract_multiple_strings(self):
-        from u3edit.shapes import extract_overlay_strings
+        from ult3edit.shapes import extract_overlay_strings
         data = bytearray(64)
         # First string at offset 0
         data[0:3] = bytes([0x20, 0xBA, 0x46])
@@ -1890,7 +1890,7 @@ class TestShapesOverlay:
         assert strings[1]['text'] == 'BC'
 
     def test_overlay_with_newline(self):
-        from u3edit.shapes import extract_overlay_strings
+        from ult3edit.shapes import extract_overlay_strings
         data = bytearray(32)
         data[0:3] = bytes([0x20, 0xBA, 0x46])
         data[3] = ord('H') | 0x80
@@ -1903,14 +1903,14 @@ class TestShapesOverlay:
         assert strings[0]['text'] == 'HI\n!'
 
     def test_detect_overlay_shop_type(self):
-        from u3edit.shapes import detect_format, SHP_SHOP_TYPES
+        from ult3edit.shapes import detect_format, SHP_SHOP_TYPES
         data = bytes(960)
         fmt = detect_format(data, 'SHP3#069400')
         assert fmt['type'] == 'overlay'
         assert fmt['shop_type'] == 'Pub/Tavern'
 
     def test_detect_text_as_hgr_bitmap(self):
-        from u3edit.shapes import detect_format
+        from ult3edit.shapes import detect_format
         data = bytes(1024)
         fmt = detect_format(data, 'TEXT#061000')
         assert fmt['type'] == 'hgr_bitmap'
@@ -1923,12 +1923,12 @@ class TestShapesOverlay:
 
 class TestShpsCodeGuard:
     def test_check_code_region_empty(self):
-        from u3edit.shapes import check_shps_code_region, SHPS_FILE_SIZE
+        from ult3edit.shapes import check_shps_code_region, SHPS_FILE_SIZE
         data = bytearray(SHPS_FILE_SIZE)
         assert not check_shps_code_region(data)
 
     def test_check_code_region_populated(self):
-        from u3edit.shapes import (
+        from ult3edit.shapes import (
             check_shps_code_region, SHPS_CODE_OFFSET, SHPS_FILE_SIZE,
         )
         data = bytearray(SHPS_FILE_SIZE)
@@ -1945,7 +1945,7 @@ class TestShpsCodeGuard:
 class TestDiskAudit:
     def test_audit_output_format(self):
         """Verify the audit function imports cleanly."""
-        from u3edit.disk import cmd_audit
+        from ult3edit.disk import cmd_audit
         # Just verify it's callable
         assert callable(cmd_audit)
 
@@ -1961,7 +1961,7 @@ import sys
 def _help_output(module: str, subcmd: str) -> str:
     """Get --help output from a standalone module entry point."""
     result = subprocess.run(
-        [sys.executable, '-m', f'u3edit.{module}', subcmd, '--help'],
+        [sys.executable, '-m', f'ult3edit.{module}', subcmd, '--help'],
         capture_output=True, text=True, timeout=10,
     )
     return result.stdout + result.stderr
@@ -2105,7 +2105,7 @@ class TestCliParity:
     def test_diff_main_help(self):
         """diff module standalone main() has correct args."""
         result = subprocess.run(
-            [sys.executable, '-m', 'u3edit.diff', '--help'],
+            [sys.executable, '-m', 'ult3edit.diff', '--help'],
             capture_output=True, text=True, timeout=10)
         out = result.stdout + result.stderr
         assert 'path1' in out
@@ -2161,28 +2161,28 @@ class TestDiskContextParseHash:
     """Test DiskContext._parse_hash_suffix."""
 
     def test_with_hash_suffix(self):
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         name, ft, at = DiskContext._parse_hash_suffix('ROST#069500')
         assert name == 'ROST'
         assert ft == 0x06
         assert at == 0x9500
 
     def test_without_hash(self):
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         name, ft, at = DiskContext._parse_hash_suffix('ROST')
         assert name == 'ROST'
         assert ft == 0x06
         assert at == 0x0000
 
     def test_short_suffix(self):
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         name, ft, at = DiskContext._parse_hash_suffix('FOO#AB')
         assert name == 'FOO'
         assert ft == 0x06  # fallback
         assert at == 0x0000
 
     def test_all_zeros(self):
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         name, ft, at = DiskContext._parse_hash_suffix('MAP#000000')
         assert name == 'MAP'
         assert ft == 0x00
@@ -2193,7 +2193,7 @@ class TestTextImportDryRun:
     """Behavioral test: text import --dry-run should not write."""
 
     def test_import_dry_run_no_write(self, tmp_dir):
-        from u3edit.text import cmd_import as text_import
+        from ult3edit.text import cmd_import as text_import
         import types
 
         # Build a TEXT file with known content
@@ -2225,7 +2225,7 @@ class TestTextImportDryRun:
         assert after == bytes(data)
 
     def test_import_writes_without_dry_run(self, tmp_dir):
-        from u3edit.text import cmd_import as text_import
+        from ult3edit.text import cmd_import as text_import
         import types
 
         data = bytearray(TEXT_FILE_SIZE)
@@ -2320,7 +2320,7 @@ class TestRosterTotalConversion:
 class TestInPartyCliArgs:
     def test_in_party_flag(self):
         import types
-        from u3edit.roster import _apply_edits
+        from ult3edit.roster import _apply_edits
         char = Character(bytearray(CHAR_RECORD_SIZE))
         args = types.SimpleNamespace(
             name=None, str=None, dex=None, int_=None, wis=None,
@@ -2337,7 +2337,7 @@ class TestInPartyCliArgs:
 
     def test_not_in_party_flag(self):
         import types
-        from u3edit.roster import _apply_edits
+        from ult3edit.roster import _apply_edits
         char = Character(bytearray(CHAR_RECORD_SIZE))
         char.raw[CHAR_IN_PARTY] = 0xFF
         args = types.SimpleNamespace(
@@ -2422,7 +2422,7 @@ class TestSaveImportSentinel:
 # Fix 3: shapes.py — SHP overlay string editing
 # =============================================================================
 
-from u3edit.shapes import (
+from ult3edit.shapes import (
     encode_overlay_string, replace_overlay_string,
     extract_overlay_strings,
 )
@@ -2514,7 +2514,7 @@ class TestCliParityShapesEditString:
         import subprocess
         import sys
         result = subprocess.run(
-            [sys.executable, '-m', 'u3edit.shapes', 'edit-string', '--help'],
+            [sys.executable, '-m', 'ult3edit.shapes', 'edit-string', '--help'],
             capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0
@@ -2693,7 +2693,7 @@ class TestPlrsImportAllFields:
             with open(json_path, 'w') as f:
                 json.dump(json_data, f)
 
-            from u3edit.save import cmd_import as save_import
+            from ult3edit.save import cmd_import as save_import
             args = type('Args', (), {
                 'game_dir': game_dir, 'json_file': json_path,
                 'output': None, 'backup': False, 'dry_run': False,
@@ -2725,7 +2725,7 @@ class TestPlrsEditExpandedArgs:
         import subprocess
         import sys
         result = subprocess.run(
-            [sys.executable, '-m', 'u3edit.save', 'edit', '--help'],
+            [sys.executable, '-m', 'ult3edit.save', 'edit', '--help'],
             capture_output=True, text=True, timeout=10,
         )
         assert result.returncode == 0
@@ -2757,7 +2757,7 @@ class TestLocationTypeImport:
             with open(json_path, 'w') as f:
                 json.dump(json_data, f)
 
-            from u3edit.save import cmd_import as save_import
+            from ult3edit.save import cmd_import as save_import
             args = type('Args', (), {
                 'game_dir': game_dir, 'json_file': json_path,
                 'output': None, 'backup': False, 'dry_run': False,
@@ -2776,8 +2776,8 @@ class TestLocationTypeImport:
 
 class TestCombatMonsterZeroZero:
     def test_to_dict_includes_zero_zero_monster(self):
-        from u3edit.combat import CombatMap
-        from u3edit.constants import CON_FILE_SIZE
+        from ult3edit.combat import CombatMap
+        from ult3edit.constants import CON_FILE_SIZE
         data = bytearray(CON_FILE_SIZE)
         cmap = CombatMap(data)
         # Monster 0 at (0,0), monster 1 at (5,3)
@@ -2791,8 +2791,8 @@ class TestCombatMonsterZeroZero:
         assert d['monsters'][1] == {'x': 5, 'y': 3}
 
     def test_roundtrip_preserves_positions(self):
-        from u3edit.combat import CombatMap
-        from u3edit.constants import CON_FILE_SIZE, CON_MONSTER_COUNT
+        from ult3edit.combat import CombatMap
+        from ult3edit.constants import CON_FILE_SIZE, CON_MONSTER_COUNT
         data = bytearray(CON_FILE_SIZE)
         cmap = CombatMap(data)
         cmap.monster_x[0] = 0
@@ -2871,7 +2871,7 @@ class TestMapJsonRoundTrip:
 
     def test_overworld_round_trip(self, tmp_dir, sample_overworld_bytes):
         """Export an overworld map to JSON, import it back, verify tiles match."""
-        from u3edit.map import cmd_view, cmd_import
+        from ult3edit.map import cmd_view, cmd_import
         map_file = os.path.join(tmp_dir, 'MAPA#061000')
         with open(map_file, 'wb') as f:
             f.write(sample_overworld_bytes)
@@ -2899,7 +2899,7 @@ class TestMapJsonRoundTrip:
 
     def test_dungeon_round_trip(self, tmp_dir, sample_dungeon_bytes):
         """Export a dungeon map to JSON, import it back, verify tiles match."""
-        from u3edit.map import cmd_view, cmd_import
+        from ult3edit.map import cmd_view, cmd_import
         map_file = os.path.join(tmp_dir, 'MAPD#061000')
         with open(map_file, 'wb') as f:
             f.write(sample_dungeon_bytes)
@@ -2925,7 +2925,7 @@ class TestMapJsonRoundTrip:
 
     def test_dungeon_import_oob_level_ignored(self, tmp_dir, sample_dungeon_bytes):
         """Import with out-of-bounds level number should skip, not crash."""
-        from u3edit.map import cmd_import
+        from ult3edit.map import cmd_import
         map_file = os.path.join(tmp_dir, 'MAPD#061000')
         with open(map_file, 'wb') as f:
             f.write(sample_dungeon_bytes)
@@ -2951,7 +2951,7 @@ class TestMapJsonRoundTrip:
 
     def test_dungeon_import_negative_level_ignored(self, tmp_dir, sample_dungeon_bytes):
         """Import with negative level number should skip, not corrupt data."""
-        from u3edit.map import cmd_import
+        from ult3edit.map import cmd_import
         map_file = os.path.join(tmp_dir, 'MAPD#061000')
         with open(map_file, 'wb') as f:
             f.write(sample_dungeon_bytes)
@@ -2973,14 +2973,14 @@ class TestMapJsonRoundTrip:
 
     def test_resolve_tile_handles_name_strings(self):
         """The resolve_tile function handles multi-char tile names."""
-        from u3edit.constants import TILE_NAMES_REVERSE
+        from ult3edit.constants import TILE_NAMES_REVERSE
         assert TILE_NAMES_REVERSE['water'] == 0x00
         assert TILE_NAMES_REVERSE['grass'] == 0x04
         assert TILE_NAMES_REVERSE['town'] == 0x18
 
     def test_resolve_tile_handles_dungeon_names(self):
         """Dungeon tile name reverse lookup works."""
-        from u3edit.constants import DUNGEON_TILE_NAMES_REVERSE
+        from ult3edit.constants import DUNGEON_TILE_NAMES_REVERSE
         assert DUNGEON_TILE_NAMES_REVERSE['open'] == 0x00
         assert DUNGEON_TILE_NAMES_REVERSE['wall'] == 0x01
         assert DUNGEON_TILE_NAMES_REVERSE['door'] == 0x02
@@ -2995,8 +2995,8 @@ class TestSaveOutputConflict:
 
     def test_dual_file_output_rejected(self, tmp_dir, sample_prty_bytes):
         """Editing both PRTY and PLRS with --output should fail."""
-        from u3edit.save import cmd_edit
-        from u3edit.constants import PLRS_FILE_SIZE, CHAR_RECORD_SIZE
+        from ult3edit.save import cmd_edit
+        from ult3edit.constants import PLRS_FILE_SIZE, CHAR_RECORD_SIZE
         # Create PRTY file in game dir
         prty_file = os.path.join(tmp_dir, 'PRTY#069500')
         with open(prty_file, 'wb') as f:
@@ -3043,7 +3043,7 @@ class TestValidateOnEditArgs:
     def test_bestiary_edit_accepts_validate(self):
         """bestiary edit --validate should be a valid CLI arg."""
         import argparse
-        from u3edit.bestiary import register_parser
+        from ult3edit.bestiary import register_parser
         parser = argparse.ArgumentParser()
         sub = parser.add_subparsers(dest='module')
         register_parser(sub)
@@ -3054,7 +3054,7 @@ class TestValidateOnEditArgs:
     def test_combat_edit_accepts_validate(self):
         """combat edit --validate should be a valid CLI arg."""
         import argparse
-        from u3edit.combat import register_parser
+        from ult3edit.combat import register_parser
         parser = argparse.ArgumentParser()
         sub = parser.add_subparsers(dest='module')
         register_parser(sub)
@@ -3064,7 +3064,7 @@ class TestValidateOnEditArgs:
 
     def test_bestiary_edit_validate_runs(self, tmp_dir, sample_mon_bytes):
         """bestiary edit with --validate should show warnings."""
-        from u3edit.bestiary import cmd_edit
+        from ult3edit.bestiary import cmd_edit
         mon_file = os.path.join(tmp_dir, 'MONA#069900')
         with open(mon_file, 'wb') as f:
             f.write(sample_mon_bytes)
@@ -3088,7 +3088,7 @@ class TestValidateOnEditArgs:
 
     def test_combat_edit_validate_runs(self, tmp_dir, sample_con_bytes):
         """combat edit with --validate should show warnings."""
-        from u3edit.combat import cmd_edit
+        from ult3edit.combat import cmd_edit
         con_file = os.path.join(tmp_dir, 'CONA#069900')
         with open(con_file, 'wb') as f:
             f.write(sample_con_bytes)
@@ -3112,19 +3112,19 @@ class TestDeadCodeRemoved:
 
     def test_validate_file_size_removed(self):
         """validate_file_size should no longer exist in fileutil."""
-        from u3edit import fileutil
+        from ult3edit import fileutil
         assert not hasattr(fileutil, 'validate_file_size')
 
     def test_load_game_file_removed(self):
         """load_game_file should no longer exist in fileutil."""
-        from u3edit import fileutil
+        from ult3edit import fileutil
         assert not hasattr(fileutil, 'load_game_file')
 
 
 class TestSpecialJsonKeyConsistency:
     def test_single_file_uses_trailing_bytes_key(self):
-        from u3edit.special import cmd_view
-        from u3edit.constants import SPECIAL_FILE_SIZE
+        from ult3edit.special import cmd_view
+        from ult3edit.constants import SPECIAL_FILE_SIZE
         data = bytearray(SPECIAL_FILE_SIZE)
         with tempfile.NamedTemporaryFile(suffix='SHRN#069900', delete=False) as f:
             f.write(data)
@@ -3418,7 +3418,7 @@ class TestPatchImport:
 
     def test_import_full_view_json_round_trip(self, tmp_path):
         """view --json output can be fed directly back into import."""
-        from u3edit.patch import cmd_view
+        from ult3edit.patch import cmd_view
         data = self._make_ult3()
         path = str(tmp_path / 'ULT3')
         with open(path, 'wb') as f:
@@ -3473,7 +3473,7 @@ class TestRosterCreateExtendedArgs:
 
     def test_create_with_hp_and_gold(self, tmp_dir, sample_roster_file):
         """The Voidborn pattern: create with --hp and --gold."""
-        from u3edit.roster import cmd_create
+        from ult3edit.roster import cmd_create
         args = type('Args', (), {
             'file': sample_roster_file,
             'slot': 5,
@@ -3527,7 +3527,7 @@ class TestRosterCreateExtendedArgs:
 
     def test_create_with_equipment(self, tmp_dir, sample_roster_file):
         """Create with weapon, armor, in-party, food, gems."""
-        from u3edit.roster import cmd_create
+        from ult3edit.roster import cmd_create
         args = type('Args', (), {
             'file': sample_roster_file,
             'slot': 6,
@@ -3581,7 +3581,7 @@ class TestRosterCreateExtendedArgs:
 
     def test_create_defaults_without_overrides(self, tmp_dir, sample_roster_file):
         """Create with minimal args uses sensible defaults."""
-        from u3edit.roster import cmd_create
+        from ult3edit.roster import cmd_create
         args = type('Args', (), {
             'file': sample_roster_file,
             'slot': 7,
@@ -3633,7 +3633,7 @@ class TestRosterCreateExtendedArgs:
         """Verify --hp appears in create subcommand help."""
         import subprocess
         result = subprocess.run(
-            ['python', '-m', 'u3edit.roster', 'create', '--help'],
+            ['python', '-m', 'ult3edit.roster', 'create', '--help'],
             capture_output=True, text=True)
         assert '--hp' in result.stdout
         assert '--gold' in result.stdout
@@ -3668,7 +3668,7 @@ class TestCmdEditStringFunctional:
         return data
 
     def test_edit_string_replaces_text(self, tmp_path):
-        from u3edit.shapes import cmd_edit_string
+        from ult3edit.shapes import cmd_edit_string
         data = self._make_shp_overlay()
         path = str(tmp_path / 'SHP0')
         with open(path, 'wb') as f:
@@ -3695,7 +3695,7 @@ class TestCmdEditStringFunctional:
         assert result[17] == 0x00
 
     def test_edit_string_dry_run(self, tmp_path):
-        from u3edit.shapes import cmd_edit_string
+        from ult3edit.shapes import cmd_edit_string
         data = self._make_shp_overlay()
         path = str(tmp_path / 'SHP0')
         with open(path, 'wb') as f:
@@ -3718,7 +3718,7 @@ class TestCmdEditStringFunctional:
         assert result[14] == 0xC5  # Still 'E' from HELLO
 
     def test_edit_string_output_file(self, tmp_path):
-        from u3edit.shapes import cmd_edit_string
+        from ult3edit.shapes import cmd_edit_string
         data = self._make_shp_overlay()
         path = str(tmp_path / 'SHP0')
         out_path = str(tmp_path / 'SHP0_out')
@@ -3745,7 +3745,7 @@ class TestCmdEditStringFunctional:
         assert result[34] == 0xCF  # O
 
     def test_edit_string_bad_offset_exits(self, tmp_path):
-        from u3edit.shapes import cmd_edit_string
+        from ult3edit.shapes import cmd_edit_string
         data = self._make_shp_overlay()
         path = str(tmp_path / 'SHP0')
         with open(path, 'wb') as f:
@@ -3767,7 +3767,7 @@ class TestCmdSearchFunctional:
     """Functional tests for tlk search command."""
 
     def test_search_single_file(self, tmp_path, sample_tlk_bytes):
-        from u3edit.tlk import cmd_search
+        from ult3edit.tlk import cmd_search
         path = str(tmp_path / 'TLKA')
         with open(path, 'wb') as f:
             f.write(sample_tlk_bytes)
@@ -3783,7 +3783,7 @@ class TestCmdSearchFunctional:
         cmd_search(args)
 
     def test_search_directory(self, tmp_path, sample_tlk_bytes):
-        from u3edit.tlk import cmd_search
+        from ult3edit.tlk import cmd_search
         # Write multiple TLK files
         for letter in ['A', 'B']:
             path = str(tmp_path / f'TLK{letter}')
@@ -3800,7 +3800,7 @@ class TestCmdSearchFunctional:
         cmd_search(args)
 
     def test_search_json_output(self, tmp_path, sample_tlk_bytes):
-        from u3edit.tlk import cmd_search
+        from ult3edit.tlk import cmd_search
         path = str(tmp_path / 'TLKA')
         with open(path, 'wb') as f:
             f.write(sample_tlk_bytes)
@@ -3821,7 +3821,7 @@ class TestCmdSearchFunctional:
         assert isinstance(results, list)
 
     def test_search_regex(self, tmp_path, sample_tlk_bytes):
-        from u3edit.tlk import cmd_search
+        from ult3edit.tlk import cmd_search
         path = str(tmp_path / 'TLKA')
         with open(path, 'wb') as f:
             f.write(sample_tlk_bytes)
@@ -3836,7 +3836,7 @@ class TestCmdSearchFunctional:
         cmd_search(args)
 
     def test_search_no_matches(self, tmp_path, sample_tlk_bytes):
-        from u3edit.tlk import cmd_search
+        from ult3edit.tlk import cmd_search
         path = str(tmp_path / 'TLKA')
         with open(path, 'wb') as f:
             f.write(sample_tlk_bytes)
@@ -3855,7 +3855,7 @@ class TestSaveEditValidate:
     """Test --validate on save edit command."""
 
     def test_validate_warns_on_bad_coords(self, tmp_path):
-        from u3edit.save import cmd_edit
+        from ult3edit.save import cmd_edit
         # Create PRTY file
         prty = bytearray(16)
         prty[0] = 0x00  # transport = foot
@@ -3890,7 +3890,7 @@ class TestSaveEditValidate:
     def test_validate_flag_in_help(self):
         import subprocess
         result = subprocess.run(
-            ['python', '-m', 'u3edit.save', 'edit', '--help'],
+            ['python', '-m', 'ult3edit.save', 'edit', '--help'],
             capture_output=True, text=True)
         assert '--validate' in result.stdout
 
@@ -3903,14 +3903,14 @@ class TestHexIntArgParsing:
     """Verify that CLI args for tiles, offsets, and flags accept hex (0x) prefix."""
 
     def test_hex_int_helper(self):
-        from u3edit.fileutil import hex_int
+        from ult3edit.fileutil import hex_int
         assert hex_int('10') == 10
         assert hex_int('0x0A') == 10
         assert hex_int('0xFF') == 255
         assert hex_int('0') == 0
 
     def test_hex_int_rejects_garbage(self):
-        from u3edit.fileutil import hex_int
+        from ult3edit.fileutil import hex_int
         with pytest.raises(ValueError):
             hex_int('xyz')
 
@@ -3928,7 +3928,7 @@ class TestHexIntArgParsing:
 
     def test_combat_tile_accepts_hex(self, tmp_dir):
         """combat edit --tile 0x08 should parse without error."""
-        from u3edit.combat import cmd_edit as combat_cmd_edit
+        from ult3edit.combat import cmd_edit as combat_cmd_edit
         path = os.path.join(tmp_dir, 'CON')
         data = bytearray(CON_FILE_SIZE)
         with open(path, 'wb') as f:
@@ -3942,7 +3942,7 @@ class TestHexIntArgParsing:
 
     def test_bestiary_flags_accept_hex(self, tmp_dir):
         """bestiary edit --flags1 0x80 should parse without error."""
-        from u3edit.bestiary import cmd_edit as bestiary_cmd_edit
+        from ult3edit.bestiary import cmd_edit as bestiary_cmd_edit
         path = os.path.join(tmp_dir, 'MON')
         data = bytearray(MON_FILE_SIZE)
         with open(path, 'wb') as f:
@@ -3959,7 +3959,7 @@ class TestHexIntArgParsing:
 
     def test_special_tile_accepts_hex(self, tmp_dir):
         """special edit --tile 0x00 0x00 0x08 should parse without error."""
-        from u3edit.special import cmd_edit as special_cmd_edit
+        from ult3edit.special import cmd_edit as special_cmd_edit
         path = os.path.join(tmp_dir, 'BRND')
         data = bytearray(SPECIAL_FILE_SIZE)
         with open(path, 'wb') as f:
@@ -3973,7 +3973,7 @@ class TestHexIntArgParsing:
     def test_argparser_accepts_hex_string(self):
         """Verify argparse actually parses '0x0A' string to 10 via hex_int type."""
         import argparse
-        from u3edit.fileutil import hex_int
+        from ult3edit.fileutil import hex_int
         parser = argparse.ArgumentParser()
         parser.add_argument('--tile', type=hex_int)
         args = parser.parse_args(['--tile', '0x0A'])
@@ -3982,7 +3982,7 @@ class TestHexIntArgParsing:
     def test_argparser_accepts_decimal_string(self):
         """hex_int still works with plain decimal strings."""
         import argparse
-        from u3edit.fileutil import hex_int
+        from ult3edit.fileutil import hex_int
         parser = argparse.ArgumentParser()
         parser.add_argument('--offset', type=hex_int)
         args = parser.parse_args(['--offset', '240'])
@@ -3998,7 +3998,7 @@ class TestSoundImportIntegration:
 
     def test_import_sound_raw(self, tmp_path):
         """cmd_import() writes raw byte array from JSON."""
-        from u3edit.sound import cmd_import as sound_cmd_import
+        from ult3edit.sound import cmd_import as sound_cmd_import
         path = str(tmp_path / 'SOSA')
         original = bytes(range(256)) * 4  # 1024 bytes
         with open(path, 'wb') as f:
@@ -4022,7 +4022,7 @@ class TestSoundImportIntegration:
 
     def test_import_sound_dry_run(self, tmp_path):
         """cmd_import() with dry_run does not modify file."""
-        from u3edit.sound import cmd_import as sound_cmd_import
+        from ult3edit.sound import cmd_import as sound_cmd_import
         path = str(tmp_path / 'SOSA')
         original = bytes(64)
         with open(path, 'wb') as f:
@@ -4045,7 +4045,7 @@ class TestSoundImportIntegration:
 
     def test_import_sound_output_file(self, tmp_path):
         """cmd_import() writes to --output file."""
-        from u3edit.sound import cmd_import as sound_cmd_import
+        from ult3edit.sound import cmd_import as sound_cmd_import
         path = str(tmp_path / 'SOSA')
         out_path = str(tmp_path / 'SOSA_OUT')
         with open(path, 'wb') as f:
@@ -4072,7 +4072,7 @@ class TestDdrwImportIntegration:
 
     def test_import_ddrw_raw(self, tmp_path):
         """cmd_import() writes raw byte array from JSON."""
-        from u3edit.ddrw import cmd_import as ddrw_cmd_import
+        from ult3edit.ddrw import cmd_import as ddrw_cmd_import
         path = str(tmp_path / 'DDRW')
         original = bytes(256)
         with open(path, 'wb') as f:
@@ -4096,7 +4096,7 @@ class TestDdrwImportIntegration:
 
     def test_import_ddrw_dry_run(self, tmp_path):
         """cmd_import() with dry_run does not modify file."""
-        from u3edit.ddrw import cmd_import as ddrw_cmd_import
+        from ult3edit.ddrw import cmd_import as ddrw_cmd_import
         path = str(tmp_path / 'DDRW')
         original = bytes(128)
         with open(path, 'wb') as f:
@@ -4138,7 +4138,7 @@ class TestShapesEditIntegration:
 
     def test_edit_glyph(self, tmp_path):
         """cmd_edit() updates a glyph's raw bytes."""
-        from u3edit.shapes import cmd_edit as shapes_cmd_edit
+        from ult3edit.shapes import cmd_edit as shapes_cmd_edit
         path, original = self._make_shps(tmp_path)
 
         args = type('Args', (), {
@@ -4154,7 +4154,7 @@ class TestShapesEditIntegration:
 
     def test_edit_glyph_dry_run(self, tmp_path):
         """cmd_edit() with dry_run does not modify file."""
-        from u3edit.shapes import cmd_edit as shapes_cmd_edit
+        from ult3edit.shapes import cmd_edit as shapes_cmd_edit
         path, original = self._make_shps(tmp_path)
 
         args = type('Args', (), {
@@ -4170,7 +4170,7 @@ class TestShapesEditIntegration:
 
     def test_edit_glyph_output_file(self, tmp_path):
         """cmd_edit() writes to --output file."""
-        from u3edit.shapes import cmd_edit as shapes_cmd_edit
+        from ult3edit.shapes import cmd_edit as shapes_cmd_edit
         path, _ = self._make_shps(tmp_path)
         out_path = str(tmp_path / 'SHPS_OUT')
 
@@ -4187,7 +4187,7 @@ class TestShapesEditIntegration:
 
     def test_edit_backup_skipped_with_output(self, tmp_path):
         """cmd_edit() with --output and --backup should NOT create .bak of input."""
-        from u3edit.shapes import cmd_edit as shapes_cmd_edit
+        from ult3edit.shapes import cmd_edit as shapes_cmd_edit
         path, _ = self._make_shps(tmp_path)
         out_path = str(tmp_path / 'SHPS_OUT')
 
@@ -4216,7 +4216,7 @@ class TestShapesImportIntegration:
 
     def test_import_glyph_list(self, tmp_path):
         """cmd_import() updates glyphs from flat list format."""
-        from u3edit.shapes import cmd_import as shapes_cmd_import
+        from ult3edit.shapes import cmd_import as shapes_cmd_import
         path, _ = self._make_shps(tmp_path)
 
         jdata = [
@@ -4242,7 +4242,7 @@ class TestShapesImportIntegration:
 
     def test_import_tiles_format(self, tmp_path):
         """cmd_import() updates glyphs from tiles dict format."""
-        from u3edit.shapes import cmd_import as shapes_cmd_import
+        from ult3edit.shapes import cmd_import as shapes_cmd_import
         path, _ = self._make_shps(tmp_path)
 
         jdata = {
@@ -4271,7 +4271,7 @@ class TestShapesImportIntegration:
 
     def test_import_dry_run(self, tmp_path):
         """cmd_import() with dry_run does not modify file."""
-        from u3edit.shapes import cmd_import as shapes_cmd_import
+        from ult3edit.shapes import cmd_import as shapes_cmd_import
         path, original = self._make_shps(tmp_path)
 
         jdata = [{'index': 0, 'raw': [0xFF] * 8}]
@@ -4299,7 +4299,7 @@ class TestHpMaxHpOrdering:
 
     def test_roster_hp_exceeds_max_hp(self, sample_character_bytes):
         """roster _apply_edits: --hp 200 --max-hp 100 should auto-raise max_hp."""
-        from u3edit.roster import Character, _apply_edits
+        from ult3edit.roster import Character, _apply_edits
         char = Character(bytearray(sample_character_bytes))
         args = type('Args', (), {
             'name': None, 'str': None, 'dex': None, 'int_': None, 'wis': None,
@@ -4317,7 +4317,7 @@ class TestHpMaxHpOrdering:
 
     def test_roster_max_hp_alone(self, sample_character_bytes):
         """roster _apply_edits: --max-hp 500 alone sets max_hp without touching hp."""
-        from u3edit.roster import Character, _apply_edits
+        from ult3edit.roster import Character, _apply_edits
         char = Character(bytearray(sample_character_bytes))
         original_hp = char.hp
         args = type('Args', (), {
@@ -4337,9 +4337,9 @@ class TestHpMaxHpOrdering:
     def test_save_plrs_hp_exceeds_max_hp(self, tmp_dir, sample_prty_bytes,
                                           sample_character_bytes):
         """save cmd_edit: --hp 200 --max-hp 100 via PLRS should auto-raise max_hp."""
-        from u3edit.save import cmd_edit
-        from u3edit.constants import PLRS_FILE_SIZE, CHAR_RECORD_SIZE
-        from u3edit.roster import Character
+        from ult3edit.save import cmd_edit
+        from ult3edit.constants import PLRS_FILE_SIZE, CHAR_RECORD_SIZE
+        from ult3edit.roster import Character
         prty_path = os.path.join(tmp_dir, 'PRTY#069500')
         with open(prty_path, 'wb') as f:
             f.write(sample_prty_bytes)
@@ -4389,7 +4389,7 @@ class TestShapesImportMalformedJson:
 
     def test_missing_index_in_list(self, tmp_path):
         """Entries missing 'index' key should be skipped, not crash."""
-        from u3edit.shapes import cmd_import as shapes_cmd_import
+        from ult3edit.shapes import cmd_import as shapes_cmd_import
         path, _ = self._make_shps(tmp_path)
         jdata = [
             {'raw': [0xFF] * 8},  # missing 'index'
@@ -4411,7 +4411,7 @@ class TestShapesImportMalformedJson:
 
     def test_missing_raw_in_tiles(self, tmp_path):
         """Frames missing 'raw' key should be skipped, not crash."""
-        from u3edit.shapes import cmd_import as shapes_cmd_import
+        from ult3edit.shapes import cmd_import as shapes_cmd_import
         path, _ = self._make_shps(tmp_path)
         jdata = {
             'tiles': [{
@@ -4444,7 +4444,7 @@ class TestImportMalformedInventory:
 
     def test_roster_import_null_weapons(self, tmp_dir, sample_roster_bytes):
         """roster cmd_import: weapons=null should not crash."""
-        from u3edit.roster import cmd_import as roster_cmd_import
+        from ult3edit.roster import cmd_import as roster_cmd_import
         path = os.path.join(tmp_dir, 'ROST#069500')
         with open(path, 'wb') as f:
             f.write(sample_roster_bytes)
@@ -4460,7 +4460,7 @@ class TestImportMalformedInventory:
 
     def test_roster_import_list_weapons(self, tmp_dir, sample_roster_bytes):
         """roster cmd_import: weapons as list should not crash."""
-        from u3edit.roster import cmd_import as roster_cmd_import
+        from ult3edit.roster import cmd_import as roster_cmd_import
         path = os.path.join(tmp_dir, 'ROST#069500')
         with open(path, 'wb') as f:
             f.write(sample_roster_bytes)
@@ -4477,8 +4477,8 @@ class TestImportMalformedInventory:
     def test_save_import_null_weapons(self, tmp_dir, sample_prty_bytes,
                                        sample_character_bytes):
         """save cmd_import: PLRS entry with weapons=null should not crash."""
-        from u3edit.save import cmd_import as save_cmd_import
-        from u3edit.constants import PLRS_FILE_SIZE, CHAR_RECORD_SIZE
+        from ult3edit.save import cmd_import as save_cmd_import
+        from ult3edit.constants import PLRS_FILE_SIZE, CHAR_RECORD_SIZE
         prty_path = os.path.join(tmp_dir, 'PRTY#069500')
         with open(prty_path, 'wb') as f:
             f.write(sample_prty_bytes)
@@ -4510,7 +4510,7 @@ class TestMarksCaseInsensitive:
 
     def test_marks_lowercase(self, sample_character_bytes):
         """Setting marks with lowercase names should work."""
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         char = Character(bytearray(sample_character_bytes))
         char.marks = ['fire', 'force']
         assert 'Fire' in char.marks
@@ -4518,7 +4518,7 @@ class TestMarksCaseInsensitive:
 
     def test_marks_uppercase(self, sample_character_bytes):
         """Setting marks with uppercase names should work."""
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         char = Character(bytearray(sample_character_bytes))
         char.marks = ['KINGS', 'SNAKE']
         assert 'Kings' in char.marks
@@ -4526,14 +4526,14 @@ class TestMarksCaseInsensitive:
 
     def test_cards_lowercase(self, sample_character_bytes):
         """Setting cards with lowercase names should work."""
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         char = Character(bytearray(sample_character_bytes))
         char.cards = ['death', 'sol', 'love', 'moons']
         assert len(char.cards) == 4
 
     def test_marks_mixed_case(self, sample_character_bytes):
         """Setting marks with mixed casing should work."""
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         char = Character(bytearray(sample_character_bytes))
         char.marks = ['fIrE', 'FoRcE']
         assert 'Fire' in char.marks
@@ -4541,7 +4541,7 @@ class TestMarksCaseInsensitive:
 
     def test_marks_preserves_cards(self, sample_character_bytes):
         """Setting marks should not clear existing cards."""
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         char = Character(bytearray(sample_character_bytes))
         char.cards = ['Death', 'Sol']
         char.marks = ['kings']
@@ -4706,7 +4706,7 @@ class TestTileCompilerRoundTrip:
         text = '# Tile 0x00: Test\n' + '.......\n' * 8
         tiles = parse_tiles_file(text)
         script = compile_to_script(tiles)
-        assert 'u3edit shapes edit' in script
+        assert 'ult3edit shapes edit' in script
         assert '--glyph 0' in script
         assert '--backup' in script
 
@@ -4925,7 +4925,7 @@ class TestBestiaryDictImport:
         }))
         # Run import via cmd_import
         import argparse
-        from u3edit.bestiary import cmd_import as bestiary_import
+        from ult3edit.bestiary import cmd_import as bestiary_import
         args = argparse.Namespace(
             file=str(mon_file), json_file=str(json_file),
             backup=False, dry_run=False, output=None)
@@ -4950,8 +4950,8 @@ class TestBestiaryDictImport:
             }
         }))
         import argparse
-        from u3edit.bestiary import cmd_import as bestiary_import
-        from u3edit.constants import (
+        from ult3edit.bestiary import cmd_import as bestiary_import
+        from ult3edit.constants import (
             MON_FLAG1_BOSS, MON_ABIL1_POISON,
             MON_ABIL1_NEGATE, MON_ABIL2_RESISTANT,
         )
@@ -4975,7 +4975,7 @@ class TestBestiaryDictImport:
             {"index": 0, "hp": 77, "attack": 44}
         ]))
         import argparse
-        from u3edit.bestiary import cmd_import as bestiary_import
+        from ult3edit.bestiary import cmd_import as bestiary_import
         args = argparse.Namespace(
             file=str(mon_file), json_file=str(json_file),
             backup=False, dry_run=False, output=None)
@@ -5016,13 +5016,13 @@ class TestCombatDictImport:
             }
         }))
         import argparse
-        from u3edit.combat import cmd_import as combat_import
+        from ult3edit.combat import cmd_import as combat_import
         args = argparse.Namespace(
             file=str(con_file), json_file=str(json_file),
             backup=False, dry_run=False, output=None)
         combat_import(args)
         data = con_file.read_bytes()
-        from u3edit.constants import (
+        from ult3edit.constants import (
             CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET,
             CON_PC_X_OFFSET, CON_PC_Y_OFFSET,
         )
@@ -5044,13 +5044,13 @@ class TestCombatDictImport:
             "pcs": [{"x": 2, "y": 8}]
         }))
         import argparse
-        from u3edit.combat import cmd_import as combat_import
+        from ult3edit.combat import cmd_import as combat_import
         args = argparse.Namespace(
             file=str(con_file), json_file=str(json_file),
             backup=False, dry_run=False, output=None)
         combat_import(args)
         data = con_file.read_bytes()
-        from u3edit.constants import CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET
+        from ult3edit.constants import CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET
         assert data[CON_MONSTER_X_OFFSET] == 5
         assert data[CON_MONSTER_Y_OFFSET] == 5
 
@@ -5580,7 +5580,7 @@ class TestRoundTripIntegration:
 
     def test_bestiary_import_roundtrip(self):
         """Import bestiary_a.json into synthesized MON binary and verify HP."""
-        from u3edit.bestiary import Monster
+        from ult3edit.bestiary import Monster
         path = os.path.join(self.SOURCES_DIR, 'bestiary_a.json')
         with open(path, 'r') as f:
             data = json.load(f)
@@ -5611,7 +5611,7 @@ class TestRoundTripIntegration:
 
     def test_combat_import_roundtrip(self):
         """Import combat_a.json into synthesized CON binary and verify tiles."""
-        from u3edit.combat import CombatMap, CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET
+        from ult3edit.combat import CombatMap, CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET
         path = os.path.join(self.SOURCES_DIR, 'combat_a.json')
         with open(path, 'r') as f:
             data = json.load(f)
@@ -5787,7 +5787,7 @@ class TestShopApply:
 
     def _build_shp_with_string(self, text):
         """Build a minimal SHP binary containing a JSR $46BA inline string."""
-        from u3edit.shapes import encode_overlay_string
+        from ult3edit.shapes import encode_overlay_string
         # JSR $46BA = 0x20 0xBA 0x46
         jsr = bytes([0x20, 0xBA, 0x46])
         encoded = encode_overlay_string(text)
@@ -5828,7 +5828,7 @@ class TestShopApply:
         # Verify the file was modified
         with open(shp_path, 'rb') as f:
             result = f.read()
-        from u3edit.shapes import extract_overlay_strings
+        from ult3edit.shapes import extract_overlay_strings
         strings = extract_overlay_strings(result)
         assert len(strings) == 1
         assert strings[0]['text'] == 'ARMS'
@@ -6142,7 +6142,7 @@ class TestShopApplyEdgeCases:
         return mod
 
     def _build_shp_with_string(self, text):
-        from u3edit.shapes import encode_overlay_string
+        from ult3edit.shapes import encode_overlay_string
         jsr = bytes([0x20, 0xBA, 0x46])
         encoded = encode_overlay_string(text)
         return bytearray(b'\x60' * 16 + jsr + encoded + b'\x60' * 16)
@@ -6294,7 +6294,7 @@ class TestBestiaryShortcutRawConflict:
 
     def test_shortcut_applied_after_raw(self, tmp_path):
         """Boss shortcut is preserved even when flags1 raw value is 0."""
-        from u3edit.bestiary import (
+        from ult3edit.bestiary import (
             load_mon_file, save_mon_file, cmd_import,
             MON_FLAG1_BOSS, MON_MONSTERS_PER_FILE
         )
@@ -6328,7 +6328,7 @@ class TestBestiaryShortcutRawConflict:
 
     def test_shortcut_ors_into_existing_flags(self, tmp_path):
         """Multiple shortcuts all accumulate."""
-        from u3edit.bestiary import (
+        from ult3edit.bestiary import (
             load_mon_file, cmd_import,
             MON_FLAG1_BOSS, MON_ABIL1_POISON, MON_ABIL1_NEGATE
         )
@@ -6367,7 +6367,7 @@ class TestDictKeyValidation:
 
     def test_bestiary_import_skips_bad_keys(self, tmp_path):
         """Bestiary import skips non-numeric keys without crashing."""
-        from u3edit.bestiary import load_mon_file, cmd_import
+        from ult3edit.bestiary import load_mon_file, cmd_import
         mon_data = bytearray(256)
         mon_path = str(tmp_path / 'MONA')
         with open(mon_path, 'wb') as f:
@@ -6396,7 +6396,7 @@ class TestDictKeyValidation:
 
     def test_combat_import_skips_bad_keys(self, tmp_path):
         """Combat import skips non-numeric monster keys without crashing."""
-        from u3edit.combat import cmd_import as combat_import, CON_FILE_SIZE
+        from ult3edit.combat import cmd_import as combat_import, CON_FILE_SIZE
         con_data = bytearray(CON_FILE_SIZE)
         con_path = str(tmp_path / 'CONA')
         with open(con_path, 'wb') as f:
@@ -6429,7 +6429,7 @@ class TestMapImportWidthValidation:
 
     def test_import_with_correct_width(self, tmp_path):
         """Normal import with correct width succeeds."""
-        from u3edit.map import cmd_import as map_import
+        from ult3edit.map import cmd_import as map_import
         # 64x64 overworld = 4096 bytes
         data = bytearray(4096)
         map_path = str(tmp_path / 'MAPA')
@@ -6452,7 +6452,7 @@ class TestMapImportWidthValidation:
 
     def test_import_with_zero_width_uses_default(self, tmp_path):
         """Width=0 in JSON falls back to 64 instead of corrupting data."""
-        from u3edit.map import cmd_import as map_import
+        from ult3edit.map import cmd_import as map_import
         data = bytearray(4096)
         map_path = str(tmp_path / 'MAPA')
         with open(map_path, 'wb') as f:
@@ -6493,7 +6493,7 @@ class TestPrtySlotIdsPartialWrite:
 
     def test_partial_slot_ids_zeros_remainder(self):
         """Setting 2 slot IDs zeros out slots 2 and 3."""
-        from u3edit.save import PartyState, PRTY_OFF_SLOT_IDS
+        from ult3edit.save import PartyState, PRTY_OFF_SLOT_IDS
         raw = bytearray(16)
         # Pre-fill with garbage
         raw[PRTY_OFF_SLOT_IDS] = 0xFF
@@ -6507,7 +6507,7 @@ class TestPrtySlotIdsPartialWrite:
 
     def test_empty_slot_ids_zeros_all(self):
         """Setting empty slot_ids zeros all 4 slots."""
-        from u3edit.save import PartyState, PRTY_OFF_SLOT_IDS
+        from ult3edit.save import PartyState, PRTY_OFF_SLOT_IDS
         raw = bytearray(16)
         raw[PRTY_OFF_SLOT_IDS:PRTY_OFF_SLOT_IDS + 4] = b'\xFF\xFF\xFF\xFF'
         party = PartyState(raw)
@@ -6516,7 +6516,7 @@ class TestPrtySlotIdsPartialWrite:
 
     def test_full_slot_ids_still_works(self):
         """Setting all 4 slot IDs still works correctly."""
-        from u3edit.save import PartyState
+        from ult3edit.save import PartyState
         raw = bytearray(16)
         party = PartyState(raw)
         party.slot_ids = [1, 3, 7, 15]
@@ -6528,7 +6528,7 @@ class TestDdrwImportSizeValidation:
 
     def test_correct_size_no_warning(self, tmp_path, capsys):
         """Importing 1792 bytes should produce no warning."""
-        from u3edit.ddrw import cmd_import, DDRW_FILE_SIZE
+        from ult3edit.ddrw import cmd_import, DDRW_FILE_SIZE
         json_file = tmp_path / 'ddrw.json'
         json_file.write_text(json.dumps({'raw': [0] * DDRW_FILE_SIZE}))
         out_file = tmp_path / 'DDRW'
@@ -6542,7 +6542,7 @@ class TestDdrwImportSizeValidation:
 
     def test_wrong_size_warns(self, tmp_path, capsys):
         """Importing wrong size should produce a warning."""
-        from u3edit.ddrw import cmd_import, DDRW_FILE_SIZE
+        from ult3edit.ddrw import cmd_import, DDRW_FILE_SIZE
         json_file = tmp_path / 'ddrw.json'
         json_file.write_text(json.dumps({'raw': [0] * 100}))
         out_file = tmp_path / 'DDRW'
@@ -6562,8 +6562,8 @@ class TestSoundImportSizeValidation:
 
     def test_known_size_no_warning(self, tmp_path, capsys):
         """Importing 4096 bytes (SOSA) should produce no warning."""
-        from u3edit.sound import cmd_import
-        from u3edit.constants import SOSA_FILE_SIZE
+        from ult3edit.sound import cmd_import
+        from ult3edit.constants import SOSA_FILE_SIZE
         json_file = tmp_path / 'sosa.json'
         json_file.write_text(json.dumps({'raw': [0] * SOSA_FILE_SIZE}))
         out_file = tmp_path / 'SOSA'
@@ -6577,7 +6577,7 @@ class TestSoundImportSizeValidation:
 
     def test_unknown_size_warns(self, tmp_path, capsys):
         """Importing unknown size should produce a warning."""
-        from u3edit.sound import cmd_import
+        from ult3edit.sound import cmd_import
         json_file = tmp_path / 'sound.json'
         json_file.write_text(json.dumps({'raw': [0] * 999}))
         out_file = tmp_path / 'SND'
@@ -6597,7 +6597,7 @@ class TestTextImportOverflow:
 
     def test_reports_actual_count(self, tmp_path, capsys):
         """When file is too small, report count of records actually written."""
-        from u3edit.text import cmd_import
+        from ult3edit.text import cmd_import
         # Create a tiny 20-byte TEXT file
         text_file = tmp_path / 'TEXT'
         text_file.write_bytes(b'\x00' * 20)
@@ -6618,7 +6618,7 @@ class TestTextImportOverflow:
 
     def test_all_fit_no_warning(self, tmp_path, capsys):
         """When all records fit, report total count and no warning."""
-        from u3edit.text import cmd_import
+        from ult3edit.text import cmd_import
         text_file = tmp_path / 'TEXT'
         text_file.write_bytes(b'\x00' * 200)
         records = [{'text': 'HI'}, {'text': 'BYE'}]  # 3+4=7 bytes
@@ -7273,7 +7273,7 @@ class TestSourcePatcher:
 # =============================================================================
 
 class TestPatchStrings:
-    """Test the u3edit patch strings CLI integration."""
+    """Test the ult3edit patch strings CLI integration."""
 
     def _make_binary_with_strings(self, *texts):
         """Build binary with JSR $46BA inline strings."""
@@ -7292,7 +7292,7 @@ class TestPatchStrings:
 
     def test_extract_inline_strings(self):
         """Integrated _extract_inline_strings finds strings."""
-        from u3edit.patch import _extract_inline_strings
+        from ult3edit.patch import _extract_inline_strings
         data = self._make_binary_with_strings('HELLO', 'WORLD')
         strings = _extract_inline_strings(data)
         assert len(strings) == 2
@@ -7301,7 +7301,7 @@ class TestPatchStrings:
 
     def test_extract_with_newlines(self):
         """Strings with embedded newlines ($FF) decoded correctly."""
-        from u3edit.patch import _extract_inline_strings
+        from ult3edit.patch import _extract_inline_strings
         data = self._make_binary_with_strings('LINE1\nLINE2')
         strings = _extract_inline_strings(data)
         assert len(strings) == 1
@@ -7309,14 +7309,14 @@ class TestPatchStrings:
 
     def test_extract_with_org(self):
         """Origin address added to reported addresses."""
-        from u3edit.patch import _extract_inline_strings
+        from ult3edit.patch import _extract_inline_strings
         data = self._make_binary_with_strings('TEST')
         strings = _extract_inline_strings(data, org=0x5000)
         assert strings[0]['address'] >= 0x5000
 
     def test_extract_empty_binary(self):
         """Empty or no-string binary returns empty list."""
-        from u3edit.patch import _extract_inline_strings
+        from ult3edit.patch import _extract_inline_strings
         data = bytes(100)
         strings = _extract_inline_strings(data)
         assert len(strings) == 0
@@ -7327,7 +7327,7 @@ class TestPatchStrings:
                                  'engine', 'originals', 'ULT3.bin')
         if not os.path.exists(ult3_path):
             pytest.skip("ULT3.bin not found")
-        from u3edit.patch import cmd_strings
+        from ult3edit.patch import cmd_strings
         args = argparse.Namespace(file=ult3_path, json=False, search=None,
                                   output=None)
         cmd_strings(args)
@@ -7341,7 +7341,7 @@ class TestPatchStrings:
                                  'engine', 'originals', 'ULT3.bin')
         if not os.path.exists(ult3_path):
             pytest.skip("ULT3.bin not found")
-        from u3edit.patch import cmd_strings
+        from ult3edit.patch import cmd_strings
         args = argparse.Namespace(file=ult3_path, json=False,
                                   search='MARK', output=None)
         cmd_strings(args)
@@ -7357,7 +7357,7 @@ class TestPatchStrings:
         if not os.path.exists(ult3_path):
             pytest.skip("ULT3.bin not found")
         out_path = os.path.join(tmp_dir, 'strings.json')
-        from u3edit.patch import cmd_strings
+        from ult3edit.patch import cmd_strings
         args = argparse.Namespace(file=ult3_path, json=True, search=None,
                                   output=out_path)
         cmd_strings(args)
@@ -7372,7 +7372,7 @@ class TestPatchStrings:
 # =============================================================================
 
 class TestPatchStringsEdit:
-    """Test u3edit patch strings-edit and strings-import CLI commands."""
+    """Test ult3edit patch strings-edit and strings-import CLI commands."""
 
     def _make_test_binary(self, tmp_dir, *texts):
         """Create a test binary with inline strings in tmp_dir."""
@@ -7394,14 +7394,14 @@ class TestPatchStringsEdit:
 
     def test_strings_edit_by_index(self, tmp_dir):
         """Edit string by index replaces bytes correctly."""
-        from u3edit.patch import cmd_strings_edit
+        from ult3edit.patch import cmd_strings_edit
         path = self._make_test_binary(tmp_dir, 'HELLO WORLD', 'GOODBYE')
         args = argparse.Namespace(
             file=path, text='CHANGED', index=0, vanilla=None,
             address=None, output=None, backup=False, dry_run=False)
         cmd_strings_edit(args)
         # Verify the binary was modified
-        from u3edit.patch import _extract_inline_strings
+        from ult3edit.patch import _extract_inline_strings
         with open(path, 'rb') as f:
             data = f.read()
         strings = _extract_inline_strings(data)
@@ -7410,14 +7410,14 @@ class TestPatchStringsEdit:
 
     def test_strings_edit_by_vanilla(self, tmp_dir):
         """Edit string by vanilla text match."""
-        from u3edit.patch import cmd_strings_edit
+        from ult3edit.patch import cmd_strings_edit
         path = self._make_test_binary(tmp_dir, 'CARD OF DEATH', 'HELLO')
         args = argparse.Namespace(
             file=path, text='SHARD O VOID', index=None,
             vanilla='CARD OF DEATH', address=None, output=None,
             backup=False, dry_run=False)
         cmd_strings_edit(args)
-        from u3edit.patch import _extract_inline_strings
+        from ult3edit.patch import _extract_inline_strings
         with open(path, 'rb') as f:
             data = f.read()
         strings = _extract_inline_strings(data)
@@ -7425,7 +7425,7 @@ class TestPatchStringsEdit:
 
     def test_strings_edit_too_long(self, tmp_dir):
         """Editing with text too long for in-place fails gracefully."""
-        from u3edit.patch import cmd_strings_edit
+        from ult3edit.patch import cmd_strings_edit
         path = self._make_test_binary(tmp_dir, 'HI')
         args = argparse.Namespace(
             file=path, text='THIS IS WAY TOO LONG FOR HI',
@@ -7436,7 +7436,7 @@ class TestPatchStringsEdit:
 
     def test_strings_edit_dry_run(self, tmp_dir):
         """Dry run does not modify the file."""
-        from u3edit.patch import cmd_strings_edit
+        from ult3edit.patch import cmd_strings_edit
         path = self._make_test_binary(tmp_dir, 'ORIGINAL')
         with open(path, 'rb') as f:
             original = f.read()
@@ -7450,7 +7450,7 @@ class TestPatchStringsEdit:
 
     def test_strings_edit_backup(self, tmp_dir):
         """Backup creates .bak file."""
-        from u3edit.patch import cmd_strings_edit
+        from ult3edit.patch import cmd_strings_edit
         path = self._make_test_binary(tmp_dir, 'ORIGINAL')
         args = argparse.Namespace(
             file=path, text='CHANGED', index=0, vanilla=None,
@@ -7460,7 +7460,7 @@ class TestPatchStringsEdit:
 
     def test_strings_edit_output_file(self, tmp_dir):
         """Writing to separate output file preserves original."""
-        from u3edit.patch import cmd_strings_edit
+        from ult3edit.patch import cmd_strings_edit
         path = self._make_test_binary(tmp_dir, 'ORIGINAL')
         out_path = os.path.join(tmp_dir, 'output.bin')
         with open(path, 'rb') as f:
@@ -7475,7 +7475,7 @@ class TestPatchStringsEdit:
 
     def test_strings_import_from_json(self, tmp_dir):
         """Import multiple patches from JSON file."""
-        from u3edit.patch import cmd_strings_import, _extract_inline_strings
+        from ult3edit.patch import cmd_strings_import, _extract_inline_strings
         path = self._make_test_binary(tmp_dir,
                                       'CARD OF DEATH', 'MARK OF KINGS', 'HELLO')
         # Create patch JSON
@@ -7498,7 +7498,7 @@ class TestPatchStringsEdit:
 
     def test_strings_import_dry_run(self, tmp_dir):
         """Import dry run doesn't modify file."""
-        from u3edit.patch import cmd_strings_import
+        from ult3edit.patch import cmd_strings_import
         path = self._make_test_binary(tmp_dir, 'ORIGINAL')
         with open(path, 'rb') as f:
             original = f.read()
@@ -7528,13 +7528,13 @@ class TestPatchStringsEdit:
         # Copy ULT3 to temp
         test_bin = os.path.join(tmp_dir, 'ULT3.bin')
         shutil.copy2(ult3_path, test_bin)
-        from u3edit.patch import cmd_strings_import
+        from ult3edit.patch import cmd_strings_import
         args = argparse.Namespace(
             file=test_bin, json_file=patches_path, output=None,
             backup=False, dry_run=False)
         cmd_strings_import(args)
         # Verify changes
-        from u3edit.patch import _extract_inline_strings
+        from ult3edit.patch import _extract_inline_strings
         with open(test_bin, 'rb') as f:
             data = f.read()
         strings = _extract_inline_strings(data, 0x5000)
@@ -7548,11 +7548,11 @@ class TestPatchStringsEdit:
 # =============================================================================
 
 class TestMapCompileSubcommand:
-    """Test u3edit map compile/decompile CLI subcommands."""
+    """Test ult3edit map compile/decompile CLI subcommands."""
 
     def test_compile_overworld(self, tmp_dir):
         """Compile overworld .map produces 4096-byte binary."""
-        from u3edit.map import cmd_compile
+        from ult3edit.map import cmd_compile
         # Create a minimal .map with water tiles
         src = os.path.join(tmp_dir, 'test.map')
         lines = ['# Overworld (64x64)']
@@ -7569,7 +7569,7 @@ class TestMapCompileSubcommand:
 
     def test_compile_dungeon(self, tmp_dir):
         """Compile dungeon .map produces 2048-byte binary."""
-        from u3edit.map import cmd_compile
+        from ult3edit.map import cmd_compile
         src = os.path.join(tmp_dir, 'test.map')
         lines = []
         for lvl in range(8):
@@ -7588,7 +7588,7 @@ class TestMapCompileSubcommand:
 
     def test_decompile_overworld(self, tmp_dir):
         """Decompile overworld binary to text-art."""
-        from u3edit.map import cmd_decompile
+        from ult3edit.map import cmd_decompile
         # Create a 4096-byte binary (all water = 0x00)
         bin_path = os.path.join(tmp_dir, 'test.bin')
         with open(bin_path, 'wb') as f:
@@ -7606,7 +7606,7 @@ class TestMapCompileSubcommand:
 
     def test_compile_decompile_roundtrip(self, tmp_dir):
         """Compile then decompile preserves tile content."""
-        from u3edit.map import cmd_compile, cmd_decompile
+        from ult3edit.map import cmd_compile, cmd_decompile
         src = os.path.join(tmp_dir, 'orig.map')
         # Create map with mixed tiles
         lines = ['# Test']
@@ -7634,7 +7634,7 @@ class TestMapCompileSubcommand:
 
     def test_compile_no_output_prints_size(self, tmp_dir, capsys):
         """Compile without --output prints size info."""
-        from u3edit.map import cmd_compile
+        from ult3edit.map import cmd_compile
         src = os.path.join(tmp_dir, 'test.map')
         lines = ['# Test']
         for _ in range(64):
@@ -7648,7 +7648,7 @@ class TestMapCompileSubcommand:
 
 
 class TestShapesCompileSubcommand:
-    """Test u3edit shapes compile/decompile CLI subcommands."""
+    """Test ult3edit shapes compile/decompile CLI subcommands."""
 
     def _make_tiles_source(self, path, count=2):
         """Create a .tiles source with test glyphs."""
@@ -7667,7 +7667,7 @@ class TestShapesCompileSubcommand:
 
     def test_compile_binary(self, tmp_dir):
         """Compile .tiles to 2048-byte SHPS binary."""
-        from u3edit.shapes import cmd_compile_tiles
+        from ult3edit.shapes import cmd_compile_tiles
         src = os.path.join(tmp_dir, 'test.tiles')
         self._make_tiles_source(src)
         out = os.path.join(tmp_dir, 'test.bin')
@@ -7681,7 +7681,7 @@ class TestShapesCompileSubcommand:
 
     def test_compile_json(self, tmp_dir):
         """Compile .tiles to JSON format."""
-        from u3edit.shapes import cmd_compile_tiles
+        from ult3edit.shapes import cmd_compile_tiles
         src = os.path.join(tmp_dir, 'test.tiles')
         self._make_tiles_source(src, count=3)
         out = os.path.join(tmp_dir, 'test.json')
@@ -7694,7 +7694,7 @@ class TestShapesCompileSubcommand:
 
     def test_decompile(self, tmp_dir):
         """Decompile SHPS binary to text-art."""
-        from u3edit.shapes import cmd_decompile_tiles
+        from ult3edit.shapes import cmd_decompile_tiles
         # Create 2048-byte SHPS binary
         data = bytearray(2048)
         # Put a pattern in tile 0: alternating rows
@@ -7713,7 +7713,7 @@ class TestShapesCompileSubcommand:
 
     def test_compile_decompile_roundtrip(self, tmp_dir):
         """Compile then decompile preserves glyph pixel data."""
-        from u3edit.shapes import cmd_compile_tiles, cmd_decompile_tiles, \
+        from ult3edit.shapes import cmd_compile_tiles, cmd_decompile_tiles, \
             parse_tiles_text
         src = os.path.join(tmp_dir, 'orig.tiles')
         self._make_tiles_source(src, count=4)
@@ -7739,7 +7739,7 @@ class TestShapesCompileSubcommand:
 
     def test_compile_no_output_prints_count(self, tmp_dir, capsys):
         """Compile without --output prints tile count."""
-        from u3edit.shapes import cmd_compile_tiles
+        from ult3edit.shapes import cmd_compile_tiles
         src = os.path.join(tmp_dir, 'test.tiles')
         self._make_tiles_source(src, count=5)
         args = argparse.Namespace(source=src, output=None, format='binary')
@@ -7749,7 +7749,7 @@ class TestShapesCompileSubcommand:
 
     def test_parse_tiles_text_auto_index(self, tmp_dir):
         """Tiles without headers get auto-assigned sequential indices."""
-        from u3edit.shapes import parse_tiles_text
+        from ult3edit.shapes import parse_tiles_text
         text = '# Tile 0x10: Start\n'
         for _ in range(8):
             text += '#######\n'
@@ -7764,7 +7764,7 @@ class TestShapesCompileSubcommand:
 
 
 class TestPatchCompileNamesSubcommand:
-    """Test u3edit patch compile-names/decompile-names CLI subcommands."""
+    """Test ult3edit patch compile-names/decompile-names CLI subcommands."""
 
     def _make_names_source(self, path, names=None):
         """Create a .names source file."""
@@ -7781,7 +7781,7 @@ class TestPatchCompileNamesSubcommand:
 
     def test_compile_names_json(self, tmp_dir):
         """Compile .names to JSON with regions.name-table.data."""
-        from u3edit.patch import cmd_compile_names
+        from ult3edit.patch import cmd_compile_names
         src = os.path.join(tmp_dir, 'test.names')
         self._make_names_source(src)
         out = os.path.join(tmp_dir, 'names.json')
@@ -7798,7 +7798,7 @@ class TestPatchCompileNamesSubcommand:
 
     def test_compile_names_stdout(self, tmp_dir, capsys):
         """Compile .names to stdout prints JSON."""
-        from u3edit.patch import cmd_compile_names
+        from ult3edit.patch import cmd_compile_names
         src = os.path.join(tmp_dir, 'test.names')
         self._make_names_source(src)
         args = argparse.Namespace(source=src, output=None)
@@ -7809,7 +7809,7 @@ class TestPatchCompileNamesSubcommand:
 
     def test_validate_names_pass(self, tmp_dir, capsys):
         """Validate .names within budget passes."""
-        from u3edit.patch import cmd_validate_names
+        from ult3edit.patch import cmd_validate_names
         src = os.path.join(tmp_dir, 'test.names')
         self._make_names_source(src)
         args = argparse.Namespace(source=src)
@@ -7819,7 +7819,7 @@ class TestPatchCompileNamesSubcommand:
 
     def test_validate_names_fail(self, tmp_dir):
         """Validate .names over budget fails."""
-        from u3edit.patch import cmd_validate_names
+        from ult3edit.patch import cmd_validate_names
         src = os.path.join(tmp_dir, 'test.names')
         # Create names that exceed 891-byte budget
         names = [f'VERY_LONG_NAME_PADDING_{i:04d}' for i in range(100)]
@@ -7830,7 +7830,7 @@ class TestPatchCompileNamesSubcommand:
 
     def test_decompile_names(self, tmp_dir):
         """Decompile name table from ULT3-sized binary."""
-        from u3edit.patch import cmd_decompile_names
+        from ult3edit.patch import cmd_decompile_names
         # Create a minimal binary with name table at offset 0x397A
         data = bytearray(0x397A + 921)
         # Encode some test names at offset 0x397A
@@ -7855,14 +7855,14 @@ class TestPatchCompileNamesSubcommand:
 
     def test_parse_names_empty_string(self):
         """Explicit empty strings ('""') are preserved."""
-        from u3edit.patch import _parse_names_file
+        from ult3edit.patch import _parse_names_file
         text = '# Test\nFOO\n""\nBAR\n'
         names = _parse_names_file(text)
         assert names == ['FOO', '', 'BAR']
 
     def test_validate_names_budget_math(self):
         """Budget math: encoded size = sum(len+1), budget = 921-30."""
-        from u3edit.patch import _validate_names
+        from ult3edit.patch import _validate_names
         names = ['AB', 'CD']
         size, budget, valid = _validate_names(names)
         assert size == 6  # (2+1) + (2+1)
@@ -7875,49 +7875,49 @@ class TestCliParityCompilers:
 
     def test_map_compile_in_dispatch(self):
         """map dispatch handles 'compile'."""
-        from u3edit.map import dispatch
+        from ult3edit.map import dispatch
         import inspect
         src = inspect.getsource(dispatch)
         assert "'compile'" in src
 
     def test_map_decompile_in_dispatch(self):
         """map dispatch handles 'decompile'."""
-        from u3edit.map import dispatch
+        from ult3edit.map import dispatch
         import inspect
         src = inspect.getsource(dispatch)
         assert "'decompile'" in src
 
     def test_shapes_compile_in_dispatch(self):
         """shapes dispatch handles 'compile'."""
-        from u3edit.shapes import dispatch
+        from ult3edit.shapes import dispatch
         import inspect
         src = inspect.getsource(dispatch)
         assert "'compile'" in src
 
     def test_shapes_decompile_in_dispatch(self):
         """shapes dispatch handles 'decompile'."""
-        from u3edit.shapes import dispatch
+        from ult3edit.shapes import dispatch
         import inspect
         src = inspect.getsource(dispatch)
         assert "'decompile'" in src
 
     def test_patch_compile_names_in_dispatch(self):
         """patch dispatch handles 'compile-names'."""
-        from u3edit.patch import dispatch
+        from ult3edit.patch import dispatch
         import inspect
         src = inspect.getsource(dispatch)
         assert "'compile-names'" in src
 
     def test_patch_decompile_names_in_dispatch(self):
         """patch dispatch handles 'decompile-names'."""
-        from u3edit.patch import dispatch
+        from ult3edit.patch import dispatch
         import inspect
         src = inspect.getsource(dispatch)
         assert "'decompile-names'" in src
 
     def test_patch_validate_names_in_dispatch(self):
         """patch dispatch handles 'validate-names'."""
-        from u3edit.patch import dispatch
+        from ult3edit.patch import dispatch
         import inspect
         src = inspect.getsource(dispatch)
         assert "'validate-names'" in src
@@ -7932,7 +7932,7 @@ class TestMapCompileWarnings:
 
     def test_overworld_short_rows_warns(self, tmp_path):
         """Compiling overworld with <64 rows warns on stderr."""
-        from u3edit.map import cmd_compile
+        from ult3edit.map import cmd_compile
         # Build a 10-row overworld source
         src = tmp_path / 'short.map'
         src.write_text('# Overworld\n' + ('.' * 64 + '\n') * 10)
@@ -7948,7 +7948,7 @@ class TestMapCompileWarnings:
 
     def test_dungeon_short_levels_warns(self, tmp_path):
         """Compiling dungeon with <8 levels warns on stderr."""
-        from u3edit.map import cmd_compile
+        from ult3edit.map import cmd_compile
         # Build 2-level dungeon source
         lines = []
         for lvl in range(2):
@@ -7970,7 +7970,7 @@ class TestMapCompileWarnings:
 
     def test_unknown_char_warns(self, tmp_path):
         """Compiling map with unknown chars warns and maps to 0x00."""
-        from u3edit.map import cmd_compile
+        from ult3edit.map import cmd_compile
         # 'Z' is not a valid tile char
         src = tmp_path / 'bad.map'
         src.write_text('# Overworld\n' + ('Z' * 64 + '\n') * 64)
@@ -7986,7 +7986,7 @@ class TestMapCompileWarnings:
 
     def test_full_overworld_no_warning(self, tmp_path):
         """64-row overworld compile produces no warnings."""
-        from u3edit.map import cmd_compile
+        from ult3edit.map import cmd_compile
         src = tmp_path / 'full.map'
         src.write_text('# Overworld\n' + ('.' * 64 + '\n') * 64)
         out = tmp_path / 'out.bin'
@@ -8004,7 +8004,7 @@ class TestShapesCompileWarnings:
 
     def test_partial_tileset_warns(self, tmp_path):
         """Compiling fewer than 256 glyphs warns on stderr."""
-        from u3edit.shapes import cmd_compile_tiles
+        from ult3edit.shapes import cmd_compile_tiles
         # Source with only 2 tiles
         lines = []
         for idx in range(2):
@@ -8025,7 +8025,7 @@ class TestShapesCompileWarnings:
 
     def test_full_tileset_no_warning(self, tmp_path):
         """Compiling all 256 glyphs produces no warning."""
-        from u3edit.shapes import cmd_compile_tiles, GLYPHS_PER_FILE
+        from ult3edit.shapes import cmd_compile_tiles, GLYPHS_PER_FILE
         lines = []
         for idx in range(GLYPHS_PER_FILE):
             lines.append(f'# Tile 0x{idx:02X}')
@@ -8049,7 +8049,7 @@ class TestMapDecompileUnknownTiles:
 
     def test_unknown_overworld_tile_warns(self, tmp_path):
         """Decompiling overworld with unmapped byte warns on stderr."""
-        from u3edit.map import cmd_decompile
+        from ult3edit.map import cmd_decompile
         # Create 4096 bytes: all 0xFF (unlikely to be mapped)
         binfile = tmp_path / 'MAP'
         binfile.write_bytes(bytes([0xFF]) * 4096)
@@ -8066,7 +8066,7 @@ class TestMapDecompileUnknownTiles:
 
     def test_unknown_dungeon_tile_warns(self, tmp_path):
         """Decompiling dungeon with unmapped byte warns on stderr."""
-        from u3edit.map import cmd_decompile
+        from ult3edit.map import cmd_decompile
         binfile = tmp_path / 'DNG'
         binfile.write_bytes(bytes([0xFE]) * 2048)
         out = tmp_path / 'out.map'
@@ -8081,7 +8081,7 @@ class TestMapDecompileUnknownTiles:
 
     def test_known_tiles_no_warning(self, tmp_path):
         """Decompiling all-zero map produces no warning."""
-        from u3edit.map import cmd_decompile
+        from ult3edit.map import cmd_decompile
         binfile = tmp_path / 'MAP'
         binfile.write_bytes(bytes(4096))
         out = tmp_path / 'out.map'
@@ -8098,8 +8098,8 @@ class TestCombatMapTruncated:
 
     def test_truncated_padding_defaults_to_zeros(self):
         """Truncated file gets zero-filled padding arrays."""
-        from u3edit.combat import CombatMap
-        from u3edit.constants import CON_PADDING1_SIZE
+        from ult3edit.combat import CombatMap
+        from ult3edit.constants import CON_PADDING1_SIZE
         # 150 bytes: past monster positions but short of full runtime data
         data = bytes(150)
         cm = CombatMap(data)
@@ -8111,8 +8111,8 @@ class TestCombatMapTruncated:
 
     def test_full_file_preserves_all_arrays(self):
         """Full 192-byte file preserves all padding/runtime data."""
-        from u3edit.combat import CombatMap
-        from u3edit.constants import CON_FILE_SIZE
+        from ult3edit.combat import CombatMap
+        from ult3edit.constants import CON_FILE_SIZE
         data = bytearray(CON_FILE_SIZE)
         data[0xB0] = 0xAA  # padding2[0]
         data[0x79] = 0xBB  # padding1[0]
@@ -8128,8 +8128,8 @@ class TestCombatImportBoundsValidation:
 
     def test_monster_oob_clamped_and_warns(self, tmp_path):
         """Monster positions >10 are clamped to 10 with a warning."""
-        from u3edit.combat import cmd_import
-        from u3edit.constants import (
+        from ult3edit.combat import cmd_import
+        from ult3edit.constants import (
             CON_FILE_SIZE, CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET)
         binfile = tmp_path / 'CON'
         binfile.write_bytes(bytes(CON_FILE_SIZE))
@@ -8151,8 +8151,8 @@ class TestCombatImportBoundsValidation:
 
     def test_pc_oob_clamped_and_warns(self, tmp_path):
         """PC positions >10 are clamped to 10 with a warning."""
-        from u3edit.combat import cmd_import
-        from u3edit.constants import (
+        from ult3edit.combat import cmd_import
+        from ult3edit.constants import (
             CON_FILE_SIZE, CON_PC_X_OFFSET, CON_PC_Y_OFFSET)
         binfile = tmp_path / 'CON'
         binfile.write_bytes(bytes(CON_FILE_SIZE))
@@ -8174,8 +8174,8 @@ class TestCombatImportBoundsValidation:
 
     def test_valid_positions_no_warning(self, tmp_path):
         """Positions within 0-10 produce no warning."""
-        from u3edit.combat import cmd_import
-        from u3edit.constants import CON_FILE_SIZE
+        from ult3edit.combat import cmd_import
+        from ult3edit.constants import CON_FILE_SIZE
         binfile = tmp_path / 'CON'
         binfile.write_bytes(bytes(CON_FILE_SIZE))
         jdata = {'monsters': [{'x': 5, 'y': 5}],
@@ -8202,8 +8202,8 @@ class TestDdrwCommands:
 
     def test_view_text_output(self, tmp_path, capsys):
         """cmd_view prints dungeon drawing data summary."""
-        from u3edit.ddrw import cmd_view
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.ddrw import cmd_view
+        from ult3edit.constants import DDRW_FILE_SIZE
         binfile = tmp_path / 'DDRW'
         binfile.write_bytes(bytes(DDRW_FILE_SIZE))
         args = argparse.Namespace(
@@ -8215,8 +8215,8 @@ class TestDdrwCommands:
 
     def test_view_json_output(self, tmp_path):
         """cmd_view --json produces JSON with vectors and records."""
-        from u3edit.ddrw import cmd_view
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.ddrw import cmd_view
+        from ult3edit.constants import DDRW_FILE_SIZE
         binfile = tmp_path / 'DDRW'
         data = bytearray(DDRW_FILE_SIZE)
         data[0xF0] = 0x42  # Set a perspective vector
@@ -8232,8 +8232,8 @@ class TestDdrwCommands:
 
     def test_edit_patches_bytes(self, tmp_path):
         """cmd_edit patches bytes at offset."""
-        from u3edit.ddrw import cmd_edit
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.ddrw import cmd_edit
+        from ult3edit.constants import DDRW_FILE_SIZE
         binfile = tmp_path / 'DDRW'
         binfile.write_bytes(bytes(DDRW_FILE_SIZE))
         out = tmp_path / 'OUT'
@@ -8247,8 +8247,8 @@ class TestDdrwCommands:
 
     def test_edit_dry_run(self, tmp_path, capsys):
         """cmd_edit --dry-run doesn't write."""
-        from u3edit.ddrw import cmd_edit
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.ddrw import cmd_edit
+        from ult3edit.constants import DDRW_FILE_SIZE
         binfile = tmp_path / 'DDRW'
         binfile.write_bytes(bytes(DDRW_FILE_SIZE))
         out = tmp_path / 'OUT'
@@ -8261,8 +8261,8 @@ class TestDdrwCommands:
 
     def test_import_raw_json(self, tmp_path):
         """cmd_import writes raw byte array from JSON."""
-        from u3edit.ddrw import cmd_import
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.ddrw import cmd_import
+        from ult3edit.constants import DDRW_FILE_SIZE
         binfile = tmp_path / 'DDRW'
         binfile.write_bytes(bytes(DDRW_FILE_SIZE))
         data = [0] * DDRW_FILE_SIZE
@@ -8280,8 +8280,8 @@ class TestDdrwCommands:
 
     def test_import_backup(self, tmp_path):
         """cmd_import --backup creates .bak file."""
-        from u3edit.ddrw import cmd_import
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.ddrw import cmd_import
+        from ult3edit.constants import DDRW_FILE_SIZE
         binfile = tmp_path / 'DDRW'
         binfile.write_bytes(bytes(DDRW_FILE_SIZE))
         data = [0] * DDRW_FILE_SIZE
@@ -8304,8 +8304,8 @@ class TestSoundCommands:
 
     def test_view_sosa(self, tmp_path, capsys):
         """cmd_view displays SOSA file summary."""
-        from u3edit.sound import cmd_view
-        from u3edit.constants import SOSA_FILE_SIZE
+        from ult3edit.sound import cmd_view
+        from ult3edit.constants import SOSA_FILE_SIZE
         binfile = tmp_path / 'SOSA'
         binfile.write_bytes(bytes(SOSA_FILE_SIZE))
         args = argparse.Namespace(
@@ -8316,8 +8316,8 @@ class TestSoundCommands:
 
     def test_view_json(self, tmp_path):
         """cmd_view --json produces JSON output."""
-        from u3edit.sound import cmd_view
-        from u3edit.constants import SOSM_FILE_SIZE
+        from ult3edit.sound import cmd_view
+        from ult3edit.constants import SOSM_FILE_SIZE
         binfile = tmp_path / 'SOSM'
         binfile.write_bytes(bytes(SOSM_FILE_SIZE))
         outfile = tmp_path / 'out.json'
@@ -8329,8 +8329,8 @@ class TestSoundCommands:
 
     def test_edit_patches_bytes(self, tmp_path):
         """cmd_edit patches sound file bytes."""
-        from u3edit.sound import cmd_edit
-        from u3edit.constants import SOSA_FILE_SIZE
+        from ult3edit.sound import cmd_edit
+        from ult3edit.constants import SOSA_FILE_SIZE
         binfile = tmp_path / 'SOSA'
         binfile.write_bytes(bytes(SOSA_FILE_SIZE))
         out = tmp_path / 'OUT'
@@ -8343,8 +8343,8 @@ class TestSoundCommands:
 
     def test_edit_past_end_exits(self, tmp_path):
         """cmd_edit rejects patch beyond file end."""
-        from u3edit.sound import cmd_edit
-        from u3edit.constants import SOSM_FILE_SIZE
+        from ult3edit.sound import cmd_edit
+        from ult3edit.constants import SOSM_FILE_SIZE
         binfile = tmp_path / 'SOSM'
         binfile.write_bytes(bytes(SOSM_FILE_SIZE))
         args = argparse.Namespace(
@@ -8355,8 +8355,8 @@ class TestSoundCommands:
 
     def test_import_sosa(self, tmp_path):
         """cmd_import writes SOSA from JSON."""
-        from u3edit.sound import cmd_import
-        from u3edit.constants import SOSA_FILE_SIZE
+        from ult3edit.sound import cmd_import
+        from ult3edit.constants import SOSA_FILE_SIZE
         binfile = tmp_path / 'SOSA'
         binfile.write_bytes(bytes(SOSA_FILE_SIZE))
         data = [0] * SOSA_FILE_SIZE
@@ -8374,7 +8374,7 @@ class TestSoundCommands:
 
     def test_import_wrong_size_warns(self, tmp_path):
         """cmd_import warns when size doesn't match known formats."""
-        from u3edit.sound import cmd_import
+        from ult3edit.sound import cmd_import
         binfile = tmp_path / 'SOUND'
         binfile.write_bytes(bytes(100))
         jfile = tmp_path / 'sound.json'
@@ -8399,8 +8399,8 @@ class TestDiffCommands:
 
     def test_diff_identical_rosters(self, tmp_path, capsys):
         """Diffing identical roster files shows no changes."""
-        from u3edit.diff import cmd_diff
-        from u3edit.constants import ROSTER_FILE_SIZE
+        from ult3edit.diff import cmd_diff
+        from ult3edit.constants import ROSTER_FILE_SIZE
         d1 = tmp_path / 'a'
         d2 = tmp_path / 'b'
         d1.mkdir()
@@ -8417,8 +8417,8 @@ class TestDiffCommands:
 
     def test_diff_modified_roster(self, tmp_path, capsys):
         """Diffing rosters with different names shows change."""
-        from u3edit.diff import cmd_diff
-        from u3edit.constants import ROSTER_FILE_SIZE
+        from ult3edit.diff import cmd_diff
+        from ult3edit.constants import ROSTER_FILE_SIZE
         d1 = bytearray(ROSTER_FILE_SIZE)
         d2 = bytearray(ROSTER_FILE_SIZE)
         # Set a name in slot 0 of d2
@@ -8442,8 +8442,8 @@ class TestDiffCommands:
 
     def test_diff_json_output(self, tmp_path):
         """Diff --json produces valid JSON."""
-        from u3edit.diff import cmd_diff
-        from u3edit.constants import ROSTER_FILE_SIZE
+        from ult3edit.diff import cmd_diff
+        from ult3edit.constants import ROSTER_FILE_SIZE
         d1 = bytearray(ROSTER_FILE_SIZE)
         d2 = bytearray(ROSTER_FILE_SIZE)
         d2[0x12] = 0x50  # Change STR in slot 0
@@ -8463,8 +8463,8 @@ class TestDiffCommands:
 
     def test_diff_summary_mode(self, tmp_path, capsys):
         """Diff --summary shows counts."""
-        from u3edit.diff import cmd_diff
-        from u3edit.constants import MAP_OVERWORLD_SIZE
+        from ult3edit.diff import cmd_diff
+        from ult3edit.constants import MAP_OVERWORLD_SIZE
         m1 = bytearray(MAP_OVERWORLD_SIZE)
         m2 = bytearray(MAP_OVERWORLD_SIZE)
         m2[0] = 0x01  # Change one tile
@@ -8482,7 +8482,7 @@ class TestDiffCommands:
 
     def test_diff_mismatched_types_exits(self, tmp_path):
         """Diffing a file against a directory exits with error."""
-        from u3edit.diff import cmd_diff
+        from ult3edit.diff import cmd_diff
         f1 = tmp_path / 'FILE'
         f1.write_bytes(b'\x00')
         d2 = tmp_path / 'DIR'
@@ -8495,8 +8495,8 @@ class TestDiffCommands:
 
     def test_diff_directories(self, tmp_path, capsys):
         """Diffing two directories compares matching files."""
-        from u3edit.diff import cmd_diff
-        from u3edit.constants import ROSTER_FILE_SIZE
+        from ult3edit.diff import cmd_diff
+        from ult3edit.constants import ROSTER_FILE_SIZE
         d1 = tmp_path / 'game1'
         d2 = tmp_path / 'game2'
         d1.mkdir()
@@ -8533,8 +8533,8 @@ class TestDiffNewFileTypes:
 
     def test_diff_mbs_files(self, tmp_path, capsys):
         """Diff detects changes in MBS sound files."""
-        from u3edit.diff import cmd_diff
-        from u3edit.constants import MBS_FILE_SIZE
+        from ult3edit.diff import cmd_diff
+        from ult3edit.constants import MBS_FILE_SIZE
         p1, p2 = self._make_pair(tmp_path, 'MBS', MBS_FILE_SIZE)
         args = argparse.Namespace(
             path1=str(p1), path2=str(p2),
@@ -8545,8 +8545,8 @@ class TestDiffNewFileTypes:
 
     def test_diff_ddrw_files(self, tmp_path, capsys):
         """Diff detects changes in DDRW files."""
-        from u3edit.diff import cmd_diff
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.diff import cmd_diff
+        from ult3edit.constants import DDRW_FILE_SIZE
         p1, p2 = self._make_pair(tmp_path, 'DDRW', DDRW_FILE_SIZE)
         args = argparse.Namespace(
             path1=str(p1), path2=str(p2),
@@ -8557,8 +8557,8 @@ class TestDiffNewFileTypes:
 
     def test_diff_shps_files(self, tmp_path, capsys):
         """Diff detects changes in SHPS files."""
-        from u3edit.diff import cmd_diff
-        from u3edit.constants import SHPS_FILE_SIZE
+        from ult3edit.diff import cmd_diff
+        from ult3edit.constants import SHPS_FILE_SIZE
         p1, p2 = self._make_pair(tmp_path, 'SHPS', SHPS_FILE_SIZE)
         args = argparse.Namespace(
             path1=str(p1), path2=str(p2),
@@ -8569,8 +8569,8 @@ class TestDiffNewFileTypes:
 
     def test_diff_text_files(self, tmp_path, capsys):
         """Diff detects changes in TEXT files."""
-        from u3edit.diff import cmd_diff
-        from u3edit.constants import TEXT_FILE_SIZE
+        from ult3edit.diff import cmd_diff
+        from ult3edit.constants import TEXT_FILE_SIZE
         p1, p2 = self._make_pair(tmp_path, 'TEXT', TEXT_FILE_SIZE)
         args = argparse.Namespace(
             path1=str(p1), path2=str(p2),
@@ -8581,8 +8581,8 @@ class TestDiffNewFileTypes:
 
     def test_diff_binary_identical(self, tmp_path, capsys):
         """Identical binary files show no byte changes."""
-        from u3edit.diff import diff_binary
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.diff import diff_binary
+        from ult3edit.constants import DDRW_FILE_SIZE
         da = tmp_path / 'a'
         db = tmp_path / 'b'
         da.mkdir()
@@ -8598,8 +8598,8 @@ class TestDiffNewFileTypes:
 
     def test_diff_directories_includes_new_types(self, tmp_path):
         """Directory diff scans for MBS, DDRW, SHPS, TEXT."""
-        from u3edit.diff import cmd_diff
-        from u3edit.constants import (
+        from ult3edit.diff import cmd_diff
+        from ult3edit.constants import (
             DDRW_FILE_SIZE, MBS_FILE_SIZE, SHPS_FILE_SIZE, TEXT_FILE_SIZE)
         d1 = tmp_path / 'game1'
         d2 = tmp_path / 'game2'
@@ -8633,7 +8633,7 @@ class TestViewOnlyCommands:
 
     def test_equip_view(self, capsys):
         """equip view produces equipment stats table."""
-        from u3edit.equip import cmd_view
+        from ult3edit.equip import cmd_view
         args = argparse.Namespace(json=False, output=None)
         cmd_view(args)
         out = capsys.readouterr().out
@@ -8641,7 +8641,7 @@ class TestViewOnlyCommands:
 
     def test_equip_view_json(self, tmp_path):
         """equip view --json produces valid JSON."""
-        from u3edit.equip import cmd_view
+        from ult3edit.equip import cmd_view
         outfile = tmp_path / 'equip.json'
         args = argparse.Namespace(json=True, output=str(outfile))
         cmd_view(args)
@@ -8650,7 +8650,7 @@ class TestViewOnlyCommands:
 
     def test_spell_view(self, capsys):
         """spell view produces spell reference table."""
-        from u3edit.spell import cmd_view
+        from ult3edit.spell import cmd_view
         args = argparse.Namespace(
             json=False, output=None,
             cleric_only=False, wizard_only=False)
@@ -8660,7 +8660,7 @@ class TestViewOnlyCommands:
 
     def test_spell_view_json(self, tmp_path):
         """spell view --json produces valid JSON."""
-        from u3edit.spell import cmd_view
+        from ult3edit.spell import cmd_view
         outfile = tmp_path / 'spells.json'
         args = argparse.Namespace(
             json=True, output=str(outfile),
@@ -8671,8 +8671,8 @@ class TestViewOnlyCommands:
 
     def test_shapes_export_png(self, tmp_path):
         """shapes export creates PNG files from SHPS data."""
-        from u3edit.shapes import cmd_export
-        from u3edit.constants import SHPS_FILE_SIZE
+        from ult3edit.shapes import cmd_export
+        from ult3edit.constants import SHPS_FILE_SIZE
         shps = tmp_path / 'SHPS'
         shps.write_bytes(bytes(SHPS_FILE_SIZE))
         out_dir = tmp_path / 'pngs'
@@ -8686,8 +8686,8 @@ class TestViewOnlyCommands:
 
     def test_shapes_export_with_sheet(self, tmp_path):
         """shapes export --sheet creates sprite sheet PNG."""
-        from u3edit.shapes import cmd_export
-        from u3edit.constants import SHPS_FILE_SIZE
+        from ult3edit.shapes import cmd_export
+        from ult3edit.constants import SHPS_FILE_SIZE
         shps = tmp_path / 'SHPS'
         shps.write_bytes(bytes(SHPS_FILE_SIZE))
         out_dir = tmp_path / 'pngs'
@@ -8700,8 +8700,8 @@ class TestViewOnlyCommands:
 
     def test_shapes_info(self, tmp_path, capsys):
         """shapes info shows metadata."""
-        from u3edit.shapes import cmd_info
-        from u3edit.constants import SHPS_FILE_SIZE
+        from ult3edit.shapes import cmd_info
+        from ult3edit.constants import SHPS_FILE_SIZE
         shps = tmp_path / 'SHPS'
         shps.write_bytes(bytes(SHPS_FILE_SIZE))
         args = argparse.Namespace(
@@ -8712,8 +8712,8 @@ class TestViewOnlyCommands:
 
     def test_shapes_info_json(self, tmp_path):
         """shapes info --json produces valid JSON."""
-        from u3edit.shapes import cmd_info
-        from u3edit.constants import SHPS_FILE_SIZE
+        from ult3edit.shapes import cmd_info
+        from ult3edit.constants import SHPS_FILE_SIZE
         shps = tmp_path / 'SHPS'
         shps.write_bytes(bytes(SHPS_FILE_SIZE))
         outfile = tmp_path / 'info.json'
@@ -8725,8 +8725,8 @@ class TestViewOnlyCommands:
 
     def test_roster_view(self, tmp_path, capsys):
         """roster view displays character roster."""
-        from u3edit.roster import cmd_view
-        from u3edit.constants import ROSTER_FILE_SIZE
+        from ult3edit.roster import cmd_view
+        from ult3edit.constants import ROSTER_FILE_SIZE
         rost = tmp_path / 'ROST'
         data = bytearray(ROSTER_FILE_SIZE)
         # Set a name in slot 0
@@ -8743,8 +8743,8 @@ class TestViewOnlyCommands:
 
     def test_bestiary_view(self, tmp_path, capsys):
         """bestiary view displays monster data."""
-        from u3edit.bestiary import cmd_view
-        from u3edit.constants import MON_FILE_SIZE
+        from ult3edit.bestiary import cmd_view
+        from ult3edit.constants import MON_FILE_SIZE
         monfile = tmp_path / 'MONA'
         monfile.write_bytes(bytes(MON_FILE_SIZE))
         args = argparse.Namespace(
@@ -8756,8 +8756,8 @@ class TestViewOnlyCommands:
 
     def test_save_view(self, tmp_path, capsys):
         """save view displays party state."""
-        from u3edit.save import cmd_view
-        from u3edit.constants import PRTY_FILE_SIZE
+        from ult3edit.save import cmd_view
+        from ult3edit.constants import PRTY_FILE_SIZE
         prty = tmp_path / 'PRTY'
         data = bytearray(PRTY_FILE_SIZE)
         data[5] = 0xFF  # sentinel
@@ -8771,8 +8771,8 @@ class TestViewOnlyCommands:
 
     def test_combat_view(self, tmp_path, capsys):
         """combat view displays battlefield data."""
-        from u3edit.combat import cmd_view
-        from u3edit.constants import CON_FILE_SIZE
+        from ult3edit.combat import cmd_view
+        from ult3edit.constants import CON_FILE_SIZE
         con = tmp_path / 'CONA'
         con.write_bytes(bytes(CON_FILE_SIZE))
         args = argparse.Namespace(
@@ -8792,14 +8792,14 @@ class TestPatchCmdEdit:
 
     def _make_ult3(self, tmp_path):
         """Create a fake ULT3 binary of the right size."""
-        from u3edit.constants import ULT3_FILE_SIZE
+        from ult3edit.constants import ULT3_FILE_SIZE
         path = tmp_path / 'ULT3'
         path.write_bytes(bytes(ULT3_FILE_SIZE))
         return str(path)
 
     def test_edit_moongate_x(self, tmp_path, capsys):
         """Patch moongate-x region and verify bytes written."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = self._make_ult3(tmp_path)
         args = argparse.Namespace(
             file=path, region='moongate-x', data='01 02 03 04 05 06 07 08',
@@ -8811,7 +8811,7 @@ class TestPatchCmdEdit:
 
     def test_edit_dry_run(self, tmp_path, capsys):
         """Dry run shows changes but doesn't write."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = self._make_ult3(tmp_path)
         args = argparse.Namespace(
             file=path, region='moongate-x', data='AABBCCDD',
@@ -8825,7 +8825,7 @@ class TestPatchCmdEdit:
 
     def test_edit_unknown_region_exits(self, tmp_path):
         """Unknown region name causes sys.exit."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = self._make_ult3(tmp_path)
         args = argparse.Namespace(
             file=path, region='nonexistent', data='AA',
@@ -8835,7 +8835,7 @@ class TestPatchCmdEdit:
 
     def test_edit_data_too_long_exits(self, tmp_path):
         """Data exceeding region max_length causes sys.exit."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = self._make_ult3(tmp_path)
         # moongate-x max_length is 8, send 9 bytes
         args = argparse.Namespace(
@@ -8846,7 +8846,7 @@ class TestPatchCmdEdit:
 
     def test_edit_invalid_hex_exits(self, tmp_path):
         """Invalid hex data causes sys.exit."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = self._make_ult3(tmp_path)
         args = argparse.Namespace(
             file=path, region='moongate-x', data='ZZZZ',
@@ -8856,7 +8856,7 @@ class TestPatchCmdEdit:
 
     def test_edit_unrecognized_binary_exits(self, tmp_path):
         """Non-engine binary file causes sys.exit."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = tmp_path / 'JUNK'
         path.write_bytes(bytes(100))
         args = argparse.Namespace(
@@ -8867,7 +8867,7 @@ class TestPatchCmdEdit:
 
     def test_edit_with_backup(self, tmp_path):
         """Backup flag creates .bak before patching."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = self._make_ult3(tmp_path)
         args = argparse.Namespace(
             file=path, region='food-rate', data='02',
@@ -8881,8 +8881,8 @@ class TestPatchCmdDump:
 
     def test_dump_basic(self, tmp_path, capsys):
         """Hex dump produces output with hex values."""
-        from u3edit.patch import cmd_dump
-        from u3edit.constants import ULT3_FILE_SIZE
+        from ult3edit.patch import cmd_dump
+        from ult3edit.constants import ULT3_FILE_SIZE
         path = tmp_path / 'ULT3'
         data = bytearray(ULT3_FILE_SIZE)
         data[0] = 0xAB
@@ -8895,7 +8895,7 @@ class TestPatchCmdDump:
 
     def test_dump_offset_past_end_exits(self, tmp_path):
         """Offset past end of file causes sys.exit."""
-        from u3edit.patch import cmd_dump
+        from ult3edit.patch import cmd_dump
         path = tmp_path / 'SMALL'
         path.write_bytes(bytes(16))
         args = argparse.Namespace(file=str(path), offset=100, length=16)
@@ -8904,8 +8904,8 @@ class TestPatchCmdDump:
 
     def test_dump_with_load_addr(self, tmp_path, capsys):
         """Recognized binary shows load addresses."""
-        from u3edit.patch import cmd_dump
-        from u3edit.constants import ULT3_FILE_SIZE
+        from ult3edit.patch import cmd_dump
+        from ult3edit.constants import ULT3_FILE_SIZE
         path = tmp_path / 'ULT3'
         path.write_bytes(bytes(ULT3_FILE_SIZE))
         args = argparse.Namespace(file=str(path), offset=0, length=16)
@@ -8924,7 +8924,7 @@ class TestMapCmdFill:
 
     def test_fill_basic(self, tmp_path, capsys):
         """Fill a 2x2 region on an overworld map."""
-        from u3edit.map import cmd_fill
+        from ult3edit.map import cmd_fill
         path = tmp_path / 'SOSA'
         path.write_bytes(bytes(MAP_OVERWORLD_SIZE))
         args = argparse.Namespace(
@@ -8941,7 +8941,7 @@ class TestMapCmdFill:
 
     def test_fill_dry_run(self, tmp_path, capsys):
         """Dry run doesn't write changes."""
-        from u3edit.map import cmd_fill
+        from ult3edit.map import cmd_fill
         path = tmp_path / 'SOSA'
         path.write_bytes(bytes(MAP_OVERWORLD_SIZE))
         args = argparse.Namespace(
@@ -8956,7 +8956,7 @@ class TestMapCmdFill:
 
     def test_fill_clamps_coords(self, tmp_path, capsys):
         """Out-of-bounds coordinates are clamped."""
-        from u3edit.map import cmd_fill
+        from ult3edit.map import cmd_fill
         path = tmp_path / 'SOSA'
         path.write_bytes(bytes(MAP_OVERWORLD_SIZE))
         args = argparse.Namespace(
@@ -8973,7 +8973,7 @@ class TestMapCmdReplace:
 
     def test_replace_basic(self, tmp_path, capsys):
         """Replace one tile type with another."""
-        from u3edit.map import cmd_replace
+        from ult3edit.map import cmd_replace
         path = tmp_path / 'SOSA'
         data = bytearray(MAP_OVERWORLD_SIZE)
         data[0] = 0x04  # grass
@@ -8994,7 +8994,7 @@ class TestMapCmdReplace:
 
     def test_replace_dry_run(self, tmp_path, capsys):
         """Dry run shows count but doesn't write."""
-        from u3edit.map import cmd_replace
+        from ult3edit.map import cmd_replace
         path = tmp_path / 'SOSA'
         data = bytearray(MAP_OVERWORLD_SIZE)
         data[0] = 0x04
@@ -9015,7 +9015,7 @@ class TestMapCmdFind:
 
     def test_find_basic(self, tmp_path, capsys):
         """Find tiles at known positions."""
-        from u3edit.map import cmd_find
+        from ult3edit.map import cmd_find
         path = tmp_path / 'SOSA'
         data = bytearray(MAP_OVERWORLD_SIZE)
         data[0] = 0x04  # (0,0)
@@ -9032,7 +9032,7 @@ class TestMapCmdFind:
 
     def test_find_json(self, tmp_path):
         """Find with --json produces valid JSON."""
-        from u3edit.map import cmd_find
+        from ult3edit.map import cmd_find
         path = tmp_path / 'SOSA'
         data = bytearray(MAP_OVERWORLD_SIZE)
         data[0] = 0x04
@@ -9048,7 +9048,7 @@ class TestMapCmdFind:
 
     def test_find_no_matches(self, tmp_path, capsys):
         """Find with no matches shows 0 found."""
-        from u3edit.map import cmd_find
+        from ult3edit.map import cmd_find
         path = tmp_path / 'SOSA'
         path.write_bytes(bytes(MAP_OVERWORLD_SIZE))
         args = argparse.Namespace(
@@ -9068,13 +9068,13 @@ class TestTlkCmdView:
 
     def _make_tlk(self, path, text='Hello'):
         """Create a single-record TLK file."""
-        from u3edit.tlk import encode_record
+        from ult3edit.tlk import encode_record
         data = encode_record([text])
         path.write_bytes(bytes(data))
 
     def test_view_single_file(self, tmp_path, capsys):
         """View a single TLK file."""
-        from u3edit.tlk import cmd_view
+        from ult3edit.tlk import cmd_view
         tlk = tmp_path / 'TLKA'
         self._make_tlk(tlk, 'TEST DIALOG')
         args = argparse.Namespace(
@@ -9085,7 +9085,7 @@ class TestTlkCmdView:
 
     def test_view_json(self, tmp_path):
         """View --json produces valid JSON."""
-        from u3edit.tlk import cmd_view
+        from ult3edit.tlk import cmd_view
         tlk = tmp_path / 'TLKA'
         self._make_tlk(tlk, 'JSON dialog')
         outfile = tmp_path / 'tlk.json'
@@ -9097,7 +9097,7 @@ class TestTlkCmdView:
 
     def test_view_directory(self, tmp_path, capsys):
         """View all TLK files in a directory."""
-        from u3edit.tlk import cmd_view
+        from ult3edit.tlk import cmd_view
         tlk = tmp_path / 'TLKA'
         self._make_tlk(tlk, 'Town dialog')
         args = argparse.Namespace(
@@ -9112,7 +9112,7 @@ class TestTlkCmdImport:
 
     def test_import_roundtrip(self, tmp_path, capsys):
         """Import from JSON writes correct TLK data."""
-        from u3edit.tlk import cmd_import, load_tlk_records
+        from ult3edit.tlk import cmd_import, load_tlk_records
         tlk_path = tmp_path / 'TLKA'
         tlk_path.write_bytes(bytes(64))  # placeholder
         json_path = tmp_path / 'dialog.json'
@@ -9132,7 +9132,7 @@ class TestTlkCmdImport:
 
     def test_import_dry_run(self, tmp_path, capsys):
         """Dry run doesn't write changes."""
-        from u3edit.tlk import cmd_import
+        from ult3edit.tlk import cmd_import
         tlk_path = tmp_path / 'TLKA'
         original = bytes(64)
         tlk_path.write_bytes(original)
@@ -9148,7 +9148,7 @@ class TestTlkCmdImport:
 
     def test_import_with_backup(self, tmp_path, capsys):
         """Import with --backup creates .bak file."""
-        from u3edit.tlk import cmd_import
+        from ult3edit.tlk import cmd_import
         tlk_path = tmp_path / 'TLKA'
         tlk_path.write_bytes(bytes(64))
         json_path = tmp_path / 'dialog.json'
@@ -9169,7 +9169,7 @@ class TestImportTypeErrorHandling:
 
     def test_roster_import_bad_weapon_count_warns(self, tmp_path, capsys):
         """Non-integer weapon count in JSON warns instead of crashing."""
-        from u3edit.roster import cmd_import
+        from ult3edit.roster import cmd_import
         rost = tmp_path / 'ROST'
         data = bytearray(ROSTER_FILE_SIZE)
         for i, ch in enumerate('HERO'):
@@ -9190,7 +9190,7 @@ class TestImportTypeErrorHandling:
 
     def test_roster_import_bad_armor_count_warns(self, tmp_path, capsys):
         """Non-integer armor count in JSON warns instead of crashing."""
-        from u3edit.roster import cmd_import
+        from ult3edit.roster import cmd_import
         rost = tmp_path / 'ROST'
         data = bytearray(ROSTER_FILE_SIZE)
         for i, ch in enumerate('HERO'):
@@ -9219,7 +9219,7 @@ class TestMapCropError:
 
     def test_crop_invalid_values_exits(self, tmp_path):
         """Non-integer crop values cause sys.exit."""
-        from u3edit.map import cmd_view
+        from ult3edit.map import cmd_view
         path = tmp_path / 'SOSA'
         path.write_bytes(bytes(MAP_OVERWORLD_SIZE))
         args = argparse.Namespace(
@@ -9255,7 +9255,7 @@ class TestSaveCmdViewExpanded:
 
     def test_view_json(self, tmp_path):
         """save view --json produces valid JSON with party and active chars."""
-        from u3edit.save import cmd_view
+        from ult3edit.save import cmd_view
         game_dir = self._make_save_dir(tmp_path)
         outfile = tmp_path / 'save.json'
         args = argparse.Namespace(
@@ -9268,10 +9268,10 @@ class TestSaveCmdViewExpanded:
 
     def test_view_brief_skips_map(self, tmp_path, capsys):
         """save view --brief skips the SOSA mini-map."""
-        from u3edit.save import cmd_view
+        from ult3edit.save import cmd_view
         game_dir = self._make_save_dir(tmp_path)
         # Also create a SOSA file (overworld map)
-        from u3edit.constants import SOSA_FILE_SIZE
+        from ult3edit.constants import SOSA_FILE_SIZE
         sosa = tmp_path / 'SOSA'
         sosa.write_bytes(bytes(SOSA_FILE_SIZE))
         args = argparse.Namespace(
@@ -9284,7 +9284,7 @@ class TestSaveCmdViewExpanded:
 
     def test_view_validate_shows_warnings(self, tmp_path, capsys):
         """save view --validate shows party state warnings."""
-        from u3edit.save import cmd_view
+        from ult3edit.save import cmd_view
         game_dir = self._make_save_dir(tmp_path)
         # Set an invalid slot ID (>19)
         prty = tmp_path / 'PRTY'
@@ -9313,7 +9313,7 @@ class TestSaveCmdEditExpanded:
 
     def test_edit_location(self, tmp_path, capsys):
         """Edit party location_type."""
-        from u3edit.save import cmd_edit
+        from ult3edit.save import cmd_edit
         game_dir = self._make_save_dir(tmp_path)
         args = argparse.Namespace(
             game_dir=game_dir, transport=None, x=None, y=None,
@@ -9328,7 +9328,7 @@ class TestSaveCmdEditExpanded:
 
     def test_edit_slot_ids(self, tmp_path, capsys):
         """Edit party slot_ids."""
-        from u3edit.save import cmd_edit
+        from ult3edit.save import cmd_edit
         game_dir = self._make_save_dir(tmp_path)
         args = argparse.Namespace(
             game_dir=game_dir, transport=None, x=None, y=None,
@@ -9345,7 +9345,7 @@ class TestSaveCmdEditExpanded:
 
     def test_edit_dry_run(self, tmp_path, capsys):
         """Edit with dry_run shows changes but doesn't write."""
-        from u3edit.save import cmd_edit
+        from ult3edit.save import cmd_edit
         game_dir = self._make_save_dir(tmp_path)
         args = argparse.Namespace(
             game_dir=game_dir, transport=None, x=10, y=20,
@@ -9366,7 +9366,7 @@ class TestCombatCmdViewDir:
 
     def test_view_directory(self, tmp_path, capsys):
         """View all CON files in a directory."""
-        from u3edit.combat import cmd_view
+        from ult3edit.combat import cmd_view
         con = tmp_path / 'CONA'
         con.write_bytes(bytes(CON_FILE_SIZE))
         args = argparse.Namespace(
@@ -9378,7 +9378,7 @@ class TestCombatCmdViewDir:
 
     def test_view_directory_json(self, tmp_path):
         """View directory --json produces valid JSON."""
-        from u3edit.combat import cmd_view
+        from ult3edit.combat import cmd_view
         con = tmp_path / 'CONA'
         con.write_bytes(bytes(CON_FILE_SIZE))
         outfile = tmp_path / 'combat.json'
@@ -9391,7 +9391,7 @@ class TestCombatCmdViewDir:
 
     def test_view_empty_dir_exits(self, tmp_path):
         """Directory with no CON files causes sys.exit."""
-        from u3edit.combat import cmd_view
+        from ult3edit.combat import cmd_view
         args = argparse.Namespace(
             path=str(tmp_path), json=False, output=None,
             validate=False)
@@ -9408,7 +9408,7 @@ class TestSpecialCmdViewDir:
 
     def test_view_directory(self, tmp_path, capsys):
         """View all special location files in a directory."""
-        from u3edit.special import cmd_view
+        from ult3edit.special import cmd_view
         brnd = tmp_path / 'BRND'
         brnd.write_bytes(bytes(SPECIAL_FILE_SIZE))
         args = argparse.Namespace(
@@ -9419,7 +9419,7 @@ class TestSpecialCmdViewDir:
 
     def test_view_directory_json(self, tmp_path):
         """View directory --json produces valid JSON."""
-        from u3edit.special import cmd_view
+        from ult3edit.special import cmd_view
         brnd = tmp_path / 'BRND'
         brnd.write_bytes(bytes(SPECIAL_FILE_SIZE))
         outfile = tmp_path / 'special.json'
@@ -9431,7 +9431,7 @@ class TestSpecialCmdViewDir:
 
     def test_view_empty_dir_exits(self, tmp_path):
         """Directory with no special files causes sys.exit."""
-        from u3edit.special import cmd_view
+        from ult3edit.special import cmd_view
         args = argparse.Namespace(
             path=str(tmp_path), json=False, output=None)
         with pytest.raises(SystemExit):
@@ -9447,8 +9447,8 @@ class TestDdrwCmdEditBounds:
 
     def test_edit_past_end_exits(self, tmp_path):
         """Patch extending past end of file causes sys.exit."""
-        from u3edit.ddrw import cmd_edit
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.ddrw import cmd_edit
+        from ult3edit.constants import DDRW_FILE_SIZE
         path = tmp_path / 'DDRW'
         path.write_bytes(bytes(DDRW_FILE_SIZE))
         args = argparse.Namespace(
@@ -9459,8 +9459,8 @@ class TestDdrwCmdEditBounds:
 
     def test_edit_dry_run(self, tmp_path, capsys):
         """DDRW edit dry run shows changes without writing."""
-        from u3edit.ddrw import cmd_edit
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.ddrw import cmd_edit
+        from ult3edit.constants import DDRW_FILE_SIZE
         path = tmp_path / 'DDRW'
         path.write_bytes(bytes(DDRW_FILE_SIZE))
         args = argparse.Namespace(
@@ -9477,8 +9477,8 @@ class TestSoundCmdEditExpanded:
 
     def test_edit_dry_run(self, tmp_path, capsys):
         """Sound edit dry run shows changes without writing."""
-        from u3edit.sound import cmd_edit
-        from u3edit.constants import SOSA_FILE_SIZE
+        from ult3edit.sound import cmd_edit
+        from ult3edit.constants import SOSA_FILE_SIZE
         path = tmp_path / 'SOSA'
         path.write_bytes(bytes(SOSA_FILE_SIZE))
         args = argparse.Namespace(
@@ -9491,8 +9491,8 @@ class TestSoundCmdEditExpanded:
 
     def test_edit_with_backup(self, tmp_path):
         """Sound edit --backup creates .bak file."""
-        from u3edit.sound import cmd_edit
-        from u3edit.constants import SOSA_FILE_SIZE
+        from ult3edit.sound import cmd_edit
+        from ult3edit.constants import SOSA_FILE_SIZE
         path = tmp_path / 'SOSA'
         path.write_bytes(bytes(SOSA_FILE_SIZE))
         args = argparse.Namespace(
@@ -9550,14 +9550,14 @@ class TestCharacterNameTruncation:
 
     def test_name_13_chars_exact(self):
         """13-character name fills exactly to the limit."""
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         char = Character(bytearray(CHAR_RECORD_SIZE))
         char.name = 'ABCDEFGHIJKLM'  # 13 chars
         assert char.name == 'ABCDEFGHIJKLM'
 
     def test_name_14_chars_truncated(self):
         """14-character name is truncated to 13."""
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         char = Character(bytearray(CHAR_RECORD_SIZE))
         char.name = 'ABCDEFGHIJKLMN'  # 14 chars
         assert char.name == 'ABCDEFGHIJKLM'  # truncated to 13
@@ -9566,7 +9566,7 @@ class TestCharacterNameTruncation:
 
     def test_name_short_null_fills(self):
         """Short name null-fills the remaining field bytes."""
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         char = Character(bytearray(CHAR_RECORD_SIZE))
         char.name = 'AB'
         assert char.name == 'AB'
@@ -9580,7 +9580,7 @@ class TestCombatMonsterOverlap:
 
     def test_monster_monster_overlap_warns(self):
         """Two monsters at the same position produce a warning."""
-        from u3edit.combat import CombatMap, validate_combat_map
+        from ult3edit.combat import CombatMap, validate_combat_map
         data = bytearray(CON_FILE_SIZE)
         cm = CombatMap(data)
         # Place monster 0 and monster 1 at same position
@@ -9595,7 +9595,7 @@ class TestCombatMonsterOverlap:
 
     def test_no_overlap_no_warning(self):
         """Monsters at different positions produce no overlap warning."""
-        from u3edit.combat import CombatMap, validate_combat_map
+        from ult3edit.combat import CombatMap, validate_combat_map
         data = bytearray(CON_FILE_SIZE)
         cm = CombatMap(data)
         cm.monster_x[0] = 3
@@ -9616,7 +9616,7 @@ class TestDispatchIntegration:
 
     def test_equip_view_text(self, capsys):
         """equip view text mode shows weapon and armor tables."""
-        from u3edit.equip import cmd_view
+        from ult3edit.equip import cmd_view
         args = argparse.Namespace(json=False, output=None)
         cmd_view(args)
         out = capsys.readouterr().out
@@ -9627,7 +9627,7 @@ class TestDispatchIntegration:
 
     def test_equip_dispatch_view(self, capsys):
         """equip dispatch routes 'view' correctly."""
-        from u3edit.equip import dispatch
+        from ult3edit.equip import dispatch
         args = argparse.Namespace(equip_command='view', json=False, output=None)
         dispatch(args)
         out = capsys.readouterr().out
@@ -9635,7 +9635,7 @@ class TestDispatchIntegration:
 
     def test_equip_dispatch_none(self, capsys):
         """equip dispatch with no subcommand shows usage."""
-        from u3edit.equip import dispatch
+        from ult3edit.equip import dispatch
         args = argparse.Namespace(equip_command=None)
         dispatch(args)
         err = capsys.readouterr().err
@@ -9643,7 +9643,7 @@ class TestDispatchIntegration:
 
     def test_spell_wizard_only(self, capsys):
         """spell view --wizard-only shows only wizard spells."""
-        from u3edit.spell import cmd_view
+        from ult3edit.spell import cmd_view
         args = argparse.Namespace(
             json=False, output=None,
             wizard_only=True, cleric_only=False)
@@ -9654,7 +9654,7 @@ class TestDispatchIntegration:
 
     def test_spell_cleric_only(self, capsys):
         """spell view --cleric-only shows only cleric spells."""
-        from u3edit.spell import cmd_view
+        from ult3edit.spell import cmd_view
         args = argparse.Namespace(
             json=False, output=None,
             wizard_only=False, cleric_only=True)
@@ -9665,7 +9665,7 @@ class TestDispatchIntegration:
 
     def test_spell_dispatch_none(self, capsys):
         """spell dispatch with no subcommand shows usage."""
-        from u3edit.spell import dispatch
+        from ult3edit.spell import dispatch
         args = argparse.Namespace(spell_command=None)
         dispatch(args)
         err = capsys.readouterr().err
@@ -9673,7 +9673,7 @@ class TestDispatchIntegration:
 
     def test_combat_dispatch_view(self, tmp_path, capsys):
         """combat dispatch routes 'view' correctly."""
-        from u3edit.combat import dispatch
+        from ult3edit.combat import dispatch
         con = tmp_path / 'CONA'
         con.write_bytes(bytes(CON_FILE_SIZE))
         args = argparse.Namespace(
@@ -9685,7 +9685,7 @@ class TestDispatchIntegration:
 
     def test_special_dispatch_view(self, tmp_path, capsys):
         """special dispatch routes 'view' correctly."""
-        from u3edit.special import dispatch
+        from ult3edit.special import dispatch
         brnd = tmp_path / 'BRND'
         brnd.write_bytes(bytes(SPECIAL_FILE_SIZE))
         args = argparse.Namespace(
@@ -9697,7 +9697,7 @@ class TestDispatchIntegration:
 
     def test_save_dispatch_view(self, tmp_path, capsys):
         """save dispatch routes 'view' correctly."""
-        from u3edit.save import dispatch
+        from ult3edit.save import dispatch
         prty = tmp_path / 'PRTY'
         data = bytearray(PRTY_FILE_SIZE)
         data[5] = 0xFF
@@ -9711,8 +9711,8 @@ class TestDispatchIntegration:
 
     def test_ddrw_dispatch_view(self, tmp_path, capsys):
         """ddrw dispatch routes 'view' correctly."""
-        from u3edit.ddrw import dispatch
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.ddrw import dispatch
+        from ult3edit.constants import DDRW_FILE_SIZE
         ddrw = tmp_path / 'DDRW'
         ddrw.write_bytes(bytes(DDRW_FILE_SIZE))
         args = argparse.Namespace(
@@ -9724,8 +9724,8 @@ class TestDispatchIntegration:
 
     def test_sound_dispatch_view(self, tmp_path, capsys):
         """sound dispatch routes 'view' correctly."""
-        from u3edit.sound import dispatch
-        from u3edit.constants import SOSA_FILE_SIZE
+        from ult3edit.sound import dispatch
+        from ult3edit.constants import SOSA_FILE_SIZE
         sosa = tmp_path / 'SOSA'
         sosa.write_bytes(bytes(SOSA_FILE_SIZE))
         args = argparse.Namespace(
@@ -9745,8 +9745,8 @@ class TestTextImportNoPhantomRecords:
 
     def test_import_shorter_records_no_phantoms(self, tmp_path, capsys):
         """Importing fewer/shorter records doesn't leave stale data."""
-        from u3edit.text import cmd_import, load_text_records
-        from u3edit.fileutil import encode_high_ascii
+        from ult3edit.text import cmd_import, load_text_records
+        from ult3edit.fileutil import encode_high_ascii
         # Build a TEXT file with 3 original records
         data = bytearray(TEXT_FILE_SIZE)
         offset = 0
@@ -9774,8 +9774,8 @@ class TestTextImportNoPhantomRecords:
 
     def test_import_same_count_exact(self, tmp_path, capsys):
         """Importing same number of records produces exact count."""
-        from u3edit.text import cmd_import, load_text_records
-        from u3edit.fileutil import encode_high_ascii
+        from ult3edit.text import cmd_import, load_text_records
+        from ult3edit.fileutil import encode_high_ascii
         data = bytearray(TEXT_FILE_SIZE)
         offset = 0
         for text in ['AAA', 'BBB']:
@@ -9799,8 +9799,8 @@ class TestTextImportNoPhantomRecords:
 
     def test_stale_bytes_zeroed(self, tmp_path, capsys):
         """Bytes after final record are zeroed."""
-        from u3edit.text import cmd_import
-        from u3edit.fileutil import encode_high_ascii
+        from ult3edit.text import cmd_import
+        from ult3edit.fileutil import encode_high_ascii
         # Fill file with 0xFF to detect stale data
         data = bytearray([0xFF] * TEXT_FILE_SIZE)
         path = tmp_path / 'TEXT'
@@ -9822,7 +9822,7 @@ class TestTlkEncodeRecordCase:
 
     def test_encode_forces_uppercase(self):
         """encode_record converts lowercase to uppercase high-ASCII."""
-        from u3edit.tlk import encode_record
+        from ult3edit.tlk import encode_record
         data = encode_record(['hello'])
         # Each char should be uppercase: H=0xC8, E=0xC5, L=0xCC, L=0xCC, O=0xCF
         assert data[0] == 0xC8  # H
@@ -9834,14 +9834,14 @@ class TestTlkEncodeRecordCase:
 
     def test_encode_preserves_uppercase(self):
         """encode_record keeps already-uppercase text unchanged."""
-        from u3edit.tlk import encode_record
+        from ult3edit.tlk import encode_record
         data = encode_record(['HELLO'])
         assert data[0] == 0xC8  # H
         assert data[4] == 0xCF  # O
 
     def test_encode_mixed_case(self):
         """encode_record normalizes mixed case to uppercase."""
-        from u3edit.tlk import encode_record
+        from ult3edit.tlk import encode_record
         data = encode_record(['HeLLo'])
         assert data[0] == 0xC8  # H
         assert data[1] == 0xC5  # E (was lowercase e)
@@ -9853,7 +9853,7 @@ class TestTlkFindReplaceError:
 
     def test_find_without_replace_exits(self, tmp_path, capsys):
         """--find without --replace gives correct error message."""
-        from u3edit.tlk import cmd_edit
+        from ult3edit.tlk import cmd_edit
         tlk = tmp_path / 'TLKA'
         tlk.write_bytes(bytes(64))
         args = argparse.Namespace(
@@ -9867,7 +9867,7 @@ class TestTlkFindReplaceError:
 
     def test_replace_without_find_exits(self, tmp_path, capsys):
         """--replace without --find gives correct error message."""
-        from u3edit.tlk import cmd_edit
+        from ult3edit.tlk import cmd_edit
         tlk = tmp_path / 'TLKA'
         tlk.write_bytes(bytes(64))
         args = argparse.Namespace(
@@ -9889,7 +9889,7 @@ class TestSpecialTruncatedFile:
 
     def test_truncated_file_json_no_crash(self, tmp_path):
         """Truncated special file doesn't crash in single-file JSON export."""
-        from u3edit.special import cmd_view
+        from ult3edit.special import cmd_view
         path = tmp_path / 'BRND'
         path.write_bytes(bytes(50))  # 50 < 128 (SPECIAL_FILE_SIZE)
         outfile = tmp_path / 'special.json'
@@ -9902,7 +9902,7 @@ class TestSpecialTruncatedFile:
 
     def test_full_file_json_complete(self, tmp_path):
         """Full-size special file produces complete 11x11 grid."""
-        from u3edit.special import cmd_view
+        from ult3edit.special import cmd_view
         path = tmp_path / 'BRND'
         path.write_bytes(bytes(SPECIAL_FILE_SIZE))
         outfile = tmp_path / 'special.json'
@@ -9919,7 +9919,7 @@ class TestDiskContextLeakGuard:
 
     def test_enter_failure_cleans_tmpdir(self, tmp_path):
         """DiskContext cleans up temp dir when disk extraction raises."""
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         # Use a non-existent image path and non-existent tool
         fake_image = str(tmp_path / 'nonexistent.po')
         ctx = DiskContext(fake_image, diskiigs_path='/nonexistent/tool')
@@ -9934,7 +9934,7 @@ class TestMapEditorDungeonPadding:
 
     def test_short_dungeon_file_pads(self):
         """Short dungeon data is padded to at least 256 bytes."""
-        from u3edit.tui.map_editor import MapEditor
+        from ult3edit.tui.map_editor import MapEditor
         # 100-byte file (less than one dungeon level)
         data = bytes(100)
         editor = MapEditor('test', data, is_dungeon=True)
@@ -9950,8 +9950,8 @@ class TestDialogEditorEmptyRecord:
 
     def test_encode_empty_lines_produces_nonzero(self):
         """encode_record(['']) produces at least 1 byte before stripping."""
-        from u3edit.tlk import encode_record
-        from u3edit.constants import TLK_RECORD_END
+        from ult3edit.tlk import encode_record
+        from ult3edit.constants import TLK_RECORD_END
         result = encode_record([''])
         # Empty line should produce just TLK_RECORD_END (0x00)
         assert len(result) >= 1
@@ -9962,9 +9962,9 @@ class TestDialogEditorEmptyRecord:
 
     def test_dialog_editor_save_preserves_records(self):
         """DialogEditor save doesn't collapse null separators."""
-        from u3edit.tui.dialog_editor import DialogEditor
-        from u3edit.tlk import encode_record
-        from u3edit.constants import TLK_RECORD_END
+        from ult3edit.tui.dialog_editor import DialogEditor
+        from ult3edit.tlk import encode_record
+        from ult3edit.constants import TLK_RECORD_END
         # Build a TLK-like blob with 3 records
         records = [
             encode_record(['HELLO'])[:-1],  # strip trailing null
@@ -10006,7 +10006,7 @@ class TestRosterErrorPaths:
 
     def test_view_slot_out_of_range(self, tmp_path):
         """cmd_view with --slot out of range exits."""
-        from u3edit.roster import cmd_view
+        from ult3edit.roster import cmd_view
         path = self._make_roster(tmp_path)
         args = argparse.Namespace(
             file=path, json=False, output=None,
@@ -10016,7 +10016,7 @@ class TestRosterErrorPaths:
 
     def test_edit_no_slot_no_all(self, tmp_path):
         """cmd_edit without --slot or --all exits."""
-        from u3edit.roster import cmd_edit
+        from ult3edit.roster import cmd_edit
         path = self._make_roster(tmp_path)
         args = argparse.Namespace(
             file=path, slot=None, all=False,
@@ -10027,7 +10027,7 @@ class TestRosterErrorPaths:
 
     def test_edit_slot_out_of_range(self, tmp_path):
         """cmd_edit with --slot out of range exits."""
-        from u3edit.roster import cmd_edit
+        from ult3edit.roster import cmd_edit
         path = self._make_roster(tmp_path)
         args = argparse.Namespace(
             file=path, slot=99, all=False,
@@ -10038,7 +10038,7 @@ class TestRosterErrorPaths:
 
     def test_edit_empty_slot(self, tmp_path):
         """cmd_edit on empty slot exits with helpful message."""
-        from u3edit.roster import cmd_edit
+        from ult3edit.roster import cmd_edit
         path = self._make_roster(tmp_path, name_in_slot0=None)
         args = argparse.Namespace(
             file=path, slot=0, all=False,
@@ -10049,7 +10049,7 @@ class TestRosterErrorPaths:
 
     def test_create_slot_out_of_range(self, tmp_path):
         """cmd_create with --slot out of range exits."""
-        from u3edit.roster import cmd_create
+        from ult3edit.roster import cmd_create
         path = self._make_roster(tmp_path)
         args = argparse.Namespace(
             file=path, slot=99, force=False,
@@ -10065,7 +10065,7 @@ class TestRosterErrorPaths:
 
     def test_create_occupied_slot_no_force(self, tmp_path, capsys):
         """cmd_create on occupied slot without --force exits."""
-        from u3edit.roster import cmd_create
+        from ult3edit.roster import cmd_create
         path = self._make_roster(tmp_path)
         args = argparse.Namespace(
             file=path, slot=0, force=False,
@@ -10083,7 +10083,7 @@ class TestRosterErrorPaths:
 
     def test_import_non_list_json(self, tmp_path):
         """cmd_import with non-list JSON exits."""
-        from u3edit.roster import cmd_import
+        from ult3edit.roster import cmd_import
         path = self._make_roster(tmp_path)
         json_path = tmp_path / 'bad.json'
         json_path.write_text('{"name": "not a list"}')
@@ -10099,7 +10099,7 @@ class TestSaveErrorPaths:
 
     def test_view_no_prty(self, tmp_path):
         """cmd_view with no PRTY file exits."""
-        from u3edit.save import cmd_view
+        from ult3edit.save import cmd_view
         args = argparse.Namespace(
             game_dir=str(tmp_path), json=False, output=None,
             validate=False, brief=True)
@@ -10108,7 +10108,7 @@ class TestSaveErrorPaths:
 
     def test_edit_no_prty(self, tmp_path):
         """cmd_edit with no PRTY file exits."""
-        from u3edit.save import cmd_edit
+        from ult3edit.save import cmd_edit
         args = argparse.Namespace(
             game_dir=str(tmp_path), transport=None, x=1, y=1,
             party_size=None, slot_ids=None, sentinel=None,
@@ -10119,7 +10119,7 @@ class TestSaveErrorPaths:
 
     def test_edit_invalid_transport(self, tmp_path, capsys):
         """cmd_edit with invalid transport name exits."""
-        from u3edit.save import cmd_edit
+        from ult3edit.save import cmd_edit
         prty = tmp_path / 'PRTY'
         data = bytearray(PRTY_FILE_SIZE)
         data[5] = 0xFF
@@ -10134,7 +10134,7 @@ class TestSaveErrorPaths:
 
     def test_edit_invalid_location(self, tmp_path, capsys):
         """cmd_edit with invalid location name exits."""
-        from u3edit.save import cmd_edit
+        from ult3edit.save import cmd_edit
         prty = tmp_path / 'PRTY'
         data = bytearray(PRTY_FILE_SIZE)
         data[5] = 0xFF
@@ -10149,7 +10149,7 @@ class TestSaveErrorPaths:
 
     def test_edit_plrs_slot_no_plrs(self, tmp_path):
         """cmd_edit with --plrs-slot but no PLRS file exits."""
-        from u3edit.save import cmd_edit
+        from ult3edit.save import cmd_edit
         prty = tmp_path / 'PRTY'
         data = bytearray(PRTY_FILE_SIZE)
         data[5] = 0xFF
@@ -10170,7 +10170,7 @@ class TestSaveErrorPaths:
 
     def test_import_no_prty(self, tmp_path):
         """cmd_import with no PRTY file exits."""
-        from u3edit.save import cmd_import
+        from ult3edit.save import cmd_import
         json_path = tmp_path / 'save.json'
         json_path.write_text(json.dumps({'party': {'transport': 'foot'}}))
         args = argparse.Namespace(
@@ -10185,7 +10185,7 @@ class TestBestiaryErrorPaths:
 
     def test_edit_no_monster_no_all(self, tmp_path):
         """cmd_edit without --monster or --all exits."""
-        from u3edit.bestiary import cmd_edit
+        from ult3edit.bestiary import cmd_edit
         mon = tmp_path / 'MONA'
         mon.write_bytes(bytes(MON_FILE_SIZE))
         args = argparse.Namespace(
@@ -10198,7 +10198,7 @@ class TestBestiaryErrorPaths:
 
     def test_edit_monster_out_of_range(self, tmp_path):
         """cmd_edit with monster index > 15 exits."""
-        from u3edit.bestiary import cmd_edit
+        from ult3edit.bestiary import cmd_edit
         mon = tmp_path / 'MONA'
         mon.write_bytes(bytes(MON_FILE_SIZE))
         args = argparse.Namespace(
@@ -10215,7 +10215,7 @@ class TestTlkErrorPaths:
 
     def test_view_no_tlk_files(self, tmp_path):
         """cmd_view on empty directory exits."""
-        from u3edit.tlk import cmd_view
+        from ult3edit.tlk import cmd_view
         args = argparse.Namespace(
             path=str(tmp_path), json=False, output=None)
         with pytest.raises(SystemExit):
@@ -10223,8 +10223,8 @@ class TestTlkErrorPaths:
 
     def test_edit_no_args_exits(self, tmp_path):
         """cmd_edit with no --record/--text and no --find/--replace exits."""
-        from u3edit.tlk import cmd_edit
-        from u3edit.tlk import encode_record
+        from ult3edit.tlk import cmd_edit
+        from ult3edit.tlk import encode_record
         tlk = tmp_path / 'TLKA'
         tlk.write_bytes(encode_record(['TEST']))
         args = argparse.Namespace(
@@ -10270,7 +10270,7 @@ class TestPrtyRoundTrip:
 
     def test_json_export_import_roundtrip(self, tmp_path):
         """Export PRTY to JSON via to_dict, re-import via cmd_import, verify."""
-        from u3edit.save import cmd_import as save_import
+        from ult3edit.save import cmd_import as save_import
 
         # Set up initial PRTY state
         data = bytearray(PRTY_FILE_SIZE)
@@ -10328,7 +10328,7 @@ class TestRosterFullRoundTrip:
 
     def _make_full_character(self):
         """Create a character with every field set to non-default values."""
-        from u3edit.constants import CHAR_ARMOR_START, CHAR_WEAPON_START
+        from ult3edit.constants import CHAR_ARMOR_START, CHAR_WEAPON_START
         data = bytearray(CHAR_RECORD_SIZE)
         char = Character(data)
         char.name = 'TESTHEROINE'
@@ -10487,8 +10487,8 @@ class TestCombatPaddingRoundTrip:
 
     def test_padding_and_runtime_preservation(self, tmp_path):
         """Non-zero padding and runtime bytes survive CombatMap round-trip."""
-        from u3edit.combat import CombatMap
-        from u3edit.constants import (
+        from ult3edit.combat import CombatMap
+        from ult3edit.constants import (
             CON_PADDING1_OFFSET, CON_PADDING1_SIZE,
             CON_RUNTIME_MONSAVE_OFFSET,
             CON_RUNTIME_PCSAVE_OFFSET,
@@ -10513,8 +10513,8 @@ class TestCombatPaddingRoundTrip:
 
     def test_json_roundtrip_preserves_padding(self, tmp_path):
         """Export CON to JSON dict, import it back, verify padding intact."""
-        from u3edit.combat import CombatMap, cmd_import as combat_import
-        from u3edit.constants import (
+        from ult3edit.combat import CombatMap, cmd_import as combat_import
+        from ult3edit.constants import (
             CON_PADDING1_OFFSET, CON_PADDING1_SIZE,
             CON_PADDING2_OFFSET, CON_PADDING2_SIZE,
             CON_RUNTIME_MONSAVE_OFFSET, CON_RUNTIME_PCSAVE_OFFSET,
@@ -10561,7 +10561,7 @@ class TestSpecialTrailingBytesRoundTrip:
 
     def test_trailing_bytes_preserved(self, tmp_path):
         """Import special location tiles, verify trailing 7 bytes unchanged."""
-        from u3edit.special import cmd_import as special_import
+        from ult3edit.special import cmd_import as special_import
 
         data = bytearray(SPECIAL_FILE_SIZE)
         for i in range(121):
@@ -10593,7 +10593,7 @@ class TestSpecialTrailingBytesRoundTrip:
 
     def test_trailing_bytes_absent_preserves_original(self, tmp_path):
         """Import JSON without trailing_bytes key preserves original padding."""
-        from u3edit.special import cmd_import as special_import
+        from ult3edit.special import cmd_import as special_import
 
         data = bytearray(SPECIAL_FILE_SIZE)
         for i in range(7):
@@ -10621,7 +10621,7 @@ class TestMapJsonRoundTrip:
 
     def test_overworld_export_import_cycle(self, tmp_path):
         """Export overworld as JSON, import back, verify identical bytes."""
-        from u3edit.map import cmd_view as map_view, cmd_import as map_import
+        from ult3edit.map import cmd_view as map_view, cmd_import as map_import
 
         data = bytearray(MAP_OVERWORLD_SIZE)
         for i in range(MAP_OVERWORLD_SIZE):
@@ -10659,7 +10659,7 @@ class TestTlkMultilineRoundTrip:
 
     def test_multiline_encode_decode(self):
         """Multi-line records round-trip through encode→decode."""
-        from u3edit.tlk import encode_record, decode_record
+        from ult3edit.tlk import encode_record, decode_record
         lines = ['HELLO TRAVELER', 'WELCOME TO TOWN', 'FAREWELL']
         encoded = encode_record(lines)
         decoded = decode_record(encoded)
@@ -10667,7 +10667,7 @@ class TestTlkMultilineRoundTrip:
 
     def test_single_line_roundtrip(self):
         """Single-line record round-trips correctly."""
-        from u3edit.tlk import encode_record, decode_record
+        from ult3edit.tlk import encode_record, decode_record
         lines = ['GOOD DAY']
         encoded = encode_record(lines)
         decoded = decode_record(encoded)
@@ -10675,7 +10675,7 @@ class TestTlkMultilineRoundTrip:
 
     def test_empty_string_in_lines(self):
         """Records with empty lines survive round-trip."""
-        from u3edit.tlk import encode_record, decode_record
+        from ult3edit.tlk import encode_record, decode_record
         lines = ['START', '', 'END']
         encoded = encode_record(lines)
         decoded = decode_record(encoded)
@@ -10691,7 +10691,7 @@ class TestMbsParsingFixes:
 
     def test_loop_opcode_handled(self):
         """LOOP opcode (0x80) is parsed as its own event type."""
-        from u3edit.sound import parse_mbs_stream
+        from ult3edit.sound import parse_mbs_stream
         data = bytes([0x80, 0x05, 0x82])  # LOOP, NOTE 5, END
         events = parse_mbs_stream(data)
         assert len(events) == 3
@@ -10702,7 +10702,7 @@ class TestMbsParsingFixes:
 
     def test_jump_truncated_marked(self):
         """JUMP at end of data marks event as truncated."""
-        from u3edit.sound import parse_mbs_stream
+        from ult3edit.sound import parse_mbs_stream
         data = bytes([0x81])  # JUMP with no operands
         events = parse_mbs_stream(data)
         assert len(events) == 1
@@ -10712,7 +10712,7 @@ class TestMbsParsingFixes:
 
     def test_jump_with_full_operand(self):
         """JUMP with full 2-byte operand reads target address."""
-        from u3edit.sound import parse_mbs_stream
+        from ult3edit.sound import parse_mbs_stream
         data = bytes([0x81, 0x34, 0x12, 0x82])  # JUMP $1234, END
         events = parse_mbs_stream(data)
         assert len(events) == 2
@@ -10722,7 +10722,7 @@ class TestMbsParsingFixes:
 
     def test_write_truncated_marked(self):
         """WRITE at end of data marks event as truncated."""
-        from u3edit.sound import parse_mbs_stream
+        from ult3edit.sound import parse_mbs_stream
         data = bytes([0x83])  # WRITE with no operands
         events = parse_mbs_stream(data)
         assert len(events) == 1
@@ -10731,7 +10731,7 @@ class TestMbsParsingFixes:
 
     def test_tempo_truncated_marked(self):
         """TEMPO at end of data marks event as truncated."""
-        from u3edit.sound import parse_mbs_stream
+        from ult3edit.sound import parse_mbs_stream
         data = bytes([0x84])  # TEMPO with no operand
         events = parse_mbs_stream(data)
         assert len(events) == 1
@@ -10740,7 +10740,7 @@ class TestMbsParsingFixes:
 
     def test_full_stream_parse(self):
         """Complete MBS stream with multiple event types parses correctly."""
-        from u3edit.sound import parse_mbs_stream
+        from ult3edit.sound import parse_mbs_stream
         data = bytes([
             0x84, 0x06,       # TEMPO 6
             0x85, 0x38,       # MIXER $38
@@ -10763,7 +10763,7 @@ class TestShapesOverlayBoundsFix:
 
     def test_string_at_end_of_data(self):
         """JSR $46BA pattern at the last possible position is found."""
-        from u3edit.shapes import extract_overlay_strings
+        from ult3edit.shapes import extract_overlay_strings
         # Build data where JSR $46BA + inline string starts at len-3
         prefix = bytes(10)  # 10 zero bytes
         jsr = bytes([0x20, 0xBA, 0x46])  # JSR $46BA
@@ -10776,7 +10776,7 @@ class TestShapesOverlayBoundsFix:
 
     def test_string_at_exact_boundary(self):
         """JSR $46BA pattern exactly at data end (no text following) found."""
-        from u3edit.shapes import extract_overlay_strings
+        from ult3edit.shapes import extract_overlay_strings
         # JSR pattern at end with only null terminator after
         prefix = bytes(5)
         jsr = bytes([0x20, 0xBA, 0x46])
@@ -10796,7 +10796,7 @@ class TestResolveSingleFile:
 
     def test_find_plain_file(self, tmp_path):
         """Finds a plain file by name."""
-        from u3edit.fileutil import resolve_single_file
+        from ult3edit.fileutil import resolve_single_file
         (tmp_path / 'PRTY').write_bytes(b'\x00' * 16)
         result = resolve_single_file(str(tmp_path), 'PRTY')
         assert result is not None
@@ -10804,7 +10804,7 @@ class TestResolveSingleFile:
 
     def test_find_prodos_hashed_file(self, tmp_path):
         """Finds a file with ProDOS #hash suffix."""
-        from u3edit.fileutil import resolve_single_file
+        from ult3edit.fileutil import resolve_single_file
         (tmp_path / 'PRTY#069500').write_bytes(b'\x00' * 16)
         result = resolve_single_file(str(tmp_path), 'PRTY')
         assert result is not None
@@ -10812,13 +10812,13 @@ class TestResolveSingleFile:
 
     def test_not_found_returns_none(self, tmp_path):
         """Returns None when file doesn't exist."""
-        from u3edit.fileutil import resolve_single_file
+        from ult3edit.fileutil import resolve_single_file
         result = resolve_single_file(str(tmp_path), 'NOSUCHFILE')
         assert result is None
 
     def test_prefers_hashed_over_plain(self, tmp_path):
         """When both plain and hashed exist, hashed is returned first."""
-        from u3edit.fileutil import resolve_single_file
+        from ult3edit.fileutil import resolve_single_file
         (tmp_path / 'ROST#069500').write_bytes(b'\x00' * 64)
         (tmp_path / 'ROST').write_bytes(b'\x00' * 64)
         result = resolve_single_file(str(tmp_path), 'ROST')
@@ -10831,7 +10831,7 @@ class TestResolveGameFile:
 
     def test_find_with_hash(self, tmp_path):
         """Finds MAPA#061000 style files."""
-        from u3edit.fileutil import resolve_game_file
+        from ult3edit.fileutil import resolve_game_file
         (tmp_path / 'MAPA#061000').write_bytes(b'\x00' * 100)
         result = resolve_game_file(str(tmp_path), 'MAP', 'A')
         assert result is not None
@@ -10839,7 +10839,7 @@ class TestResolveGameFile:
 
     def test_find_plain(self, tmp_path):
         """Falls back to plain name if no hash file exists."""
-        from u3edit.fileutil import resolve_game_file
+        from ult3edit.fileutil import resolve_game_file
         (tmp_path / 'CONA').write_bytes(b'\x00' * 192)
         result = resolve_game_file(str(tmp_path), 'CON', 'A')
         assert result is not None
@@ -10847,13 +10847,13 @@ class TestResolveGameFile:
 
     def test_not_found(self, tmp_path):
         """Returns None if neither hashed nor plain exists."""
-        from u3edit.fileutil import resolve_game_file
+        from ult3edit.fileutil import resolve_game_file
         result = resolve_game_file(str(tmp_path), 'MAP', 'Z')
         assert result is None
 
     def test_excludes_dproj(self, tmp_path):
         """Files ending in .dproj are excluded."""
-        from u3edit.fileutil import resolve_game_file
+        from ult3edit.fileutil import resolve_game_file
         (tmp_path / 'MAPA#061000.dproj').write_bytes(b'\x00')
         result = resolve_game_file(str(tmp_path), 'MAP', 'A')
         assert result is None
@@ -10864,7 +10864,7 @@ class TestFindGameFiles:
 
     def test_finds_multiple(self, tmp_path):
         """Finds all existing files across letter range."""
-        from u3edit.fileutil import find_game_files
+        from ult3edit.fileutil import find_game_files
         (tmp_path / 'CONA').write_bytes(b'\x00' * 192)
         (tmp_path / 'CONC').write_bytes(b'\x00' * 192)
         result = find_game_files(str(tmp_path), 'CON', 'ABCDE')
@@ -10875,7 +10875,7 @@ class TestFindGameFiles:
 
     def test_empty_directory(self, tmp_path):
         """Returns empty list for empty directory."""
-        from u3edit.fileutil import find_game_files
+        from ult3edit.fileutil import find_game_files
         result = find_game_files(str(tmp_path), 'CON', 'ABCDE')
         assert result == []
 
@@ -10889,7 +10889,7 @@ class TestPatchInlineString:
 
     def test_patch_exact_fit(self):
         """Replacement text exactly fills available space."""
-        from u3edit.patch import _patch_inline_string
+        from ult3edit.patch import _patch_inline_string
         data = bytearray(20)
         # Simulate inline string: "ABC" (3 bytes) at offset 5, ending at 8
         for i, ch in enumerate('ABC'):
@@ -10906,7 +10906,7 @@ class TestPatchInlineString:
 
     def test_patch_shorter_nullfills(self):
         """Shorter replacement null-fills remaining space."""
-        from u3edit.patch import _patch_inline_string
+        from ult3edit.patch import _patch_inline_string
         data = bytearray(20)
         for i, ch in enumerate('ABCDE'):
             data[5 + i] = ord(ch) | 0x80
@@ -10924,7 +10924,7 @@ class TestPatchInlineString:
 
     def test_patch_too_long_fails(self):
         """Text longer than available space returns failure."""
-        from u3edit.patch import _patch_inline_string
+        from ult3edit.patch import _patch_inline_string
         data = bytearray(20)
         info = {'text_offset': 5, 'text_end': 7, 'text': 'AB', 'index': 0}
         ok, msg = _patch_inline_string(data, info, 'TOOLONG')
@@ -10933,7 +10933,7 @@ class TestPatchInlineString:
 
     def test_resolve_by_index(self):
         """_resolve_string_target finds by index."""
-        from u3edit.patch import _resolve_string_target
+        from ult3edit.patch import _resolve_string_target
         strings = [
             {'index': 0, 'text': 'HELLO', 'address': 0x100},
             {'index': 1, 'text': 'WORLD', 'address': 0x110},
@@ -10944,7 +10944,7 @@ class TestPatchInlineString:
 
     def test_resolve_by_vanilla_text(self):
         """_resolve_string_target finds by vanilla text (case-insensitive)."""
-        from u3edit.patch import _resolve_string_target
+        from ult3edit.patch import _resolve_string_target
         strings = [
             {'index': 0, 'text': 'HELLO', 'address': 0x100},
             {'index': 1, 'text': 'WORLD', 'address': 0x110},
@@ -10955,7 +10955,7 @@ class TestPatchInlineString:
 
     def test_resolve_by_address(self):
         """_resolve_string_target finds by address."""
-        from u3edit.patch import _resolve_string_target
+        from ult3edit.patch import _resolve_string_target
         strings = [
             {'index': 0, 'text': 'HELLO', 'address': 0x100},
             {'index': 1, 'text': 'WORLD', 'address': 0x110},
@@ -10966,14 +10966,14 @@ class TestPatchInlineString:
 
     def test_resolve_no_match(self):
         """_resolve_string_target returns empty list for no match."""
-        from u3edit.patch import _resolve_string_target
+        from ult3edit.patch import _resolve_string_target
         strings = [{'index': 0, 'text': 'HELLO', 'address': 0x100}]
         result = _resolve_string_target(strings, index=99)
         assert result == []
 
     def test_resolve_no_criteria(self):
         """_resolve_string_target returns empty list with no criteria."""
-        from u3edit.patch import _resolve_string_target
+        from ult3edit.patch import _resolve_string_target
         strings = [{'index': 0, 'text': 'HELLO', 'address': 0x100}]
         result = _resolve_string_target(strings)
         assert result == []
@@ -10988,7 +10988,7 @@ class TestShapesPixelHelpers:
 
     def test_scale_pixels_noop(self):
         """Scale factor 1 returns pixels unchanged."""
-        from u3edit.shapes import scale_pixels
+        from ult3edit.shapes import scale_pixels
         pixels = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
         result, w, h = scale_pixels(pixels, 2, 2, 1)
         assert result == pixels
@@ -10997,7 +10997,7 @@ class TestShapesPixelHelpers:
 
     def test_scale_pixels_2x(self):
         """Scale factor 2 doubles each dimension."""
-        from u3edit.shapes import scale_pixels
+        from ult3edit.shapes import scale_pixels
         pixels = [(255, 0, 0), (0, 255, 0),
                   (0, 0, 255), (255, 255, 0)]
         result, w, h = scale_pixels(pixels, 2, 2, 2)
@@ -11012,7 +11012,7 @@ class TestShapesPixelHelpers:
 
     def test_render_hgr_sprite_basic(self):
         """render_hgr_sprite produces correct pixel count."""
-        from u3edit.shapes import render_hgr_sprite
+        from ult3edit.shapes import render_hgr_sprite
         # 1 byte wide, 2 rows tall
         data = bytes([0x00, 0x7F])
         pixels = render_hgr_sprite(data, width_bytes=1, height=2, offset=0)
@@ -11021,7 +11021,7 @@ class TestShapesPixelHelpers:
 
     def test_hgr_ascii_preview_basic(self):
         """hgr_ascii_preview produces text representation."""
-        from u3edit.shapes import hgr_ascii_preview
+        from ult3edit.shapes import hgr_ascii_preview
         # Create simple 2x2 pixel data
         black = (0, 0, 0)
         white = (255, 255, 255)
@@ -11039,7 +11039,7 @@ class TestDdrwParsing:
 
     def test_parse_vectors_full(self):
         """parse_vectors reads 32 bytes at vector offset."""
-        from u3edit.ddrw import parse_vectors, DDRW_VECTOR_OFFSET
+        from ult3edit.ddrw import parse_vectors, DDRW_VECTOR_OFFSET
         data = bytearray(1792)
         for i in range(32):
             data[DDRW_VECTOR_OFFSET + i] = i + 1
@@ -11050,7 +11050,7 @@ class TestDdrwParsing:
 
     def test_parse_vectors_truncated(self):
         """parse_vectors pads with zeros for truncated data."""
-        from u3edit.ddrw import parse_vectors
+        from ult3edit.ddrw import parse_vectors
         data = bytes(100)  # Too short for vector offset
         result = parse_vectors(data)
         assert len(result) == 32
@@ -11058,7 +11058,7 @@ class TestDdrwParsing:
 
     def test_parse_tile_records(self):
         """parse_tile_records reads 7-byte records at tile offset."""
-        from u3edit.ddrw import (parse_tile_records, DDRW_TILE_OFFSET,
+        from ult3edit.ddrw import (parse_tile_records, DDRW_TILE_OFFSET,
                                   DDRW_TILE_RECORD_SIZE)
         data = bytearray(1792)
         # Write 2 tile records at offset
@@ -11073,7 +11073,7 @@ class TestDdrwParsing:
 
     def test_cmd_edit_dry_run(self, tmp_path):
         """ddrw cmd_edit --dry-run doesn't modify file."""
-        from u3edit.ddrw import cmd_edit
+        from ult3edit.ddrw import cmd_edit
         ddrw_file = tmp_path / 'DDRW'
         original = bytes(1792)
         ddrw_file.write_bytes(original)
@@ -11085,7 +11085,7 @@ class TestDdrwParsing:
 
     def test_cmd_edit_writes_bytes(self, tmp_path):
         """ddrw cmd_edit patches bytes at offset."""
-        from u3edit.ddrw import cmd_edit
+        from ult3edit.ddrw import cmd_edit
         ddrw_file = tmp_path / 'DDRW'
         ddrw_file.write_bytes(bytes(1792))
         args = argparse.Namespace(
@@ -11097,7 +11097,7 @@ class TestDdrwParsing:
 
     def test_cmd_edit_past_end_exits(self, tmp_path):
         """ddrw cmd_edit past end of file exits with error."""
-        from u3edit.ddrw import cmd_edit
+        from ult3edit.ddrw import cmd_edit
         ddrw_file = tmp_path / 'DDRW'
         ddrw_file.write_bytes(bytes(10))
         args = argparse.Namespace(
@@ -11116,7 +11116,7 @@ class TestSpecialEditorSave:
 
     def test_save_preserves_trailing_bytes(self):
         """SpecialEditor._save() preserves trailing 7 bytes."""
-        from u3edit.tui.special_editor import SpecialEditor
+        from ult3edit.tui.special_editor import SpecialEditor
 
         data = bytearray(128)
         # Fill tiles with grass
@@ -11146,8 +11146,8 @@ class TestSpecialEditorSave:
 
     def test_save_with_short_data(self):
         """SpecialEditor pads short data to at least tile grid size."""
-        from u3edit.tui.special_editor import SpecialEditor
-        from u3edit.constants import SPECIAL_MAP_TILES
+        from ult3edit.tui.special_editor import SpecialEditor
+        from ult3edit.constants import SPECIAL_MAP_TILES
 
         data = bytes(100)  # Shorter than 121 tiles
         saved_data = None
@@ -11172,7 +11172,7 @@ class TestImportTypeValidation:
 
     def test_sound_import_non_int_in_raw_exits(self, tmp_path):
         """sound cmd_import with non-integer in raw array exits gracefully."""
-        from u3edit.sound import cmd_import as sound_import
+        from ult3edit.sound import cmd_import as sound_import
         json_file = tmp_path / 'bad.json'
         json_file.write_text(json.dumps({'raw': ['hello', 123]}))
         snd_file = tmp_path / 'SOSA'
@@ -11185,7 +11185,7 @@ class TestImportTypeValidation:
 
     def test_sound_import_non_list_raw_exits(self, tmp_path):
         """sound cmd_import with non-list raw exits gracefully."""
-        from u3edit.sound import cmd_import as sound_import
+        from ult3edit.sound import cmd_import as sound_import
         json_file = tmp_path / 'bad.json'
         json_file.write_text(json.dumps({'raw': 'not a list'}))
         snd_file = tmp_path / 'SOSA'
@@ -11198,7 +11198,7 @@ class TestImportTypeValidation:
 
     def test_ddrw_import_non_int_in_raw_exits(self, tmp_path):
         """ddrw cmd_import with non-integer in raw array exits gracefully."""
-        from u3edit.ddrw import cmd_import as ddrw_import
+        from ult3edit.ddrw import cmd_import as ddrw_import
         json_file = tmp_path / 'bad.json'
         json_file.write_text(json.dumps({'raw': [1, 2, 'bad', 4]}))
         ddrw_file = tmp_path / 'DDRW'
@@ -11211,7 +11211,7 @@ class TestImportTypeValidation:
 
     def test_ddrw_import_valid_raw_works(self, tmp_path):
         """ddrw cmd_import with valid raw array succeeds."""
-        from u3edit.ddrw import cmd_import as ddrw_import
+        from ult3edit.ddrw import cmd_import as ddrw_import
         json_file = tmp_path / 'good.json'
         json_file.write_text(json.dumps({'raw': [0] * 1792}))
         ddrw_file = tmp_path / 'DDRW'
@@ -11224,7 +11224,7 @@ class TestImportTypeValidation:
 
     def test_sound_import_valid_raw_works(self, tmp_path):
         """sound cmd_import with valid raw array succeeds."""
-        from u3edit.sound import cmd_import as sound_import
+        from ult3edit.sound import cmd_import as sound_import
         json_file = tmp_path / 'good.json'
         json_file.write_text(json.dumps({'raw': [0] * 256}))
         snd_file = tmp_path / 'SOSM'
@@ -11245,26 +11245,26 @@ class TestShpsCodeRegion:
 
     def test_data_too_short(self):
         """Returns False when data is shorter than code region offset."""
-        from u3edit.shapes import check_shps_code_region
+        from ult3edit.shapes import check_shps_code_region
         data = bytes(100)  # Way shorter than SHPS_CODE_OFFSET (0x1F9)
         assert check_shps_code_region(data) is False
 
     def test_code_region_all_zeros(self):
         """Returns False when code region is all zeros."""
-        from u3edit.shapes import check_shps_code_region, SHPS_CODE_OFFSET, SHPS_CODE_SIZE
+        from ult3edit.shapes import check_shps_code_region, SHPS_CODE_OFFSET, SHPS_CODE_SIZE
         data = bytes(SHPS_CODE_OFFSET + SHPS_CODE_SIZE + 100)
         assert check_shps_code_region(data) is False
 
     def test_code_region_has_code(self):
         """Returns True when code region has non-zero bytes."""
-        from u3edit.shapes import check_shps_code_region, SHPS_CODE_OFFSET, SHPS_CODE_SIZE
+        from ult3edit.shapes import check_shps_code_region, SHPS_CODE_OFFSET, SHPS_CODE_SIZE
         data = bytearray(SHPS_CODE_OFFSET + SHPS_CODE_SIZE + 100)
         data[SHPS_CODE_OFFSET] = 0x60  # RTS opcode
         assert check_shps_code_region(data) is True
 
     def test_code_region_last_byte_nonzero(self):
         """Returns True when only last byte of code region is non-zero."""
-        from u3edit.shapes import check_shps_code_region, SHPS_CODE_OFFSET, SHPS_CODE_SIZE
+        from ult3edit.shapes import check_shps_code_region, SHPS_CODE_OFFSET, SHPS_CODE_SIZE
         data = bytearray(SHPS_CODE_OFFSET + SHPS_CODE_SIZE + 100)
         data[SHPS_CODE_OFFSET + SHPS_CODE_SIZE - 1] = 0x01
         assert check_shps_code_region(data) is True
@@ -11279,7 +11279,7 @@ class TestSaveValidationBounds:
 
     def test_valid_coordinates_no_warning(self):
         """Coordinates within 0-63 produce no warnings about coords."""
-        from u3edit.save import validate_party_state
+        from ult3edit.save import validate_party_state
         data = bytearray(PRTY_FILE_SIZE)
         party = PartyState(data)
         party.transport = 'foot'
@@ -11295,7 +11295,7 @@ class TestSaveValidationBounds:
 
     def test_x_out_of_bounds_warning(self):
         """X coordinate > 63 triggers warning."""
-        from u3edit.save import validate_party_state
+        from ult3edit.save import validate_party_state
         data = bytearray(PRTY_FILE_SIZE)
         party = PartyState(data)
         party.transport = 'foot'
@@ -11309,7 +11309,7 @@ class TestSaveValidationBounds:
 
     def test_y_out_of_bounds_warning(self):
         """Y coordinate > 63 triggers warning."""
-        from u3edit.save import validate_party_state
+        from ult3edit.save import validate_party_state
         data = bytearray(PRTY_FILE_SIZE)
         party = PartyState(data)
         party.transport = 'foot'
@@ -11322,7 +11322,7 @@ class TestSaveValidationBounds:
 
     def test_multiple_violations(self):
         """Multiple validation issues produce multiple warnings."""
-        from u3edit.save import validate_party_state
+        from ult3edit.save import validate_party_state
         data = bytearray(PRTY_FILE_SIZE)
         party = PartyState(data)
         # Unknown transport
@@ -11382,7 +11382,7 @@ class TestMapFillEdgeCases:
 
     def test_fill_reversed_coords(self, tmp_path):
         """cmd_fill with x1>x2 clamps x2 to x1 (single column)."""
-        from u3edit.map import cmd_fill
+        from ult3edit.map import cmd_fill
         map_file = tmp_path / 'SOSMAP'
         map_file.write_bytes(bytes(MAP_OVERWORLD_SIZE))
         # Reversed: x1=5 > x2=2 → after clamping: x2=max(5, min(2,63))=5
@@ -11397,7 +11397,7 @@ class TestMapFillEdgeCases:
 
     def test_fill_entire_row(self, tmp_path):
         """cmd_fill across full width fills all tiles in row."""
-        from u3edit.map import cmd_fill
+        from ult3edit.map import cmd_fill
         map_file = tmp_path / 'SOSMAP'
         map_file.write_bytes(bytes(MAP_OVERWORLD_SIZE))
         args = argparse.Namespace(
@@ -11410,7 +11410,7 @@ class TestMapFillEdgeCases:
 
     def test_replace_no_matches(self, tmp_path):
         """cmd_replace with no matching tiles reports 0 changes."""
-        from u3edit.map import cmd_replace
+        from ult3edit.map import cmd_replace
         map_file = tmp_path / 'SOSMAP'
         # All zeros, try to replace 0xFF -> 0x04
         map_file.write_bytes(bytes(MAP_OVERWORLD_SIZE))
@@ -11423,7 +11423,7 @@ class TestMapFillEdgeCases:
 
     def test_replace_preserves_file_size(self, tmp_path):
         """cmd_replace preserves exact file size."""
-        from u3edit.map import cmd_replace
+        from ult3edit.map import cmd_replace
         map_file = tmp_path / 'SOSMAP'
         data = bytearray(MAP_OVERWORLD_SIZE)
         data[0] = 0x04
@@ -11446,8 +11446,8 @@ class TestCombatValidateEdgeCases:
 
     def test_all_positions_populated(self):
         """Validate with all 8 monster + 4 PC positions set."""
-        from u3edit.combat import CombatMap, validate_combat_map
-        from u3edit.constants import (CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET,
+        from ult3edit.combat import CombatMap, validate_combat_map
+        from ult3edit.constants import (CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET,
                                        CON_PC_X_OFFSET, CON_PC_Y_OFFSET)
         data = bytearray(CON_FILE_SIZE)
         # Place 8 monsters in different positions
@@ -11466,8 +11466,8 @@ class TestCombatValidateEdgeCases:
 
     def test_monster_pc_overlap_detected(self):
         """Validate detects monster-PC overlap at same position."""
-        from u3edit.combat import CombatMap, validate_combat_map
-        from u3edit.constants import (CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET,
+        from ult3edit.combat import CombatMap, validate_combat_map
+        from ult3edit.constants import (CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET,
                                        CON_PC_X_OFFSET, CON_PC_Y_OFFSET)
         data = bytearray(CON_FILE_SIZE)
         # Monster 0 at (5, 5)
@@ -11483,7 +11483,7 @@ class TestCombatValidateEdgeCases:
 
     def test_tile_misalignment_count(self):
         """Validate counts multiple misaligned tiles."""
-        from u3edit.combat import CombatMap, validate_combat_map
+        from ult3edit.combat import CombatMap, validate_combat_map
         data = bytearray(CON_FILE_SIZE)
         # Set 3 misaligned tiles (not multiples of 4)
         data[0] = 0x01  # misaligned
@@ -11507,7 +11507,7 @@ class TestBcdEdgeCases:
 
     def test_bcd_to_int_invalid_nibble(self):
         """bcd_to_int(0xFF) returns 165 (15*10 + 15) — undocumented but stable."""
-        from u3edit.bcd import bcd_to_int
+        from ult3edit.bcd import bcd_to_int
         # 0xFF has nibbles F(15) and F(15): 15*10 + 15 = 165
         assert bcd_to_int(0xFF) == 165
         # 0xAB has nibbles A(10) and B(11): 10*10 + 11 = 111
@@ -11515,27 +11515,27 @@ class TestBcdEdgeCases:
 
     def test_bcd16_max_value(self):
         """bcd16_to_int(0x99, 0x99) returns 9999."""
-        from u3edit.bcd import bcd16_to_int
+        from ult3edit.bcd import bcd16_to_int
         assert bcd16_to_int(0x99, 0x99) == 9999
 
     def test_int_to_bcd_negative_clamps(self):
         """int_to_bcd(-5) clamps to 0."""
-        from u3edit.bcd import int_to_bcd
+        from ult3edit.bcd import int_to_bcd
         assert int_to_bcd(-5) == 0x00
 
     def test_int_to_bcd16_negative_clamps(self):
         """int_to_bcd16(-100) clamps to (0, 0)."""
-        from u3edit.bcd import int_to_bcd16
+        from ult3edit.bcd import int_to_bcd16
         assert int_to_bcd16(-100) == (0x00, 0x00)
 
     def test_int_to_bcd16_overflow_clamps(self):
         """int_to_bcd16(10000) clamps to 9999."""
-        from u3edit.bcd import int_to_bcd16
+        from ult3edit.bcd import int_to_bcd16
         assert int_to_bcd16(10000) == (0x99, 0x99)
 
     def test_bcd_roundtrip_all_valid(self):
         """Every value 0-99 round-trips through int_to_bcd→bcd_to_int."""
-        from u3edit.bcd import bcd_to_int, int_to_bcd
+        from ult3edit.bcd import bcd_to_int, int_to_bcd
         for val in range(100):
             assert bcd_to_int(int_to_bcd(val)) == val
 
@@ -11672,7 +11672,7 @@ class TestRosterCmdErrors:
 
     def test_view_slot_out_of_range(self, tmp_path):
         """cmd_view with --slot beyond range exits with error."""
-        from u3edit.roster import cmd_view
+        from ult3edit.roster import cmd_view
         path = self._make_roster_file(tmp_path)
         args = argparse.Namespace(
             file=path, slot=99, json=False, validate=False, output=None)
@@ -11681,7 +11681,7 @@ class TestRosterCmdErrors:
 
     def test_view_negative_slot(self, tmp_path):
         """cmd_view with negative --slot exits with error."""
-        from u3edit.roster import cmd_view
+        from ult3edit.roster import cmd_view
         path = self._make_roster_file(tmp_path)
         args = argparse.Namespace(
             file=path, slot=-1, json=False, validate=False, output=None)
@@ -11690,7 +11690,7 @@ class TestRosterCmdErrors:
 
     def test_create_occupied_slot_no_force(self, tmp_path):
         """cmd_create on occupied slot without --force exits."""
-        from u3edit.roster import cmd_create
+        from ult3edit.roster import cmd_create
         path = self._make_roster_file(tmp_path)
         args = argparse.Namespace(
             file=path, slot=0, force=False, dry_run=True, backup=False,
@@ -11707,7 +11707,7 @@ class TestRosterCmdErrors:
 
     def test_create_slot_out_of_range(self, tmp_path):
         """cmd_create with out-of-range slot exits."""
-        from u3edit.roster import cmd_create
+        from ult3edit.roster import cmd_create
         path = self._make_roster_file(tmp_path)
         args = argparse.Namespace(
             file=path, slot=99, force=True, dry_run=True, backup=False,
@@ -11744,35 +11744,35 @@ class TestPatchNameCompile:
 
     def test_parse_names_file_basic(self):
         """Parse a simple .names file."""
-        from u3edit.patch import _parse_names_file
+        from ult3edit.patch import _parse_names_file
         text = "# Comment\nGRASS\nWATER\n\nFIRE\n"
         result = _parse_names_file(text)
         assert result == ['GRASS', 'WATER', 'FIRE']
 
     def test_parse_names_file_empty_quotes(self):
         """Empty string via double-quotes."""
-        from u3edit.patch import _parse_names_file
+        from ult3edit.patch import _parse_names_file
         text = 'HELLO\n""\nWORLD\n'
         result = _parse_names_file(text)
         assert result == ['HELLO', '', 'WORLD']
 
     def test_parse_names_file_single_quotes(self):
         """Empty string via single-quotes."""
-        from u3edit.patch import _parse_names_file
+        from ult3edit.patch import _parse_names_file
         text = "HELLO\n''\nWORLD\n"
         result = _parse_names_file(text)
         assert result == ['HELLO', '', 'WORLD']
 
     def test_parse_names_comments_and_blanks(self):
         """Comments and blank lines are skipped."""
-        from u3edit.patch import _parse_names_file
+        from ult3edit.patch import _parse_names_file
         text = "# header\n\n# another comment\nONE\n#\nTWO\n"
         result = _parse_names_file(text)
         assert result == ['ONE', 'TWO']
 
     def test_validate_names_within_budget(self):
         """Names within the 921-byte budget pass validation."""
-        from u3edit.patch import _validate_names
+        from ult3edit.patch import _validate_names
         names = ['GRASS', 'WATER', 'FIRE']
         size, budget, valid = _validate_names(names)
         assert valid
@@ -11781,7 +11781,7 @@ class TestPatchNameCompile:
 
     def test_validate_names_overflow(self):
         """Names exceeding the budget fail validation."""
-        from u3edit.patch import _validate_names
+        from ult3edit.patch import _validate_names
         # Create names that total > 891 bytes (921 - 30 reserved)
         names = ['X' * 100] * 10  # 10 * 101 = 1010 bytes > 891
         size, budget, valid = _validate_names(names)
@@ -11790,7 +11790,7 @@ class TestPatchNameCompile:
 
     def test_compile_names_overflow_exits(self, tmp_path):
         """cmd_compile_names with too-large names exits with error."""
-        from u3edit.patch import cmd_compile_names
+        from ult3edit.patch import cmd_compile_names
         source = os.path.join(str(tmp_path), 'big.names')
         with open(source, 'w') as f:
             for i in range(100):
@@ -11801,7 +11801,7 @@ class TestPatchNameCompile:
 
     def test_compile_names_empty_exits(self, tmp_path):
         """cmd_compile_names with no names exits with error."""
-        from u3edit.patch import cmd_compile_names
+        from ult3edit.patch import cmd_compile_names
         source = os.path.join(str(tmp_path), 'empty.names')
         with open(source, 'w') as f:
             f.write('# only comments\n\n')
@@ -11823,7 +11823,7 @@ class TestPatchCmdErrors:
 
     def test_cmd_edit_unknown_region(self, tmp_path):
         """cmd_edit with non-existent region name exits."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = self._make_ult3_binary(tmp_path)
         args = argparse.Namespace(
             file=path, region='nonexistent', data='FF',
@@ -11833,7 +11833,7 @@ class TestPatchCmdErrors:
 
     def test_cmd_edit_invalid_hex(self, tmp_path):
         """cmd_edit with malformed hex exits."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = self._make_ult3_binary(tmp_path)
         args = argparse.Namespace(
             file=path, region='food-rate', data='ZZZZ',
@@ -11843,7 +11843,7 @@ class TestPatchCmdErrors:
 
     def test_cmd_edit_data_too_long(self, tmp_path):
         """cmd_edit with data exceeding region max exits."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = self._make_ult3_binary(tmp_path)
         # food-rate max_length is 1, send 10 bytes
         args = argparse.Namespace(
@@ -11854,7 +11854,7 @@ class TestPatchCmdErrors:
 
     def test_cmd_dump_offset_past_end(self, tmp_path):
         """cmd_dump with offset past EOF exits."""
-        from u3edit.patch import cmd_dump
+        from ult3edit.patch import cmd_dump
         path = self._make_ult3_binary(tmp_path)
         args = argparse.Namespace(
             file=path, offset=99999, length=16)
@@ -11863,7 +11863,7 @@ class TestPatchCmdErrors:
 
     def test_cmd_view_unknown_region_filter(self, tmp_path):
         """cmd_view with region filter for unknown region exits."""
-        from u3edit.patch import cmd_view
+        from ult3edit.patch import cmd_view
         path = self._make_ult3_binary(tmp_path)
         args = argparse.Namespace(
             file=path, region='nonexistent', json=False, output=None)
@@ -11872,7 +11872,7 @@ class TestPatchCmdErrors:
 
     def test_cmd_view_unrecognized_binary(self, tmp_path):
         """cmd_view on unrecognized binary shows warning (no exit)."""
-        from u3edit.patch import cmd_view
+        from ult3edit.patch import cmd_view
         path = os.path.join(str(tmp_path), 'UNKNOWN')
         with open(path, 'wb') as f:
             f.write(b'\x00' * 100)
@@ -11883,7 +11883,7 @@ class TestPatchCmdErrors:
 
     def test_cmd_import_no_matching_regions(self, tmp_path):
         """cmd_import with JSON that has no matching region names exits."""
-        from u3edit.patch import cmd_import
+        from ult3edit.patch import cmd_import
         path = self._make_ult3_binary(tmp_path)
         json_path = os.path.join(str(tmp_path), 'bad.json')
         with open(json_path, 'w') as f:
@@ -11904,7 +11904,7 @@ class TestPatchEncoding:
 
     def test_parse_text_region(self):
         """Parse null-terminated high-ASCII strings."""
-        from u3edit.patch import parse_text_region
+        from ult3edit.patch import parse_text_region
         # Build: "HI\x00BYE\x00\x00" (trailing null padding)
         data = bytearray(100)
         for i, ch in enumerate('HI'):
@@ -11918,7 +11918,7 @@ class TestPatchEncoding:
 
     def test_encode_coord_region(self):
         """Encode XY coordinate pairs."""
-        from u3edit.patch import encode_coord_region
+        from ult3edit.patch import encode_coord_region
         coords = [{'x': 10, 'y': 20}, {'x': 30, 'y': 40}]
         result = encode_coord_region(coords, 8)
         assert result[:4] == bytes([10, 20, 30, 40])
@@ -11927,14 +11927,14 @@ class TestPatchEncoding:
 
     def test_encode_coord_region_overflow(self):
         """Encoding coords that exceed max_length raises ValueError."""
-        from u3edit.patch import encode_coord_region
+        from ult3edit.patch import encode_coord_region
         coords = [{'x': i, 'y': i} for i in range(10)]
         with pytest.raises(ValueError, match='exceeds max'):
             encode_coord_region(coords, 4)
 
     def test_encode_text_region(self):
         """Encode strings as null-terminated high-ASCII."""
-        from u3edit.patch import encode_text_region
+        from ult3edit.patch import encode_text_region
         result = encode_text_region(['HI', 'BYE'], 20)
         # HI = 0xC8 0xC9 0x00, BYE = 0xC2 0xD9 0xC5 0x00
         assert result[0] == ord('H') | 0x80
@@ -11953,7 +11953,7 @@ class TestTlkCmdErrors:
 
     def _make_tlk_file(self, tmp_path, records=None):
         """Create a TLK file with simple text records."""
-        from u3edit.tlk import encode_record, TLK_RECORD_END
+        from ult3edit.tlk import encode_record, TLK_RECORD_END
         data = bytearray()
         if records is None:
             records = [['HELLO WORLD'], ['GOODBYE']]
@@ -11984,7 +11984,7 @@ class TestTlkCmdErrors:
 
     def test_edit_record_out_of_range(self, tmp_path):
         """cmd_edit with record index beyond count exits."""
-        from u3edit.tlk import cmd_edit as tlk_cmd_edit
+        from ult3edit.tlk import cmd_edit as tlk_cmd_edit
         path = self._make_tlk_file(tmp_path)
         args = argparse.Namespace(
             file=path, record=99, text='NEW TEXT',
@@ -12012,7 +12012,7 @@ class TestDiffDetectFileType:
 
     def test_detect_roster(self, tmp_path):
         """Detect ROST file by name and size."""
-        from u3edit.diff import detect_file_type
+        from ult3edit.diff import detect_file_type
         path = os.path.join(str(tmp_path), 'ROST')
         with open(path, 'wb') as f:
             f.write(bytes(ROSTER_FILE_SIZE))
@@ -12020,7 +12020,7 @@ class TestDiffDetectFileType:
 
     def test_detect_prty(self, tmp_path):
         """Detect PRTY file."""
-        from u3edit.diff import detect_file_type
+        from ult3edit.diff import detect_file_type
         path = os.path.join(str(tmp_path), 'PRTY')
         with open(path, 'wb') as f:
             f.write(bytes(PRTY_FILE_SIZE))
@@ -12028,7 +12028,7 @@ class TestDiffDetectFileType:
 
     def test_detect_mon_file(self, tmp_path):
         """Detect MON file with letter suffix."""
-        from u3edit.diff import detect_file_type
+        from ult3edit.diff import detect_file_type
         path = os.path.join(str(tmp_path), 'MONA')
         with open(path, 'wb') as f:
             f.write(bytes(MON_FILE_SIZE))
@@ -12036,7 +12036,7 @@ class TestDiffDetectFileType:
 
     def test_detect_con_file(self, tmp_path):
         """Detect CON file with letter suffix."""
-        from u3edit.diff import detect_file_type
+        from ult3edit.diff import detect_file_type
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
             f.write(bytes(CON_FILE_SIZE))
@@ -12044,7 +12044,7 @@ class TestDiffDetectFileType:
 
     def test_detect_prodos_hash(self, tmp_path):
         """Detect file with ProDOS #hash suffix."""
-        from u3edit.diff import detect_file_type
+        from ult3edit.diff import detect_file_type
         path = os.path.join(str(tmp_path), 'ROST#069500')
         with open(path, 'wb') as f:
             f.write(bytes(ROSTER_FILE_SIZE))
@@ -12052,7 +12052,7 @@ class TestDiffDetectFileType:
 
     def test_unknown_file_returns_none(self, tmp_path):
         """Unrecognized file returns None."""
-        from u3edit.diff import detect_file_type
+        from ult3edit.diff import detect_file_type
         path = os.path.join(str(tmp_path), 'UNKNOWN')
         with open(path, 'wb') as f:
             f.write(bytes(42))
@@ -12060,14 +12060,14 @@ class TestDiffDetectFileType:
 
     def test_nonexistent_file_returns_none(self, tmp_path):
         """Nonexistent file returns None."""
-        from u3edit.diff import detect_file_type
+        from ult3edit.diff import detect_file_type
         path = os.path.join(str(tmp_path), 'NOFILE')
         assert detect_file_type(path) is None
 
     def test_detect_special_file(self, tmp_path):
         """Detect special location file."""
-        from u3edit.diff import detect_file_type
-        from u3edit.constants import SPECIAL_NAMES
+        from ult3edit.diff import detect_file_type
+        from ult3edit.constants import SPECIAL_NAMES
         name = list(SPECIAL_NAMES.keys())[0]
         path = os.path.join(str(tmp_path), name)
         with open(path, 'wb') as f:
@@ -12084,7 +12084,7 @@ class TestPatchIdentifyBinary:
 
     def test_identify_ult3_by_name(self):
         """Identify ULT3 by filename."""
-        from u3edit.patch import identify_binary
+        from ult3edit.patch import identify_binary
         data = bytes(17408)
         result = identify_binary(data, 'ULT3')
         assert result is not None
@@ -12093,7 +12093,7 @@ class TestPatchIdentifyBinary:
 
     def test_identify_exod_by_name(self):
         """Identify EXOD by filename."""
-        from u3edit.patch import identify_binary
+        from ult3edit.patch import identify_binary
         data = bytes(26208)
         result = identify_binary(data, 'EXOD')
         assert result is not None
@@ -12101,7 +12101,7 @@ class TestPatchIdentifyBinary:
 
     def test_identify_by_size_only(self):
         """Identify binary by size when filename doesn't match."""
-        from u3edit.patch import identify_binary
+        from ult3edit.patch import identify_binary
         data = bytes(17408)  # ULT3 size
         result = identify_binary(data, 'randomfile')
         assert result is not None
@@ -12109,14 +12109,14 @@ class TestPatchIdentifyBinary:
 
     def test_unrecognized_returns_none(self):
         """Unrecognized binary returns None."""
-        from u3edit.patch import identify_binary
+        from ult3edit.patch import identify_binary
         data = bytes(100)
         result = identify_binary(data, 'UNKNOWN')
         assert result is None
 
     def test_identify_subs(self):
         """Identify SUBS by filename."""
-        from u3edit.patch import identify_binary
+        from ult3edit.patch import identify_binary
         data = bytes(3584)
         result = identify_binary(data, 'SUBS')
         assert result is not None
@@ -12132,7 +12132,7 @@ class TestPatchCmdEditWriteback:
 
     def test_cmd_edit_dry_run_no_write(self, tmp_path):
         """cmd_edit with --dry-run doesn't modify the file."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = os.path.join(str(tmp_path), 'ULT3')
         data = bytearray(17408)
         with open(path, 'wb') as f:
@@ -12147,7 +12147,7 @@ class TestPatchCmdEditWriteback:
 
     def test_cmd_edit_writes_bytes(self, tmp_path):
         """cmd_edit actually patches the correct offset."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = os.path.join(str(tmp_path), 'ULT3')
         data = bytearray(17408)
         with open(path, 'wb') as f:
@@ -12171,7 +12171,7 @@ class TestTextCmdErrors:
 
     def test_text_edit_record_out_of_range(self, tmp_path):
         """text cmd_edit with record index beyond count exits."""
-        from u3edit.text import cmd_edit as text_cmd_edit
+        from ult3edit.text import cmd_edit as text_cmd_edit
         path = os.path.join(str(tmp_path), 'TEXT')
         with open(path, 'wb') as f:
             f.write(bytes(TEXT_FILE_SIZE))
@@ -12208,7 +12208,7 @@ class TestEquipView:
 
     def test_view_text_output(self, capsys):
         """cmd_view in text mode outputs weapon and armor tables."""
-        from u3edit.equip import cmd_view
+        from ult3edit.equip import cmd_view
         args = argparse.Namespace(json=False, output=None)
         cmd_view(args)
         captured = capsys.readouterr()
@@ -12218,7 +12218,7 @@ class TestEquipView:
 
     def test_view_json_output(self, tmp_path):
         """cmd_view in JSON mode produces valid structured data."""
-        from u3edit.equip import cmd_view
+        from ult3edit.equip import cmd_view
         out_path = os.path.join(str(tmp_path), 'equip.json')
         args = argparse.Namespace(json=True, output=out_path)
         cmd_view(args)
@@ -12232,7 +12232,7 @@ class TestEquipView:
 
     def test_dispatch_no_command(self, capsys):
         """dispatch with no subcommand prints usage."""
-        from u3edit.equip import dispatch
+        from ult3edit.equip import dispatch
         args = argparse.Namespace(equip_command=None)
         dispatch(args)
         captured = capsys.readouterr()
@@ -12248,7 +12248,7 @@ class TestSpellView:
 
     def test_view_all_spells(self, capsys):
         """cmd_view shows both wizard and cleric spells."""
-        from u3edit.spell import cmd_view
+        from ult3edit.spell import cmd_view
         args = argparse.Namespace(
             json=False, output=None,
             wizard_only=False, cleric_only=False)
@@ -12259,7 +12259,7 @@ class TestSpellView:
 
     def test_view_wizard_only(self, capsys):
         """cmd_view with --wizard-only hides cleric spells."""
-        from u3edit.spell import cmd_view
+        from ult3edit.spell import cmd_view
         args = argparse.Namespace(
             json=False, output=None,
             wizard_only=True, cleric_only=False)
@@ -12270,7 +12270,7 @@ class TestSpellView:
 
     def test_view_cleric_only(self, capsys):
         """cmd_view with --cleric-only hides wizard spells."""
-        from u3edit.spell import cmd_view
+        from ult3edit.spell import cmd_view
         args = argparse.Namespace(
             json=False, output=None,
             wizard_only=False, cleric_only=True)
@@ -12281,7 +12281,7 @@ class TestSpellView:
 
     def test_view_json_output(self, tmp_path):
         """cmd_view JSON mode produces structured spell data."""
-        from u3edit.spell import cmd_view
+        from ult3edit.spell import cmd_view
         out_path = os.path.join(str(tmp_path), 'spells.json')
         args = argparse.Namespace(
             json=True, output=out_path,
@@ -12296,7 +12296,7 @@ class TestSpellView:
 
     def test_dispatch_no_command(self, capsys):
         """dispatch with no subcommand prints usage."""
-        from u3edit.spell import dispatch
+        from ult3edit.spell import dispatch
         args = argparse.Namespace(spell_command=None)
         dispatch(args)
         captured = capsys.readouterr()
@@ -12312,13 +12312,13 @@ class TestDiffAlgorithm:
 
     def test_diff_dicts_identical(self):
         """Identical dicts produce no diffs."""
-        from u3edit.diff import diff_dicts
+        from ult3edit.diff import diff_dicts
         d = {'a': 1, 'b': 'hello', 'c': [1, 2]}
         assert diff_dicts(d, d) == []
 
     def test_diff_dicts_changed_field(self):
         """Changed field produces a FieldDiff."""
-        from u3edit.diff import diff_dicts
+        from ult3edit.diff import diff_dicts
         result = diff_dicts({'a': 1}, {'a': 2})
         assert len(result) == 1
         assert result[0].path == 'a'
@@ -12327,7 +12327,7 @@ class TestDiffAlgorithm:
 
     def test_diff_dicts_added_key(self):
         """New key in second dict is detected."""
-        from u3edit.diff import diff_dicts
+        from ult3edit.diff import diff_dicts
         result = diff_dicts({}, {'a': 1})
         assert len(result) == 1
         assert result[0].path == 'a'
@@ -12336,7 +12336,7 @@ class TestDiffAlgorithm:
 
     def test_diff_dicts_removed_key(self):
         """Missing key in second dict is detected."""
-        from u3edit.diff import diff_dicts
+        from ult3edit.diff import diff_dicts
         result = diff_dicts({'a': 1}, {})
         assert len(result) == 1
         assert result[0].old == 1
@@ -12344,7 +12344,7 @@ class TestDiffAlgorithm:
 
     def test_diff_dicts_nested(self):
         """Nested dict changes produce dotted paths."""
-        from u3edit.diff import diff_dicts
+        from ult3edit.diff import diff_dicts
         d1 = {'a': {'b': 1, 'c': 2}}
         d2 = {'a': {'b': 1, 'c': 3}}
         result = diff_dicts(d1, d2)
@@ -12353,7 +12353,7 @@ class TestDiffAlgorithm:
 
     def test_diff_dicts_list_change(self):
         """List element change is detected with [index] path."""
-        from u3edit.diff import diff_dicts
+        from ult3edit.diff import diff_dicts
         d1 = {'items': [1, 2, 3]}
         d2 = {'items': [1, 9, 3]}
         result = diff_dicts(d1, d2)
@@ -12362,7 +12362,7 @@ class TestDiffAlgorithm:
 
     def test_diff_dicts_list_length_change(self):
         """Different list lengths produce diffs for extra elements."""
-        from u3edit.diff import diff_dicts
+        from ult3edit.diff import diff_dicts
         d1 = {'items': [1, 2]}
         d2 = {'items': [1, 2, 3]}
         result = diff_dicts(d1, d2)
@@ -12375,7 +12375,7 @@ class TestDiffTileGrid:
 
     def test_identical_grids(self):
         """Identical grids produce no tile changes."""
-        from u3edit.diff import FileDiff, _diff_tile_grid
+        from ult3edit.diff import FileDiff, _diff_tile_grid
         fd = FileDiff('test', 'test')
         data = bytes(range(16))
         _diff_tile_grid(fd, data, data, 4, 4)
@@ -12384,7 +12384,7 @@ class TestDiffTileGrid:
 
     def test_one_changed_tile(self):
         """One changed tile is detected with correct position."""
-        from u3edit.diff import FileDiff, _diff_tile_grid
+        from ult3edit.diff import FileDiff, _diff_tile_grid
         fd = FileDiff('test', 'test')
         d1 = bytes(16)
         d2 = bytearray(16)
@@ -12399,7 +12399,7 @@ class TestDiffRoster:
 
     def test_identical_rosters(self, tmp_path):
         """Identical rosters produce no changes."""
-        from u3edit.diff import diff_roster
+        from ult3edit.diff import diff_roster
         data = bytearray(ROSTER_FILE_SIZE)
         p1 = os.path.join(str(tmp_path), 'ROST1')
         p2 = os.path.join(str(tmp_path), 'ROST2')
@@ -12412,7 +12412,7 @@ class TestDiffRoster:
 
     def test_changed_character(self, tmp_path):
         """Changed character stat produces field diff."""
-        from u3edit.diff import diff_roster
+        from ult3edit.diff import diff_roster
         data1 = bytearray(ROSTER_FILE_SIZE)
         data2 = bytearray(ROSTER_FILE_SIZE)
         # Set name in both so slot is non-empty
@@ -12434,7 +12434,7 @@ class TestDiffRoster:
 
     def test_added_character(self, tmp_path):
         """Empty slot in file1, character in file2 → added_entities."""
-        from u3edit.diff import diff_roster
+        from ult3edit.diff import diff_roster
         data1 = bytearray(ROSTER_FILE_SIZE)
         data2 = bytearray(ROSTER_FILE_SIZE)
         for i, ch in enumerate('HERO'):
@@ -12455,7 +12455,7 @@ class TestDiffCombat:
 
     def test_identical_combat_maps(self, tmp_path):
         """Identical CON files produce no changes."""
-        from u3edit.diff import diff_combat
+        from ult3edit.diff import diff_combat
         data = bytearray(CON_FILE_SIZE)
         p1 = os.path.join(str(tmp_path), 'CONA1')
         p2 = os.path.join(str(tmp_path), 'CONA2')
@@ -12468,7 +12468,7 @@ class TestDiffCombat:
 
     def test_changed_tile(self, tmp_path):
         """Changed tile in CON file is detected."""
-        from u3edit.diff import diff_combat
+        from ult3edit.diff import diff_combat
         data1 = bytearray(CON_FILE_SIZE)
         data2 = bytearray(CON_FILE_SIZE)
         data2[0] = 0x10  # Change first tile
@@ -12487,8 +12487,8 @@ class TestDiffTlk:
 
     def test_identical_tlk(self, tmp_path):
         """Identical TLK files produce no changes."""
-        from u3edit.diff import diff_tlk
-        from u3edit.tlk import encode_record
+        from ult3edit.diff import diff_tlk
+        from ult3edit.tlk import encode_record
         data = encode_record(['HELLO WORLD'])
         p1 = os.path.join(str(tmp_path), 'TLKA1')
         p2 = os.path.join(str(tmp_path), 'TLKA2')
@@ -12501,8 +12501,8 @@ class TestDiffTlk:
 
     def test_changed_record(self, tmp_path):
         """Changed dialog record is detected."""
-        from u3edit.diff import diff_tlk
-        from u3edit.tlk import encode_record
+        from ult3edit.diff import diff_tlk
+        from ult3edit.tlk import encode_record
         d1 = encode_record(['HELLO WORLD'])
         d2 = encode_record(['GOODBYE WORLD'])
         p1 = os.path.join(str(tmp_path), 'TLKA1')
@@ -12516,8 +12516,8 @@ class TestDiffTlk:
 
     def test_added_record(self, tmp_path):
         """Extra record in file2 shows as added."""
-        from u3edit.diff import diff_tlk
-        from u3edit.tlk import encode_record
+        from ult3edit.diff import diff_tlk
+        from ult3edit.tlk import encode_record
         d1 = encode_record(['HELLO'])
         d2 = encode_record(['HELLO']) + encode_record(['EXTRA'])
         p1 = os.path.join(str(tmp_path), 'TLKA1')
@@ -12535,7 +12535,7 @@ class TestDiffBinary:
 
     def test_identical_binary(self, tmp_path):
         """Identical binary files show no changes."""
-        from u3edit.diff import diff_binary
+        from ult3edit.diff import diff_binary
         data = bytes(100)
         p1 = os.path.join(str(tmp_path), 'FILE1')
         p2 = os.path.join(str(tmp_path), 'FILE2')
@@ -12548,7 +12548,7 @@ class TestDiffBinary:
 
     def test_changed_binary(self, tmp_path):
         """Changed bytes detected in binary diff."""
-        from u3edit.diff import diff_binary
+        from ult3edit.diff import diff_binary
         d1 = bytes(100)
         d2 = bytearray(100)
         d2[50] = 0xFF
@@ -12563,7 +12563,7 @@ class TestDiffBinary:
 
     def test_different_size_binary(self, tmp_path):
         """Different-sized binaries show size diff."""
-        from u3edit.diff import diff_binary
+        from ult3edit.diff import diff_binary
         p1 = os.path.join(str(tmp_path), 'FILE1')
         p2 = os.path.join(str(tmp_path), 'FILE2')
         with open(p1, 'wb') as f:
@@ -12581,7 +12581,7 @@ class TestDiffMap:
 
     def test_identical_maps(self, tmp_path):
         """Identical maps show no changes."""
-        from u3edit.diff import diff_map
+        from ult3edit.diff import diff_map
         data = bytes(MAP_OVERWORLD_SIZE)
         p1 = os.path.join(str(tmp_path), 'MAP1')
         p2 = os.path.join(str(tmp_path), 'MAP2')
@@ -12594,7 +12594,7 @@ class TestDiffMap:
 
     def test_changed_map_tile(self, tmp_path):
         """Changed tile in overworld map is detected."""
-        from u3edit.diff import diff_map
+        from ult3edit.diff import diff_map
         d1 = bytes(MAP_OVERWORLD_SIZE)
         d2 = bytearray(MAP_OVERWORLD_SIZE)
         d2[100] = 0xFF
@@ -12617,7 +12617,7 @@ class TestBestiaryCmdDump:
 
     def test_cmd_dump_runs(self, tmp_path, capsys):
         """cmd_dump executes without error on a valid MON file."""
-        from u3edit.bestiary import cmd_dump
+        from ult3edit.bestiary import cmd_dump
         data = bytearray(MON_FILE_SIZE)
         # Set some recognizable data in first monster tile
         data[0] = 0xAA
@@ -12637,7 +12637,7 @@ class TestBestiaryCmdImport:
 
     def test_import_list_format(self, tmp_path):
         """Import from JSON list format."""
-        from u3edit.bestiary import cmd_import as bestiary_import
+        from ult3edit.bestiary import cmd_import as bestiary_import
         data = bytearray(MON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'MONA')
         with open(path, 'wb') as f:
@@ -12656,7 +12656,7 @@ class TestBestiaryCmdImport:
 
     def test_import_dict_format(self, tmp_path):
         """Import from dict-of-dicts format with numeric string keys."""
-        from u3edit.bestiary import cmd_import as bestiary_import
+        from ult3edit.bestiary import cmd_import as bestiary_import
         data = bytearray(MON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'MONA')
         with open(path, 'wb') as f:
@@ -12674,7 +12674,7 @@ class TestBestiaryCmdImport:
 
     def test_import_dry_run(self, tmp_path):
         """Import with dry-run doesn't write."""
-        from u3edit.bestiary import cmd_import as bestiary_import
+        from ult3edit.bestiary import cmd_import as bestiary_import
         data = bytearray(MON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'MONA')
         with open(path, 'wb') as f:
@@ -12692,8 +12692,8 @@ class TestBestiaryCmdImport:
 
     def test_import_with_shortcuts(self, tmp_path):
         """Import with flag shortcuts (boss, poison, etc.)."""
-        from u3edit.bestiary import cmd_import as bestiary_import
-        from u3edit.constants import MON_FLAG1_BOSS, MON_ABIL1_POISON
+        from ult3edit.bestiary import cmd_import as bestiary_import
+        from ult3edit.constants import MON_FLAG1_BOSS, MON_ABIL1_POISON
         data = bytearray(MON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'MONA')
         with open(path, 'wb') as f:
@@ -12705,7 +12705,7 @@ class TestBestiaryCmdImport:
             file=path, json_file=json_path, output=None,
             backup=False, dry_run=False)
         bestiary_import(args)
-        from u3edit.bestiary import load_mon_file
+        from ult3edit.bestiary import load_mon_file
         mons = load_mon_file(path)
         assert mons[0].flags1 & MON_FLAG1_BOSS
         assert mons[0].ability1 & MON_ABIL1_POISON
@@ -12720,7 +12720,7 @@ class TestMapCmdOverview:
 
     def test_overview_no_maps_exits(self, tmp_path):
         """cmd_overview with no MAP files in dir exits."""
-        from u3edit.map import cmd_overview
+        from ult3edit.map import cmd_overview
         args = argparse.Namespace(
             game_dir=str(tmp_path), json=False, output=None, preview=False)
         with pytest.raises(SystemExit):
@@ -12728,7 +12728,7 @@ class TestMapCmdOverview:
 
     def test_overview_with_maps(self, tmp_path, capsys):
         """cmd_overview lists found MAP files."""
-        from u3edit.map import cmd_overview
+        from ult3edit.map import cmd_overview
         # Create a MAPA (overworld) file
         mapa = os.path.join(str(tmp_path), 'MAPA')
         with open(mapa, 'wb') as f:
@@ -12742,7 +12742,7 @@ class TestMapCmdOverview:
 
     def test_overview_json(self, tmp_path):
         """cmd_overview JSON mode produces valid data."""
-        from u3edit.map import cmd_overview
+        from ult3edit.map import cmd_overview
         mapa = os.path.join(str(tmp_path), 'MAPA')
         with open(mapa, 'wb') as f:
             f.write(bytes(MAP_OVERWORLD_SIZE))
@@ -12761,7 +12761,7 @@ class TestMapCmdLegend:
 
     def test_legend_output(self, capsys):
         """cmd_legend outputs tile legend text."""
-        from u3edit.map import cmd_legend
+        from ult3edit.map import cmd_legend
         args = argparse.Namespace(json=False)
         cmd_legend(args)
         captured = capsys.readouterr()
@@ -12771,7 +12771,7 @@ class TestMapCmdLegend:
 
     def test_legend_json_hides_dungeon_section(self, capsys):
         """cmd_legend with --json hides dungeon tiles section header."""
-        from u3edit.map import cmd_legend
+        from ult3edit.map import cmd_legend
         args = argparse.Namespace(json=True)
         cmd_legend(args)
         captured = capsys.readouterr()
@@ -12808,7 +12808,7 @@ class TestRosterCmdCheckProgress:
 
     def test_check_progress_text_ready(self, tmp_path, capsys):
         """cmd_check_progress shows READY verdict for complete party."""
-        from u3edit.roster import cmd_check_progress
+        from ult3edit.roster import cmd_check_progress
         path = self._make_roster_with_chars(tmp_path)
         args = argparse.Namespace(
             file=path, json=False, output=None)
@@ -12818,7 +12818,7 @@ class TestRosterCmdCheckProgress:
 
     def test_check_progress_text_not_ready(self, tmp_path, capsys):
         """cmd_check_progress shows not-ready for incomplete party."""
-        from u3edit.roster import cmd_check_progress
+        from ult3edit.roster import cmd_check_progress
         path = self._make_roster_with_chars(
             tmp_path, count=2, marks=0, cards=0, weapon=0, armor=0)
         args = argparse.Namespace(
@@ -12830,7 +12830,7 @@ class TestRosterCmdCheckProgress:
 
     def test_check_progress_json(self, tmp_path):
         """cmd_check_progress JSON mode produces valid output."""
-        from u3edit.roster import cmd_check_progress
+        from ult3edit.roster import cmd_check_progress
         path = self._make_roster_with_chars(tmp_path)
         out_path = os.path.join(str(tmp_path), 'progress.json')
         args = argparse.Namespace(
@@ -12852,7 +12852,7 @@ class TestDiffFileDispatch:
 
     def test_diff_file_roster(self, tmp_path):
         """diff_file dispatches correctly for ROST files."""
-        from u3edit.diff import diff_file
+        from ult3edit.diff import diff_file
         data = bytearray(ROSTER_FILE_SIZE)
         p1 = os.path.join(str(tmp_path), 'ROST')
         p2 = os.path.join(str(tmp_path), 'ROST2')
@@ -12867,7 +12867,7 @@ class TestDiffFileDispatch:
 
     def test_diff_file_unknown_returns_none(self, tmp_path):
         """diff_file with unrecognizable files returns None."""
-        from u3edit.diff import diff_file
+        from ult3edit.diff import diff_file
         p1 = os.path.join(str(tmp_path), 'UNKNOWN1')
         p2 = os.path.join(str(tmp_path), 'UNKNOWN2')
         with open(p1, 'wb') as f:
@@ -12887,7 +12887,7 @@ class TestCombatCmdImport:
 
     def test_import_tiles_and_positions(self, tmp_path):
         """Import tiles and positions from JSON."""
-        from u3edit.combat import cmd_import as combat_import
+        from ult3edit.combat import cmd_import as combat_import
         data = bytearray(CON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
@@ -12908,13 +12908,13 @@ class TestCombatCmdImport:
         with open(path, 'rb') as f:
             result = f.read()
         # Check monster X position (offset 0x80)
-        from u3edit.constants import CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET
+        from ult3edit.constants import CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET
         assert result[CON_MONSTER_X_OFFSET] == 5
         assert result[CON_MONSTER_Y_OFFSET] == 3
 
     def test_import_dry_run(self, tmp_path):
         """Import with dry-run doesn't write."""
-        from u3edit.combat import cmd_import as combat_import
+        from ult3edit.combat import cmd_import as combat_import
         data = bytearray(CON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
@@ -12933,8 +12933,8 @@ class TestCombatCmdImport:
 
     def test_import_clamps_out_of_bounds(self, tmp_path):
         """Positions outside grid bounds are clamped."""
-        from u3edit.combat import cmd_import as combat_import
-        from u3edit.constants import CON_MONSTER_X_OFFSET, CON_MAP_WIDTH
+        from ult3edit.combat import cmd_import as combat_import
+        from ult3edit.constants import CON_MONSTER_X_OFFSET, CON_MAP_WIDTH
         data = bytearray(CON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
@@ -12950,7 +12950,7 @@ class TestCombatCmdImport:
         with open(path, 'rb') as f:
             result = f.read()
         assert result[CON_MONSTER_X_OFFSET] == CON_MAP_WIDTH - 1
-        from u3edit.constants import CON_MONSTER_Y_OFFSET
+        from ult3edit.constants import CON_MONSTER_Y_OFFSET
         assert result[CON_MONSTER_Y_OFFSET] == 0
 
 
@@ -12963,7 +12963,7 @@ class TestSpecialCmdViewImport:
 
     def test_view_single_file(self, tmp_path, capsys):
         """cmd_view on a single special file."""
-        from u3edit.special import cmd_view as special_view
+        from ult3edit.special import cmd_view as special_view
         data = bytearray(SPECIAL_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'BRND')
         with open(path, 'wb') as f:
@@ -12976,7 +12976,7 @@ class TestSpecialCmdViewImport:
 
     def test_view_json_mode(self, tmp_path):
         """cmd_view JSON mode produces valid output."""
-        from u3edit.special import cmd_view as special_view
+        from ult3edit.special import cmd_view as special_view
         data = bytearray(SPECIAL_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'BRND')
         with open(path, 'wb') as f:
@@ -12992,7 +12992,7 @@ class TestSpecialCmdViewImport:
 
     def test_import_tiles(self, tmp_path):
         """cmd_import replaces tiles from JSON."""
-        from u3edit.special import cmd_import as special_import
+        from ult3edit.special import cmd_import as special_import
         data = bytearray(SPECIAL_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'BRND')
         with open(path, 'wb') as f:
@@ -13015,7 +13015,7 @@ class TestSpecialCmdViewImport:
 
     def test_import_preserves_trailing_bytes(self, tmp_path):
         """cmd_import restores trailing bytes from JSON."""
-        from u3edit.special import cmd_import as special_import
+        from ult3edit.special import cmd_import as special_import
         data = bytearray(SPECIAL_FILE_SIZE)
         data[121] = 0xAA  # trailing byte
         path = os.path.join(str(tmp_path), 'BRND')
@@ -13036,7 +13036,7 @@ class TestSpecialCmdViewImport:
 
     def test_import_dry_run(self, tmp_path):
         """cmd_import with dry-run doesn't write."""
-        from u3edit.special import cmd_import as special_import
+        from ult3edit.special import cmd_import as special_import
         data = bytearray(SPECIAL_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'BRND')
         with open(path, 'wb') as f:
@@ -13063,7 +13063,7 @@ class TestSaveCmdImport:
 
     def test_import_party_state(self, tmp_path):
         """Import party state from JSON."""
-        from u3edit.save import cmd_import as save_import
+        from ult3edit.save import cmd_import as save_import
         # Create PRTY file
         prty_data = bytearray(PRTY_FILE_SIZE)
         prty_path = os.path.join(str(tmp_path), 'PRTY')
@@ -13094,7 +13094,7 @@ class TestSaveCmdImport:
 
     def test_import_dry_run(self, tmp_path):
         """Import with dry-run doesn't write."""
-        from u3edit.save import cmd_import as save_import
+        from ult3edit.save import cmd_import as save_import
         prty_data = bytearray(PRTY_FILE_SIZE)
         prty_path = os.path.join(str(tmp_path), 'PRTY')
         with open(prty_path, 'wb') as f:
@@ -13121,7 +13121,7 @@ class TestCombatCmdView:
 
     def test_view_single_file(self, tmp_path, capsys):
         """cmd_view on a single CON file."""
-        from u3edit.combat import cmd_view as combat_view
+        from ult3edit.combat import cmd_view as combat_view
         data = bytearray(CON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
@@ -13134,7 +13134,7 @@ class TestCombatCmdView:
 
     def test_view_json_mode(self, tmp_path):
         """cmd_view JSON mode on single file."""
-        from u3edit.combat import cmd_view as combat_view
+        from ult3edit.combat import cmd_view as combat_view
         data = bytearray(CON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
@@ -13151,7 +13151,7 @@ class TestCombatCmdView:
 
     def test_view_directory_no_files(self, tmp_path):
         """cmd_view on directory with no CON files exits."""
-        from u3edit.combat import cmd_view as combat_view
+        from ult3edit.combat import cmd_view as combat_view
         args = argparse.Namespace(
             path=str(tmp_path), json=False, output=None, validate=False)
         with pytest.raises(SystemExit):
@@ -13167,7 +13167,7 @@ class TestDiffSpecial:
 
     def test_identical_specials(self, tmp_path):
         """Identical special files show no changes."""
-        from u3edit.diff import diff_special
+        from ult3edit.diff import diff_special
         data = bytes(SPECIAL_FILE_SIZE)
         p1 = os.path.join(str(tmp_path), 'BRND1')
         p2 = os.path.join(str(tmp_path), 'BRND2')
@@ -13180,7 +13180,7 @@ class TestDiffSpecial:
 
     def test_changed_special_tile(self, tmp_path):
         """Changed tile in special location is detected."""
-        from u3edit.diff import diff_special
+        from ult3edit.diff import diff_special
         d1 = bytes(SPECIAL_FILE_SIZE)
         d2 = bytearray(SPECIAL_FILE_SIZE)
         d2[5] = 0xFF  # change a tile
@@ -13199,7 +13199,7 @@ class TestDiffSave:
 
     def test_identical_saves(self, tmp_path):
         """Identical save directories show no changes."""
-        from u3edit.diff import diff_save
+        from ult3edit.diff import diff_save
         dir1 = os.path.join(str(tmp_path), 'dir1')
         dir2 = os.path.join(str(tmp_path), 'dir2')
         os.makedirs(dir1)
@@ -13215,7 +13215,7 @@ class TestDiffSave:
 
     def test_changed_party(self, tmp_path):
         """Changed PRTY data is detected."""
-        from u3edit.diff import diff_save
+        from ult3edit.diff import diff_save
         dir1 = os.path.join(str(tmp_path), 'dir1')
         dir2 = os.path.join(str(tmp_path), 'dir2')
         os.makedirs(dir1)
@@ -13236,7 +13236,7 @@ class TestDiffEntityProperties:
 
     def test_entity_diff_changed_with_fields(self):
         """EntityDiff.changed is True when fields present."""
-        from u3edit.diff import EntityDiff, FieldDiff
+        from ult3edit.diff import EntityDiff, FieldDiff
         ed = EntityDiff('test', 'label')
         assert not ed.changed
         ed.fields.append(FieldDiff('x', 1, 2))
@@ -13244,7 +13244,7 @@ class TestDiffEntityProperties:
 
     def test_file_diff_change_count(self):
         """FileDiff.change_count counts entities with changes."""
-        from u3edit.diff import FileDiff, EntityDiff, FieldDiff
+        from ult3edit.diff import FileDiff, EntityDiff, FieldDiff
         fd = FileDiff('test', 'test')
         e1 = EntityDiff('a', 'A')
         e1.fields.append(FieldDiff('x', 1, 2))
@@ -13254,7 +13254,7 @@ class TestDiffEntityProperties:
 
     def test_game_diff_changed(self):
         """GameDiff.changed is True when any file has changes."""
-        from u3edit.diff import GameDiff, FileDiff
+        from ult3edit.diff import GameDiff, FileDiff
         gd = GameDiff()
         fd = FileDiff('test', 'test')
         gd.files.append(fd)
@@ -13272,7 +13272,7 @@ class TestMapCmdImport:
 
     def test_import_overworld_tiles(self, tmp_path):
         """Import overworld tiles from JSON char grid."""
-        from u3edit.map import cmd_import as map_import
+        from ult3edit.map import cmd_import as map_import
         data = bytearray(MAP_OVERWORLD_SIZE)
         path = os.path.join(str(tmp_path), 'MAPA')
         with open(path, 'wb') as f:
@@ -13295,7 +13295,7 @@ class TestMapCmdImport:
 
     def test_import_dungeon_levels(self, tmp_path):
         """Import dungeon map from JSON levels format."""
-        from u3edit.map import cmd_import as map_import
+        from ult3edit.map import cmd_import as map_import
         data = bytearray(MAP_DUNGEON_SIZE)
         path = os.path.join(str(tmp_path), 'MAPB')
         with open(path, 'wb') as f:
@@ -13317,7 +13317,7 @@ class TestMapCmdImport:
 
     def test_import_dry_run(self, tmp_path):
         """Import with dry-run doesn't write."""
-        from u3edit.map import cmd_import as map_import
+        from ult3edit.map import cmd_import as map_import
         data = bytearray(MAP_OVERWORLD_SIZE)
         path = os.path.join(str(tmp_path), 'MAPA')
         with open(path, 'wb') as f:
@@ -13345,7 +13345,7 @@ class TestMapCmdCompile:
 
     def test_compile_overworld(self, tmp_path):
         """Compile overworld text-art to binary."""
-        from u3edit.map import cmd_compile
+        from ult3edit.map import cmd_compile
         source = os.path.join(str(tmp_path), 'map.map')
         # 64 rows of 64 '.' chars
         with open(source, 'w') as f:
@@ -13362,7 +13362,7 @@ class TestMapCmdCompile:
 
     def test_compile_dungeon(self, tmp_path):
         """Compile dungeon text-art to binary."""
-        from u3edit.map import cmd_compile
+        from ult3edit.map import cmd_compile
         source = os.path.join(str(tmp_path), 'map.map')
         # Note: '#' starts comment lines in compile, so use '.' for tiles
         with open(source, 'w') as f:
@@ -13383,7 +13383,7 @@ class TestMapCmdCompile:
 
     def test_compile_unknown_chars_mapped(self, tmp_path):
         """Unknown tile characters mapped to default with warning."""
-        from u3edit.map import cmd_compile
+        from ult3edit.map import cmd_compile
         source = os.path.join(str(tmp_path), 'map.map')
         with open(source, 'w') as f:
             for _ in range(64):
@@ -13408,7 +13408,7 @@ class TestTextCmdImport:
 
     def test_import_list_format(self, tmp_path):
         """Import text from JSON list of strings."""
-        from u3edit.text import cmd_import as text_import
+        from ult3edit.text import cmd_import as text_import
         data = bytearray(TEXT_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'TEXT')
         with open(path, 'wb') as f:
@@ -13427,7 +13427,7 @@ class TestTextCmdImport:
 
     def test_import_dict_format(self, tmp_path):
         """Import text from JSON with 'records' key."""
-        from u3edit.text import cmd_import as text_import
+        from ult3edit.text import cmd_import as text_import
         data = bytearray(TEXT_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'TEXT')
         with open(path, 'wb') as f:
@@ -13445,7 +13445,7 @@ class TestTextCmdImport:
 
     def test_import_dry_run(self, tmp_path):
         """Import with dry-run doesn't write."""
-        from u3edit.text import cmd_import as text_import
+        from ult3edit.text import cmd_import as text_import
         data = bytearray(TEXT_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'TEXT')
         with open(path, 'wb') as f:
@@ -13464,7 +13464,7 @@ class TestTextCmdImport:
 
     def test_import_zeros_remaining(self, tmp_path):
         """Import clears stale data after last record."""
-        from u3edit.text import cmd_import as text_import
+        from ult3edit.text import cmd_import as text_import
         # Fill with non-zero bytes first
         data = bytearray(b'\xAA' * TEXT_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'TEXT')
@@ -13493,7 +13493,7 @@ class TestTlkFindReplace:
 
     def _make_tlk(self, tmp_path, text_records):
         """Create a TLK file with given text records."""
-        from u3edit.tlk import encode_record
+        from ult3edit.tlk import encode_record
         data = bytearray()
         for rec in text_records:
             data.extend(encode_record(rec))
@@ -13504,7 +13504,7 @@ class TestTlkFindReplace:
 
     def test_find_replace_basic(self, tmp_path):
         """Basic find-replace across records."""
-        from u3edit.tlk import _cmd_find_replace
+        from ult3edit.tlk import _cmd_find_replace
         path = self._make_tlk(tmp_path, [['HELLO WORLD'], ['HELLO AGAIN']])
         args = argparse.Namespace(
             file=path, output=None, dry_run=False, backup=False,
@@ -13516,7 +13516,7 @@ class TestTlkFindReplace:
 
     def test_find_replace_case_insensitive(self, tmp_path):
         """Case-insensitive find-replace."""
-        from u3edit.tlk import _cmd_find_replace
+        from ult3edit.tlk import _cmd_find_replace
         path = self._make_tlk(tmp_path, [['hello world']])
         args = argparse.Namespace(
             file=path, output=None, dry_run=False, backup=False,
@@ -13527,7 +13527,7 @@ class TestTlkFindReplace:
 
     def test_find_replace_no_match(self, tmp_path, capsys):
         """No matches found — no write."""
-        from u3edit.tlk import _cmd_find_replace
+        from ult3edit.tlk import _cmd_find_replace
         path = self._make_tlk(tmp_path, [['HELLO WORLD']])
         args = argparse.Namespace(
             file=path, output=None, dry_run=False, backup=False,
@@ -13538,7 +13538,7 @@ class TestTlkFindReplace:
 
     def test_find_replace_dry_run(self, tmp_path):
         """Dry-run doesn't write changes."""
-        from u3edit.tlk import _cmd_find_replace
+        from ult3edit.tlk import _cmd_find_replace
         path = self._make_tlk(tmp_path, [['HELLO WORLD']])
         with open(path, 'rb') as f:
             original = f.read()
@@ -13560,7 +13560,7 @@ class TestRosterApplyEdits:
 
     def test_apply_no_edits_returns_false(self):
         """No edit flags → returns False."""
-        from u3edit.roster import _apply_edits
+        from ult3edit.roster import _apply_edits
         char = Character(bytearray(CHAR_RECORD_SIZE))
         args = argparse.Namespace(
             name=None, str=None, dex=None, int_=None, wis=None,
@@ -13574,7 +13574,7 @@ class TestRosterApplyEdits:
 
     def test_apply_marks_and_cards(self):
         """Setting marks and cards via comma-separated strings."""
-        from u3edit.roster import _apply_edits
+        from ult3edit.roster import _apply_edits
         char = Character(bytearray(CHAR_RECORD_SIZE))
         args = argparse.Namespace(
             name=None, str=None, dex=None, int_=None, wis=None,
@@ -13592,7 +13592,7 @@ class TestRosterApplyEdits:
 
     def test_apply_give_weapon(self):
         """Setting weapon inventory via --give-weapon."""
-        from u3edit.roster import _apply_edits
+        from ult3edit.roster import _apply_edits
         char = Character(bytearray(CHAR_RECORD_SIZE))
         args = argparse.Namespace(
             name=None, str=None, dex=None, int_=None, wis=None,
@@ -13604,12 +13604,12 @@ class TestRosterApplyEdits:
             sub_morsels=None)
         assert _apply_edits(char, args) is True
         # Weapon index 5, count 3 → BCD 0x03 at raw offset
-        from u3edit.constants import CHAR_WEAPON_START
+        from ult3edit.constants import CHAR_WEAPON_START
         assert char.raw[CHAR_WEAPON_START + 5 - 1] == int_to_bcd(3)
 
     def test_apply_in_party(self):
         """Setting in-party flag."""
-        from u3edit.roster import _apply_edits
+        from ult3edit.roster import _apply_edits
         char = Character(bytearray(CHAR_RECORD_SIZE))
         args = argparse.Namespace(
             name=None, str=None, dex=None, int_=None, wis=None,
@@ -13624,7 +13624,7 @@ class TestRosterApplyEdits:
 
     def test_apply_hp_raises_max(self):
         """Setting HP also raises max_hp if needed."""
-        from u3edit.roster import _apply_edits
+        from ult3edit.roster import _apply_edits
         char = Character(bytearray(CHAR_RECORD_SIZE))
         char.max_hp = 50
         args = argparse.Namespace(
@@ -13649,7 +13649,7 @@ class TestBestiaryValidate:
 
     def test_validate_empty_monster(self):
         """Empty monster produces no warnings."""
-        from u3edit.bestiary import Monster, validate_monster
+        from ult3edit.bestiary import Monster, validate_monster
         attrs = [0] * 10  # tile1=0, hp=0 → is_empty
         m = Monster(attrs, 0)
         warnings = validate_monster(m)
@@ -13657,7 +13657,7 @@ class TestBestiaryValidate:
 
     def test_validate_undefined_flag_bits(self):
         """Undefined flag bits produce warning."""
-        from u3edit.bestiary import Monster, validate_monster
+        from ult3edit.bestiary import Monster, validate_monster
         # attrs: tile1, tile2, flags1, flags2, hp, atk, def, spd, abil1, abil2
         attrs = [0x10, 0x10, 0x60, 0, 10, 5, 5, 5, 0, 0]
         # flags1=0x60: bits 5,6 set → undefined (defined = 0x04|0x08|0x0C|0x80)
@@ -13668,7 +13668,7 @@ class TestBestiaryValidate:
 
     def test_validate_undefined_ability_bits(self):
         """Undefined ability bits produce warning."""
-        from u3edit.bestiary import Monster, validate_monster
+        from ult3edit.bestiary import Monster, validate_monster
         attrs = [0x10, 0x10, 0, 0, 10, 5, 5, 5, 0x10, 0]
         # ability1=0x10: bit 4 — not in defined set (0x01|0x02|0x04|0x40|0x80)
         m = Monster(attrs, 0)
@@ -13686,7 +13686,7 @@ class TestMapCmdView:
 
     def test_view_overworld_json(self, tmp_path):
         """cmd_view JSON mode for overworld map."""
-        from u3edit.map import cmd_view as map_view
+        from ult3edit.map import cmd_view as map_view
         data = bytearray(MAP_OVERWORLD_SIZE)
         data[0] = 0x04  # grass tile
         path = os.path.join(str(tmp_path), 'MAPA')
@@ -13704,7 +13704,7 @@ class TestMapCmdView:
 
     def test_view_dungeon_json(self, tmp_path):
         """cmd_view JSON mode for dungeon map."""
-        from u3edit.map import cmd_view as map_view
+        from ult3edit.map import cmd_view as map_view
         data = bytearray(MAP_DUNGEON_SIZE)
         path = os.path.join(str(tmp_path), 'MAPB')
         with open(path, 'wb') as f:
@@ -13720,7 +13720,7 @@ class TestMapCmdView:
 
     def test_view_invalid_crop(self, tmp_path):
         """cmd_view with invalid --crop exits."""
-        from u3edit.map import cmd_view as map_view
+        from ult3edit.map import cmd_view as map_view
         data = bytearray(MAP_OVERWORLD_SIZE)
         path = os.path.join(str(tmp_path), 'MAPA')
         with open(path, 'wb') as f:
@@ -13732,7 +13732,7 @@ class TestMapCmdView:
 
     def test_view_text_with_crop(self, tmp_path, capsys):
         """cmd_view text mode with valid --crop."""
-        from u3edit.map import cmd_view as map_view
+        from ult3edit.map import cmd_view as map_view
         data = bytearray(MAP_OVERWORLD_SIZE)
         path = os.path.join(str(tmp_path), 'MAPA')
         with open(path, 'wb') as f:
@@ -13753,7 +13753,7 @@ class TestSaveCmdView:
 
     def test_view_json_mode(self, tmp_path):
         """cmd_view JSON mode with PRTY and PLRS."""
-        from u3edit.save import cmd_view as save_view
+        from ult3edit.save import cmd_view as save_view
         # Create PRTY
         prty = bytearray(PRTY_FILE_SIZE)
         prty[PRTY_OFF_TRANSPORT] = 0x01  # on foot
@@ -13778,7 +13778,7 @@ class TestSaveCmdView:
 
     def test_view_no_prty_exits(self, tmp_path):
         """cmd_view with no PRTY file exits."""
-        from u3edit.save import cmd_view as save_view
+        from ult3edit.save import cmd_view as save_view
         args = argparse.Namespace(
             game_dir=str(tmp_path), json=False, output=None,
             validate=False, brief=True)
@@ -13806,7 +13806,7 @@ class TestRosterCmdViewJson:
 
     def test_view_json_output(self, tmp_path):
         """cmd_view JSON mode exports character data."""
-        from u3edit.roster import cmd_view
+        from ult3edit.roster import cmd_view
         path = self._make_roster(tmp_path)
         out_path = os.path.join(str(tmp_path), 'roster.json')
         args = argparse.Namespace(
@@ -13821,7 +13821,7 @@ class TestRosterCmdViewJson:
 
     def test_view_json_with_validate(self, tmp_path):
         """cmd_view JSON mode with --validate includes warnings."""
-        from u3edit.roster import cmd_view
+        from ult3edit.roster import cmd_view
         path = self._make_roster(tmp_path)
         out_path = os.path.join(str(tmp_path), 'roster.json')
         args = argparse.Namespace(
@@ -13838,7 +13838,7 @@ class TestRosterCmdCreateForce:
 
     def test_create_force_overwrites(self, tmp_path):
         """cmd_create with --force overwrites existing character."""
-        from u3edit.roster import cmd_create, load_roster
+        from ult3edit.roster import cmd_create, load_roster
         # Build roster with char in slot 0
         data = bytearray(ROSTER_FILE_SIZE)
         for i, ch in enumerate('OLD'):
@@ -13863,7 +13863,7 @@ class TestRosterCmdCreateForce:
 
     def test_create_dry_run_doesnt_write(self, tmp_path):
         """cmd_create with --dry-run doesn't modify file."""
-        from u3edit.roster import cmd_create
+        from ult3edit.roster import cmd_create
         data = bytearray(ROSTER_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'ROST')
         with open(path, 'wb') as f:
@@ -13893,7 +13893,7 @@ class TestBestiaryCmdViewJson:
 
     def test_view_json_output(self, tmp_path):
         """cmd_view JSON mode exports monster data."""
-        from u3edit.bestiary import cmd_view as bestiary_view
+        from ult3edit.bestiary import cmd_view as bestiary_view
         # Create a MON file with one non-empty monster
         data = bytearray(MON_FILE_SIZE)
         data[0] = 0x10  # tile1 for monster 0
@@ -13913,7 +13913,7 @@ class TestBestiaryCmdViewJson:
 
     def test_view_no_files_exits(self, tmp_path):
         """cmd_view with no MON files exits."""
-        from u3edit.bestiary import cmd_view as bestiary_view
+        from ult3edit.bestiary import cmd_view as bestiary_view
         args = argparse.Namespace(
             game_dir=str(tmp_path), json=False, output=None,
             validate=False, file=None)
@@ -13930,7 +13930,7 @@ class TestRosterCmdEditAll:
 
     def test_edit_all_applies_to_nonempty(self, tmp_path):
         """--all flag applies edits to all non-empty slots."""
-        from u3edit.roster import cmd_edit, load_roster
+        from ult3edit.roster import cmd_edit, load_roster
         data = bytearray(ROSTER_FILE_SIZE)
         # Put chars in slots 0 and 2
         for slot in (0, 2):
@@ -13989,7 +13989,7 @@ class TestRosterCmdEditGaps:
 
     def test_edit_no_modifications_specified(self, tmp_path):
         """cmd_edit with no edit flags prints 'No modifications specified'."""
-        from u3edit.roster import cmd_edit
+        from ult3edit.roster import cmd_edit
         data = bytearray(ROSTER_FILE_SIZE)
         off = 0
         for i, ch in enumerate('HERO'):
@@ -14013,7 +14013,7 @@ class TestRosterCmdEditGaps:
 
     def test_edit_view_slot_out_of_range(self, tmp_path, capsys):
         """cmd_view with slot out of range exits."""
-        from u3edit.roster import cmd_view
+        from ult3edit.roster import cmd_view
         data = bytearray(ROSTER_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'ROST')
         with open(path, 'wb') as f:
@@ -14050,7 +14050,7 @@ class TestBestiaryCmdEditGaps:
 
     def test_edit_no_monster_no_all(self, tmp_path):
         """cmd_edit exits if neither --monster nor --all given."""
-        from u3edit.bestiary import cmd_edit
+        from ult3edit.bestiary import cmd_edit
         data = bytearray(MON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'MONA')
         with open(path, 'wb') as f:
@@ -14067,7 +14067,7 @@ class TestBestiaryCmdEditGaps:
 
     def test_edit_monster_out_of_range(self, tmp_path):
         """cmd_edit exits if monster index >= 16."""
-        from u3edit.bestiary import cmd_edit
+        from ult3edit.bestiary import cmd_edit
         data = bytearray(MON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'MONA')
         with open(path, 'wb') as f:
@@ -14084,7 +14084,7 @@ class TestBestiaryCmdEditGaps:
 
     def test_edit_no_modifications(self, tmp_path, capsys):
         """cmd_edit with no edit flags prints 'No modifications specified'."""
-        from u3edit.bestiary import cmd_edit
+        from ult3edit.bestiary import cmd_edit
         data = bytearray(MON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'MONA')
         with open(path, 'wb') as f:
@@ -14102,7 +14102,7 @@ class TestBestiaryCmdEditGaps:
 
     def test_import_non_numeric_key_warning(self, tmp_path, capsys):
         """Import with non-numeric dict key prints warning."""
-        from u3edit.bestiary import cmd_import
+        from ult3edit.bestiary import cmd_import
         data = bytearray(MON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'MONA')
         with open(path, 'wb') as f:
@@ -14119,7 +14119,7 @@ class TestBestiaryCmdEditGaps:
 
     def test_import_monster_out_of_range_skipped(self, tmp_path):
         """Import with monster index >= 16 silently skips."""
-        from u3edit.bestiary import cmd_import
+        from ult3edit.bestiary import cmd_import
         data = bytearray(MON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'MONA')
         with open(path, 'wb') as f:
@@ -14146,7 +14146,7 @@ class TestMapImportGaps:
 
     def test_import_width_zero(self, tmp_path, capsys):
         """Import with width=0 falls back to 64."""
-        from u3edit.map import cmd_import
+        from ult3edit.map import cmd_import
         data = bytearray(MAP_OVERWORLD_SIZE)
         path = os.path.join(str(tmp_path), 'MAPA')
         with open(path, 'wb') as f:
@@ -14163,7 +14163,7 @@ class TestMapImportGaps:
 
     def test_import_width_not_divisible(self, tmp_path, capsys):
         """Import with width that doesn't divide file size warns."""
-        from u3edit.map import cmd_import
+        from ult3edit.map import cmd_import
         data = bytearray(MAP_OVERWORLD_SIZE)
         path = os.path.join(str(tmp_path), 'MAPA')
         with open(path, 'wb') as f:
@@ -14224,7 +14224,7 @@ class TestSaveCmdEditGaps:
 
     def test_plrs_slot_out_of_range(self, tmp_path):
         """PLRS slot out of range exits."""
-        from u3edit.save import cmd_edit
+        from ult3edit.save import cmd_edit
         game_dir = str(tmp_path)
         # Create PRTY file
         prty = bytearray(PRTY_FILE_SIZE)
@@ -14250,7 +14250,7 @@ class TestSaveCmdEditGaps:
 
     def test_both_prty_plrs_with_output_error(self, tmp_path):
         """Editing both PRTY and PLRS with --output exits."""
-        from u3edit.save import cmd_edit
+        from ult3edit.save import cmd_edit
         game_dir = str(tmp_path)
         prty = bytearray(PRTY_FILE_SIZE)
         with open(os.path.join(game_dir, 'PRTY'), 'wb') as f:
@@ -14282,7 +14282,7 @@ class TestSpecialCmdViewGaps:
 
     def test_no_files_in_directory(self, tmp_path):
         """cmd_view on directory with no special files exits."""
-        from u3edit.special import cmd_view
+        from ult3edit.special import cmd_view
         args = argparse.Namespace(
             path=str(tmp_path), json=False, output=None)
         with pytest.raises(SystemExit):
@@ -14294,7 +14294,7 @@ class TestTextCmdEditGaps:
 
     def test_record_without_text_exits(self, tmp_path):
         """cmd_edit with --record but no --text exits."""
-        from u3edit.text import cmd_edit
+        from ult3edit.text import cmd_edit
         path = os.path.join(str(tmp_path), 'TEXT')
         with open(path, 'wb') as f:
             f.write(bytearray(TEXT_FILE_SIZE))
@@ -14306,7 +14306,7 @@ class TestTextCmdEditGaps:
 
     def test_text_without_record_exits(self, tmp_path):
         """cmd_edit with --text but no --record exits."""
-        from u3edit.text import cmd_edit
+        from ult3edit.text import cmd_edit
         path = os.path.join(str(tmp_path), 'TEXT')
         with open(path, 'wb') as f:
             f.write(bytearray(TEXT_FILE_SIZE))
@@ -14318,7 +14318,7 @@ class TestTextCmdEditGaps:
 
     def test_import_overflow_truncation(self, tmp_path, capsys):
         """Import with too many records for file size warns."""
-        from u3edit.text import cmd_import
+        from ult3edit.text import cmd_import
         # Small file (32 bytes)
         path = os.path.join(str(tmp_path), 'TEXT')
         with open(path, 'wb') as f:
@@ -14341,7 +14341,7 @@ class TestPatchCmdGaps:
 
     def test_cmd_view_unrecognized_binary_fallback(self, tmp_path, capsys):
         """cmd_view on unrecognized file prints warning."""
-        from u3edit.patch import cmd_view
+        from ult3edit.patch import cmd_view
         path = os.path.join(str(tmp_path), 'UNKNOWN')
         with open(path, 'wb') as f:
             f.write(b'\x00' * 100)
@@ -14353,7 +14353,7 @@ class TestPatchCmdGaps:
 
     def test_cmd_edit_unrecognized_exits(self, tmp_path):
         """cmd_edit on unrecognized binary exits."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = os.path.join(str(tmp_path), 'UNKNOWN')
         with open(path, 'wb') as f:
             f.write(b'\x00' * 100)
@@ -14365,14 +14365,14 @@ class TestPatchCmdGaps:
 
     def test_encode_text_overflow(self):
         """encode_text_region raises ValueError when text exceeds max_length."""
-        from u3edit.patch import encode_text_region
+        from ult3edit.patch import encode_text_region
         strings = ['A' * 100, 'B' * 100]
         with pytest.raises(ValueError, match="exceeds max"):
             encode_text_region(strings, 10)
 
     def test_cmd_view_unrecognized_json(self, tmp_path, capsys):
         """cmd_view on unrecognized file with --json outputs JSON."""
-        from u3edit.patch import cmd_view
+        from ult3edit.patch import cmd_view
         path = os.path.join(str(tmp_path), 'UNKNOWN')
         with open(path, 'wb') as f:
             f.write(b'\x00' * 100)
@@ -14391,7 +14391,7 @@ class TestDdrwCmdGaps:
 
     def test_cmd_view_no_file_in_dir(self, tmp_path):
         """cmd_view on directory with no DDRW file exits."""
-        from u3edit.ddrw import cmd_view
+        from ult3edit.ddrw import cmd_view
         args = argparse.Namespace(
             path=str(tmp_path), json=False, output=None)
         with pytest.raises(SystemExit):
@@ -14399,8 +14399,8 @@ class TestDdrwCmdGaps:
 
     def test_cmd_import_no_raw_array(self, tmp_path):
         """cmd_import with JSON missing 'raw' array exits."""
-        from u3edit.ddrw import cmd_import, DDRW_LOAD_ADDR
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.ddrw import cmd_import, DDRW_LOAD_ADDR
+        from ult3edit.constants import DDRW_FILE_SIZE
         path = os.path.join(str(tmp_path), 'DDRW')
         with open(path, 'wb') as f:
             f.write(bytearray(DDRW_FILE_SIZE))
@@ -14415,8 +14415,8 @@ class TestDdrwCmdGaps:
 
     def test_cmd_import_invalid_byte_values(self, tmp_path):
         """cmd_import with out-of-range values in raw array exits."""
-        from u3edit.ddrw import cmd_import
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.ddrw import cmd_import
+        from ult3edit.constants import DDRW_FILE_SIZE
         path = os.path.join(str(tmp_path), 'DDRW')
         with open(path, 'wb') as f:
             f.write(bytearray(DDRW_FILE_SIZE))
@@ -14435,7 +14435,7 @@ class TestTlkCmdGaps:
 
     def test_cmd_view_no_files_in_dir(self, tmp_path):
         """cmd_view on directory with no TLK files exits."""
-        from u3edit.tlk import cmd_view
+        from ult3edit.tlk import cmd_view
         args = argparse.Namespace(
             path=str(tmp_path), json=False, output=None)
         with pytest.raises(SystemExit):
@@ -14443,7 +14443,7 @@ class TestTlkCmdGaps:
 
     def test_cmd_edit_find_without_replace(self, tmp_path):
         """cmd_edit with --find but no --replace exits."""
-        from u3edit.tlk import cmd_edit
+        from ult3edit.tlk import cmd_edit
         path = os.path.join(str(tmp_path), 'TLKA')
         with open(path, 'wb') as f:
             f.write(b'\xC8\xC5\xCC\xCC\xCF\xFF')  # HELLO + end marker
@@ -14457,7 +14457,7 @@ class TestTlkCmdGaps:
 
     def test_cmd_edit_replace_without_find(self, tmp_path):
         """cmd_edit with --replace but no --find exits."""
-        from u3edit.tlk import cmd_edit
+        from ult3edit.tlk import cmd_edit
         path = os.path.join(str(tmp_path), 'TLKA')
         with open(path, 'wb') as f:
             f.write(b'\xC8\xC5\xCC\xCC\xCF\xFF')
@@ -14471,7 +14471,7 @@ class TestTlkCmdGaps:
 
     def test_cmd_edit_record_out_of_range(self, tmp_path):
         """cmd_edit with record index past end of file exits."""
-        from u3edit.tlk import cmd_edit
+        from ult3edit.tlk import cmd_edit
         path = os.path.join(str(tmp_path), 'TLKA')
         with open(path, 'wb') as f:
             f.write(b'\xC8\xC5\xCC\xCC\xCF\xFF')  # 1 record
@@ -14489,7 +14489,7 @@ class TestDiffFileGaps:
 
     def test_diff_file_undetectable_type(self, tmp_path):
         """diff_file returns None for unrecognizable files."""
-        from u3edit.diff import diff_file
+        from ult3edit.diff import diff_file
         p1 = os.path.join(str(tmp_path), 'UNKNOWN1')
         p2 = os.path.join(str(tmp_path), 'UNKNOWN2')
         with open(p1, 'wb') as f:
@@ -14501,7 +14501,7 @@ class TestDiffFileGaps:
 
     def test_diff_directories_empty_dirs(self, tmp_path):
         """diff_directories on empty dirs returns GameDiff with no changes."""
-        from u3edit.diff import diff_directories
+        from ult3edit.diff import diff_directories
         d1 = os.path.join(str(tmp_path), 'dir1')
         d2 = os.path.join(str(tmp_path), 'dir2')
         os.makedirs(d1)
@@ -14511,8 +14511,8 @@ class TestDiffFileGaps:
 
     def test_diff_file_binary_type(self, tmp_path):
         """diff_file handles binary file types (TEXT, DDRW, SHPS)."""
-        from u3edit.diff import diff_file
-        from u3edit.constants import TEXT_FILE_SIZE
+        from ult3edit.diff import diff_file
+        from ult3edit.constants import TEXT_FILE_SIZE
         p1 = os.path.join(str(tmp_path), 'TEXT')
         p2 = os.path.join(str(tmp_path), 'TEXT2')
         data = bytearray(TEXT_FILE_SIZE)
@@ -14527,7 +14527,7 @@ class TestDiffFileGaps:
 
     def test_diff_file_prty(self, tmp_path):
         """diff_file handles PRTY files."""
-        from u3edit.diff import diff_file
+        from ult3edit.diff import diff_file
         p1 = os.path.join(str(tmp_path), 'PRTY')
         p2 = os.path.join(str(tmp_path), 'PRTY2')
         data1 = bytearray(PRTY_FILE_SIZE)
@@ -14546,7 +14546,7 @@ class TestBcdEdgeCases:
 
     def test_bcd_to_int_invalid_nibble(self):
         """bcd_to_int with value > 0x99 returns clamped result."""
-        from u3edit.bcd import bcd_to_int
+        from ult3edit.bcd import bcd_to_int
         # 0xFF has nibbles F,F which are invalid BCD
         result = bcd_to_int(0xFF)
         # Implementation-dependent, but should not crash
@@ -14554,25 +14554,25 @@ class TestBcdEdgeCases:
 
     def test_int_to_bcd_overflow(self):
         """int_to_bcd clamps values > 99."""
-        from u3edit.bcd import int_to_bcd
+        from ult3edit.bcd import int_to_bcd
         result = int_to_bcd(150)
         assert result == 0x99  # Clamped to max
 
     def test_int_to_bcd_negative(self):
         """int_to_bcd clamps negative values to 0."""
-        from u3edit.bcd import int_to_bcd
+        from ult3edit.bcd import int_to_bcd
         result = int_to_bcd(-5)
         assert result == 0x00
 
     def test_int_to_bcd16_overflow(self):
         """int_to_bcd16 clamps values > 9999."""
-        from u3edit.bcd import int_to_bcd16
+        from ult3edit.bcd import int_to_bcd16
         hi, lo = int_to_bcd16(12345)
         assert hi == 0x99 and lo == 0x99  # Clamped to 9999
 
     def test_int_to_bcd16_negative(self):
         """int_to_bcd16 clamps negative values to 0."""
-        from u3edit.bcd import int_to_bcd16
+        from ult3edit.bcd import int_to_bcd16
         hi, lo = int_to_bcd16(-100)
         assert hi == 0x00 and lo == 0x00
 
@@ -14582,7 +14582,7 @@ class TestPatchEncodeCoordOverflow:
 
     def test_encode_coord_too_many_pairs(self):
         """encode_coord_region raises ValueError when coords exceed max_length."""
-        from u3edit.patch import encode_coord_region
+        from ult3edit.patch import encode_coord_region
         coords = [{'x': i, 'y': i} for i in range(20)]
         with pytest.raises(ValueError, match="exceeds max"):
             encode_coord_region(coords, 8)
@@ -14593,18 +14593,18 @@ class TestFileUtilEdgeCases:
 
     def test_hex_int_parses_hex(self):
         """hex_int parses 0x prefix."""
-        from u3edit.fileutil import hex_int
+        from ult3edit.fileutil import hex_int
         assert hex_int('0xFF') == 255
         assert hex_int('0x10') == 16
 
     def test_hex_int_parses_decimal(self):
         """hex_int parses decimal strings."""
-        from u3edit.fileutil import hex_int
+        from ult3edit.fileutil import hex_int
         assert hex_int('42') == 42
 
     def test_hex_int_parses_dollar_prefix(self):
         """hex_int parses $ prefix (if supported)."""
-        from u3edit.fileutil import hex_int
+        from ult3edit.fileutil import hex_int
         try:
             result = hex_int('$FF')
             assert result == 255
@@ -14613,13 +14613,13 @@ class TestFileUtilEdgeCases:
 
     def test_resolve_single_file_not_found(self, tmp_path):
         """resolve_single_file returns None for missing file."""
-        from u3edit.fileutil import resolve_single_file
+        from ult3edit.fileutil import resolve_single_file
         result = resolve_single_file(str(tmp_path), 'NONEXISTENT')
         assert result is None
 
     def test_resolve_single_file_found(self, tmp_path):
         """resolve_single_file finds file by prefix."""
-        from u3edit.fileutil import resolve_single_file
+        from ult3edit.fileutil import resolve_single_file
         path = os.path.join(str(tmp_path), 'ROST')
         with open(path, 'wb') as f:
             f.write(b'\x00')
@@ -14628,7 +14628,7 @@ class TestFileUtilEdgeCases:
 
     def test_decode_encode_high_ascii_roundtrip(self):
         """decode/encode_high_ascii round-trips."""
-        from u3edit.fileutil import decode_high_ascii, encode_high_ascii
+        from ult3edit.fileutil import decode_high_ascii, encode_high_ascii
         text = "HELLO WORLD"
         encoded = encode_high_ascii(text, len(text))
         decoded = decode_high_ascii(encoded)
@@ -14640,7 +14640,7 @@ class TestSoundCmdGaps:
 
     def test_cmd_view_no_file_in_dir(self, tmp_path):
         """cmd_view on directory with no sound files works or exits."""
-        from u3edit.sound import cmd_view
+        from ult3edit.sound import cmd_view
         args = argparse.Namespace(
             path=str(tmp_path), json=False, output=None)
         # May exit or print nothing, but should not crash
@@ -14651,8 +14651,8 @@ class TestSoundCmdGaps:
 
     def test_cmd_import_size_mismatch_warning(self, tmp_path, capsys):
         """Import with wrong-size raw array produces warning."""
-        from u3edit.sound import cmd_import
-        from u3edit.constants import SOSA_FILE_SIZE
+        from ult3edit.sound import cmd_import
+        from ult3edit.constants import SOSA_FILE_SIZE
         path = os.path.join(str(tmp_path), 'SOSA')
         with open(path, 'wb') as f:
             f.write(bytearray(SOSA_FILE_SIZE))
@@ -14672,7 +14672,7 @@ class TestShapesCmdGaps:
 
     def test_cmd_view_no_file_in_dir(self, tmp_path):
         """cmd_view on directory with no SHPS files works or exits."""
-        from u3edit.shapes import cmd_view
+        from ult3edit.shapes import cmd_view
         args = argparse.Namespace(
             path=str(tmp_path), json=False, output=None,
             tile=None, glyph=True, color=False)
@@ -14687,9 +14687,9 @@ class TestCliDispatch:
 
     def test_unknown_subcommand(self, capsys):
         """CLI with no subcommand prints help or exits."""
-        from u3edit.cli import main
+        from ult3edit.cli import main
         sys_argv_backup = sys.argv
-        sys.argv = ['u3edit']
+        sys.argv = ['ult3edit']
         try:
             main()
         except SystemExit:
@@ -14707,7 +14707,7 @@ class TestCombatCmdEditGaps:
 
     def test_tile_out_of_bounds(self, tmp_path):
         """cmd_edit --tile with coords out of bounds exits."""
-        from u3edit.combat import cmd_edit
+        from ult3edit.combat import cmd_edit
         data = bytearray(CON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
@@ -14721,7 +14721,7 @@ class TestCombatCmdEditGaps:
 
     def test_monster_pos_index_out_of_range(self, tmp_path):
         """cmd_edit --monster-pos with bad index exits."""
-        from u3edit.combat import cmd_edit
+        from ult3edit.combat import cmd_edit
         data = bytearray(CON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
@@ -14735,7 +14735,7 @@ class TestCombatCmdEditGaps:
 
     def test_pc_pos_index_out_of_range(self, tmp_path):
         """cmd_edit --pc-pos with bad index exits."""
-        from u3edit.combat import cmd_edit
+        from ult3edit.combat import cmd_edit
         data = bytearray(CON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
@@ -14749,7 +14749,7 @@ class TestCombatCmdEditGaps:
 
     def test_tile_value_out_of_range(self, tmp_path):
         """cmd_edit --tile with value > 255 exits."""
-        from u3edit.combat import cmd_edit
+        from ult3edit.combat import cmd_edit
         data = bytearray(CON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
@@ -14763,7 +14763,7 @@ class TestCombatCmdEditGaps:
 
     def test_monster_pos_coords_out_of_bounds(self, tmp_path):
         """cmd_edit --monster-pos with position out of map bounds exits."""
-        from u3edit.combat import cmd_edit
+        from ult3edit.combat import cmd_edit
         data = bytearray(CON_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
@@ -14781,7 +14781,7 @@ class TestCombatCmdViewGaps:
 
     def test_no_con_files_in_dir(self, tmp_path):
         """cmd_view on directory with no CON files exits."""
-        from u3edit.combat import cmd_view
+        from ult3edit.combat import cmd_view
         args = argparse.Namespace(
             path=str(tmp_path), json=False, output=None, validate=False)
         with pytest.raises(SystemExit):
@@ -14793,7 +14793,7 @@ class TestBestiaryCmdViewGaps:
 
     def test_no_mon_files_in_dir(self, tmp_path):
         """cmd_view on directory with no MON files exits."""
-        from u3edit.bestiary import cmd_view
+        from ult3edit.bestiary import cmd_view
         args = argparse.Namespace(
             game_dir=str(tmp_path), json=False, output=None,
             validate=False, file=None)
@@ -14806,7 +14806,7 @@ class TestMapCmdViewGaps:
 
     def test_overview_no_map_files(self, tmp_path):
         """cmd_overview on directory with no MAP files exits."""
-        from u3edit.map import cmd_overview
+        from ult3edit.map import cmd_overview
         args = argparse.Namespace(
             game_dir=str(tmp_path), json=False, output=None)
         with pytest.raises(SystemExit):
@@ -14814,7 +14814,7 @@ class TestMapCmdViewGaps:
 
     def test_view_invalid_crop_non_int(self, tmp_path):
         """cmd_view with non-integer crop values exits."""
-        from u3edit.map import cmd_view
+        from ult3edit.map import cmd_view
         data = bytearray(MAP_OVERWORLD_SIZE)
         path = os.path.join(str(tmp_path), 'MAPA')
         with open(path, 'wb') as f:
@@ -14842,7 +14842,7 @@ class TestDispatchFallbacks:
 
     def test_combat_dispatch_unknown(self, capsys):
         """Combat dispatch with unknown command prints usage."""
-        from u3edit.combat import dispatch
+        from ult3edit.combat import dispatch
         args = argparse.Namespace(combat_command='bogus')
         dispatch(args)
         captured = capsys.readouterr()
@@ -14850,7 +14850,7 @@ class TestDispatchFallbacks:
 
     def test_bestiary_dispatch_unknown(self, capsys):
         """Bestiary dispatch with unknown command prints usage."""
-        from u3edit.bestiary import dispatch
+        from ult3edit.bestiary import dispatch
         args = argparse.Namespace(bestiary_command='bogus')
         dispatch(args)
         captured = capsys.readouterr()
@@ -14858,7 +14858,7 @@ class TestDispatchFallbacks:
 
     def test_map_dispatch_unknown(self, capsys):
         """Map dispatch with unknown command prints usage."""
-        from u3edit.map import dispatch
+        from ult3edit.map import dispatch
         args = argparse.Namespace(map_command='bogus')
         dispatch(args)
         captured = capsys.readouterr()
@@ -14866,7 +14866,7 @@ class TestDispatchFallbacks:
 
     def test_tlk_dispatch_unknown(self, capsys):
         """TLK dispatch with unknown command prints usage."""
-        from u3edit.tlk import dispatch
+        from ult3edit.tlk import dispatch
         args = argparse.Namespace(tlk_command='bogus')
         dispatch(args)
         captured = capsys.readouterr()
@@ -14874,7 +14874,7 @@ class TestDispatchFallbacks:
 
     def test_save_dispatch_unknown(self, capsys):
         """Save dispatch with unknown command prints usage."""
-        from u3edit.save import dispatch
+        from ult3edit.save import dispatch
         args = argparse.Namespace(save_command='bogus')
         dispatch(args)
         captured = capsys.readouterr()
@@ -14882,7 +14882,7 @@ class TestDispatchFallbacks:
 
     def test_special_dispatch_unknown(self, capsys):
         """Special dispatch with unknown command prints usage."""
-        from u3edit.special import dispatch
+        from ult3edit.special import dispatch
         args = argparse.Namespace(special_command='bogus')
         dispatch(args)
         captured = capsys.readouterr()
@@ -14890,7 +14890,7 @@ class TestDispatchFallbacks:
 
     def test_text_dispatch_unknown(self, capsys):
         """Text dispatch with unknown command prints usage."""
-        from u3edit.text import dispatch
+        from ult3edit.text import dispatch
         args = argparse.Namespace(text_command='bogus')
         dispatch(args)
         captured = capsys.readouterr()
@@ -14898,7 +14898,7 @@ class TestDispatchFallbacks:
 
     def test_ddrw_dispatch_unknown(self, capsys):
         """DDRW dispatch with unknown command prints usage."""
-        from u3edit.ddrw import dispatch
+        from ult3edit.ddrw import dispatch
         args = argparse.Namespace(ddrw_command='bogus')
         dispatch(args)
         captured = capsys.readouterr()
@@ -14906,7 +14906,7 @@ class TestDispatchFallbacks:
 
     def test_patch_dispatch_unknown(self, capsys):
         """Patch dispatch with unknown command prints usage."""
-        from u3edit.patch import dispatch
+        from ult3edit.patch import dispatch
         args = argparse.Namespace(patch_command='bogus')
         dispatch(args)
         captured = capsys.readouterr()
@@ -14914,7 +14914,7 @@ class TestDispatchFallbacks:
 
     def test_roster_dispatch_unknown(self, capsys):
         """Roster dispatch with unknown command prints usage."""
-        from u3edit.roster import dispatch
+        from ult3edit.roster import dispatch
         args = argparse.Namespace(roster_command='bogus')
         dispatch(args)
         captured = capsys.readouterr()
@@ -14922,7 +14922,7 @@ class TestDispatchFallbacks:
 
     def test_sound_dispatch_unknown(self, capsys):
         """Sound dispatch with unknown command prints usage."""
-        from u3edit.sound import dispatch
+        from ult3edit.sound import dispatch
         args = argparse.Namespace(sound_command='bogus')
         dispatch(args)
         captured = capsys.readouterr()
@@ -14930,7 +14930,7 @@ class TestDispatchFallbacks:
 
     def test_shapes_dispatch_unknown(self, capsys):
         """Shapes dispatch with unknown command prints usage."""
-        from u3edit.shapes import dispatch
+        from ult3edit.shapes import dispatch
         args = argparse.Namespace(shapes_command='bogus')
         dispatch(args)
         captured = capsys.readouterr()
@@ -14938,7 +14938,7 @@ class TestDispatchFallbacks:
 
     def test_equip_dispatch_unknown(self, capsys):
         """Equip dispatch with unknown command prints usage."""
-        from u3edit.equip import dispatch
+        from ult3edit.equip import dispatch
         args = argparse.Namespace(equip_command='bogus')
         dispatch(args)
         captured = capsys.readouterr()
@@ -14946,7 +14946,7 @@ class TestDispatchFallbacks:
 
     def test_spell_dispatch_unknown(self, capsys):
         """Spell dispatch with unknown command prints usage."""
-        from u3edit.spell import dispatch
+        from ult3edit.spell import dispatch
         args = argparse.Namespace(spell_command='bogus')
         dispatch(args)
         captured = capsys.readouterr()
@@ -14958,7 +14958,7 @@ class TestSaveCmdViewGaps:
 
     def test_no_prty_in_dir(self, tmp_path):
         """cmd_view on directory with no PRTY file exits."""
-        from u3edit.save import cmd_view
+        from ult3edit.save import cmd_view
         args = argparse.Namespace(
             game_dir=str(tmp_path), json=False, output=None)
         with pytest.raises(SystemExit):
@@ -14974,8 +14974,8 @@ class TestSoundCmdEditGaps:
 
     def test_invalid_hex_data(self, tmp_path):
         """cmd_edit with invalid hex data exits."""
-        from u3edit.sound import cmd_edit
-        from u3edit.constants import SOSA_FILE_SIZE
+        from ult3edit.sound import cmd_edit
+        from ult3edit.constants import SOSA_FILE_SIZE
         path = os.path.join(str(tmp_path), 'SOSA')
         with open(path, 'wb') as f:
             f.write(bytearray(SOSA_FILE_SIZE))
@@ -14987,8 +14987,8 @@ class TestSoundCmdEditGaps:
 
     def test_patch_past_end(self, tmp_path):
         """cmd_edit with offset+data past end of file exits."""
-        from u3edit.sound import cmd_edit
-        from u3edit.constants import SOSA_FILE_SIZE
+        from ult3edit.sound import cmd_edit
+        from ult3edit.constants import SOSA_FILE_SIZE
         path = os.path.join(str(tmp_path), 'SOSA')
         with open(path, 'wb') as f:
             f.write(bytearray(SOSA_FILE_SIZE))
@@ -15000,7 +15000,7 @@ class TestSoundCmdEditGaps:
 
     def test_no_sound_files_in_dir(self, tmp_path):
         """cmd_view on directory with no sound files exits."""
-        from u3edit.sound import cmd_view
+        from ult3edit.sound import cmd_view
         args = argparse.Namespace(
             path=str(tmp_path), json=False, output=None)
         with pytest.raises(SystemExit):
@@ -15012,8 +15012,8 @@ class TestSoundCmdImportGaps:
 
     def test_import_non_list_raw(self, tmp_path):
         """cmd_import with non-list 'raw' exits."""
-        from u3edit.sound import cmd_import
-        from u3edit.constants import SOSA_FILE_SIZE
+        from ult3edit.sound import cmd_import
+        from ult3edit.constants import SOSA_FILE_SIZE
         path = os.path.join(str(tmp_path), 'SOSA')
         with open(path, 'wb') as f:
             f.write(bytearray(SOSA_FILE_SIZE))
@@ -15028,8 +15028,8 @@ class TestSoundCmdImportGaps:
 
     def test_import_invalid_byte_values(self, tmp_path):
         """cmd_import with invalid byte values exits."""
-        from u3edit.sound import cmd_import
-        from u3edit.constants import SOSA_FILE_SIZE
+        from ult3edit.sound import cmd_import
+        from ult3edit.constants import SOSA_FILE_SIZE
         path = os.path.join(str(tmp_path), 'SOSA')
         with open(path, 'wb') as f:
             f.write(bytearray(SOSA_FILE_SIZE))
@@ -15048,7 +15048,7 @@ class TestPatchCmdEditDataTooLong:
 
     def test_data_exceeds_region_max(self, tmp_path):
         """cmd_edit with data larger than region max_length exits."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         # Create file that looks like ULT3 (17408 bytes)
         path = os.path.join(str(tmp_path), 'ULT3')
         with open(path, 'wb') as f:
@@ -15062,7 +15062,7 @@ class TestPatchCmdEditDataTooLong:
 
     def test_invalid_hex_in_patch(self, tmp_path):
         """cmd_edit with invalid hex string exits."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = os.path.join(str(tmp_path), 'ULT3')
         with open(path, 'wb') as f:
             f.write(bytearray(17408))
@@ -15075,7 +15075,7 @@ class TestPatchCmdEditDataTooLong:
 
     def test_unknown_region(self, tmp_path):
         """cmd_edit with unknown region name exits."""
-        from u3edit.patch import cmd_edit
+        from ult3edit.patch import cmd_edit
         path = os.path.join(str(tmp_path), 'ULT3')
         with open(path, 'wb') as f:
             f.write(bytearray(17408))
@@ -15092,7 +15092,7 @@ class TestPatchCmdImportGaps:
 
     def test_import_unrecognized_binary(self, tmp_path):
         """cmd_import on unrecognized binary exits."""
-        from u3edit.patch import cmd_import
+        from ult3edit.patch import cmd_import
         path = os.path.join(str(tmp_path), 'UNKNOWN')
         with open(path, 'wb') as f:
             f.write(bytearray(100))
@@ -15107,7 +15107,7 @@ class TestPatchCmdImportGaps:
 
     def test_import_no_matching_regions(self, tmp_path):
         """cmd_import with no matching regions exits."""
-        from u3edit.patch import cmd_import
+        from ult3edit.patch import cmd_import
         path = os.path.join(str(tmp_path), 'ULT3')
         with open(path, 'wb') as f:
             f.write(bytearray(17408))
@@ -15122,7 +15122,7 @@ class TestPatchCmdImportGaps:
 
     def test_import_subs_no_regions(self, tmp_path):
         """cmd_import on SUBS binary (no regions) exits."""
-        from u3edit.patch import cmd_import
+        from ult3edit.patch import cmd_import
         path = os.path.join(str(tmp_path), 'SUBS')
         with open(path, 'wb') as f:
             f.write(bytearray(3584))
@@ -15141,7 +15141,7 @@ class TestShapesCmdEditGaps:
 
     def test_edit_no_file_in_dir(self, tmp_path):
         """cmd_edit on directory with no SHPS file exits or falls through."""
-        from u3edit.shapes import cmd_view
+        from ult3edit.shapes import cmd_view
         args = argparse.Namespace(
             path=str(tmp_path), json=False, output=None,
             tile=None, glyph=True, color=False)
@@ -15156,8 +15156,8 @@ class TestDdrwCmdEditGaps:
 
     def test_edit_patch_past_end(self, tmp_path):
         """cmd_edit with patch extending past end of file exits."""
-        from u3edit.ddrw import cmd_edit
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.ddrw import cmd_edit
+        from ult3edit.constants import DDRW_FILE_SIZE
         path = os.path.join(str(tmp_path), 'DDRW')
         with open(path, 'wb') as f:
             f.write(bytearray(DDRW_FILE_SIZE))
@@ -15170,8 +15170,8 @@ class TestDdrwCmdEditGaps:
 
     def test_edit_invalid_hex(self, tmp_path):
         """cmd_edit with invalid hex data exits."""
-        from u3edit.ddrw import cmd_edit
-        from u3edit.constants import DDRW_FILE_SIZE
+        from ult3edit.ddrw import cmd_edit
+        from ult3edit.constants import DDRW_FILE_SIZE
         path = os.path.join(str(tmp_path), 'DDRW')
         with open(path, 'wb') as f:
             f.write(bytearray(DDRW_FILE_SIZE))
@@ -15188,7 +15188,7 @@ class TestSpecialCmdImportGaps:
 
     def test_import_no_tiles_in_json(self, tmp_path):
         """Import with JSON missing tiles works (empty set)."""
-        from u3edit.special import cmd_import
+        from ult3edit.special import cmd_import
         data = bytearray(SPECIAL_FILE_SIZE)
         path = os.path.join(str(tmp_path), 'BRND')
         with open(path, 'wb') as f:
@@ -15207,7 +15207,7 @@ class TestPatchCmdDumpGaps:
 
     def test_dump_offset_past_end(self, tmp_path):
         """cmd_dump with offset past end of file exits."""
-        from u3edit.patch import cmd_dump
+        from ult3edit.patch import cmd_dump
         path = os.path.join(str(tmp_path), 'ULT3')
         with open(path, 'wb') as f:
             f.write(bytearray(17408))
@@ -15222,8 +15222,8 @@ class TestBestiaryAbility2Validation:
 
     def test_valid_resistant_no_warning(self):
         """Resistant (0xC0) is a defined bit — no warning."""
-        from u3edit.bestiary import Monster, validate_monster
-        from u3edit.constants import MON_ABIL2_RESISTANT
+        from ult3edit.bestiary import Monster, validate_monster
+        from ult3edit.constants import MON_ABIL2_RESISTANT
         attrs = [0x80, 0x80, 0, 0, 10, 5, 3, 4, 0, MON_ABIL2_RESISTANT]
         m = Monster(attrs, 0)
         warnings = validate_monster(m)
@@ -15231,7 +15231,7 @@ class TestBestiaryAbility2Validation:
 
     def test_undefined_ability2_bits_warned(self):
         """Bits outside 0xC0 produce a warning."""
-        from u3edit.bestiary import Monster, validate_monster
+        from ult3edit.bestiary import Monster, validate_monster
         attrs = [0x80, 0x80, 0, 0, 10, 5, 3, 4, 0, 0x01]
         m = Monster(attrs, 0)
         warnings = validate_monster(m)
@@ -15239,7 +15239,7 @@ class TestBestiaryAbility2Validation:
 
     def test_mixed_ability2_bits(self):
         """Resistant + undefined bits still warns about the undefined ones."""
-        from u3edit.bestiary import Monster, validate_monster
+        from ult3edit.bestiary import Monster, validate_monster
         attrs = [0x80, 0x80, 0, 0, 10, 5, 3, 4, 0, 0xC1]
         m = Monster(attrs, 0)
         warnings = validate_monster(m)
@@ -15247,7 +15247,7 @@ class TestBestiaryAbility2Validation:
 
     def test_ability2_zero_no_warning(self):
         """ability2=0 is valid — no warning."""
-        from u3edit.bestiary import Monster, validate_monster
+        from ult3edit.bestiary import Monster, validate_monster
         attrs = [0x80, 0x80, 0, 0, 10, 5, 3, 4, 0, 0]
         m = Monster(attrs, 0)
         warnings = validate_monster(m)
@@ -15259,35 +15259,35 @@ class TestMapLevelBoundsValidation:
 
     def test_valid_level_zero(self):
         """Level 0 of an 8-level dungeon is fine."""
-        from u3edit.map import _get_map_slice
+        from ult3edit.map import _get_map_slice
         data = bytearray(2048)  # 8 levels x 256
         slice_data, base, w, h = _get_map_slice(data, True, 0)
         assert base == 0 and w == 16 and h == 16
 
     def test_valid_level_seven(self):
         """Level 7 (last) of an 8-level dungeon is fine."""
-        from u3edit.map import _get_map_slice
+        from ult3edit.map import _get_map_slice
         data = bytearray(2048)
         slice_data, base, w, h = _get_map_slice(data, True, 7)
         assert base == 7 * 256
 
     def test_level_too_high_exits(self):
         """Level 8 of an 8-level dungeon should exit."""
-        from u3edit.map import _get_map_slice
+        from ult3edit.map import _get_map_slice
         data = bytearray(2048)  # 8 levels (0-7)
         with pytest.raises(SystemExit):
             _get_map_slice(data, True, 8)
 
     def test_negative_level_exits(self):
         """Negative level should exit."""
-        from u3edit.map import _get_map_slice
+        from ult3edit.map import _get_map_slice
         data = bytearray(2048)
         with pytest.raises(SystemExit):
             _get_map_slice(data, True, -1)
 
     def test_level_none_defaults_zero(self):
         """Level=None defaults to 0."""
-        from u3edit.map import _get_map_slice
+        from ult3edit.map import _get_map_slice
         data = bytearray(2048)
         slice_data, base, w, h = _get_map_slice(data, True, None)
         assert base == 0
@@ -15302,17 +15302,17 @@ class TestCharacterInitSize:
     """Test Character constructor rejects wrong-size data."""
 
     def test_too_small_raises(self):
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         with pytest.raises(ValueError, match='64 bytes'):
             Character(bytearray(32))
 
     def test_too_large_raises(self):
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         with pytest.raises(ValueError, match='64 bytes'):
             Character(bytearray(128))
 
     def test_exact_size_ok(self):
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         c = Character(bytearray(64))
         assert c.is_empty
 
@@ -15321,19 +15321,19 @@ class TestStatusSetterFullName:
     """Test Character.status setter with full status name strings."""
 
     def test_set_status_good_full(self):
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         c = Character(bytearray(64))
         c.status = 'Good'
         assert c.status == 'Good'
 
     def test_set_status_poisoned_full(self):
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         c = Character(bytearray(64))
         c.status = 'Poisoned'
         assert c.status == 'Poisoned'
 
     def test_set_status_dead_full(self):
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         c = Character(bytearray(64))
         c.status = 'Dead'
         assert c.status == 'Dead'
@@ -15343,7 +15343,7 @@ class TestRosterAllSlotsEmpty:
     """Test cmd_view/cmd_edit with all-empty roster."""
 
     def test_view_all_empty(self, tmp_path, capsys):
-        from u3edit.roster import cmd_view
+        from ult3edit.roster import cmd_view
         path = os.path.join(str(tmp_path), 'ROST')
         with open(path, 'wb') as f:
             f.write(bytearray(64 * 20))
@@ -15354,7 +15354,7 @@ class TestRosterAllSlotsEmpty:
         assert 'All slots empty' in out
 
     def test_edit_all_on_empty_roster(self, tmp_path, capsys):
-        from u3edit.roster import cmd_edit
+        from ult3edit.roster import cmd_edit
         path = os.path.join(str(tmp_path), 'ROST')
         with open(path, 'wb') as f:
             f.write(bytearray(64 * 20))
@@ -15380,7 +15380,7 @@ class TestPartyStateLocationTypeValueError:
     """Test PartyState.location_type setter raises ValueError for bad strings."""
 
     def test_unknown_string_raises(self):
-        from u3edit.save import PartyState
+        from ult3edit.save import PartyState
         ps = PartyState(bytearray(16))
         with pytest.raises(ValueError, match='Unknown location type'):
             ps.location_type = 'underwater'
@@ -15390,7 +15390,7 @@ class TestPartyStateNonStandardSentinel:
     """Test PartyState.display() shows non-standard sentinel."""
 
     def test_nonstandard_sentinel(self, capsys):
-        from u3edit.save import PartyState
+        from ult3edit.save import PartyState
         ps = PartyState(bytearray(16))
         ps.sentinel = 0x42
         ps.display()
@@ -15398,7 +15398,7 @@ class TestPartyStateNonStandardSentinel:
         assert 'non-standard' in out
 
     def test_inactive_sentinel(self, capsys):
-        from u3edit.save import PartyState
+        from ult3edit.save import PartyState
         ps = PartyState(bytearray(16))
         ps.sentinel = 0x00
         ps.display()
@@ -15410,7 +15410,7 @@ class TestCombatValidateView:
     """Test combat cmd_view with --validate flag."""
 
     def test_view_file_with_validate(self, tmp_path, capsys):
-        from u3edit.combat import cmd_view
+        from ult3edit.combat import cmd_view
         path = os.path.join(str(tmp_path), 'CONA')
         data = bytearray(192)
         # Set overlapping PC positions to trigger a warning
@@ -15425,7 +15425,7 @@ class TestCombatValidateView:
         cmd_view(args)
 
     def test_view_dir_json_with_validate(self, tmp_path, capsys):
-        from u3edit.combat import cmd_view
+        from ult3edit.combat import cmd_view
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
             f.write(bytearray(192))
@@ -15442,7 +15442,7 @@ class TestCombatEditValidate:
     """Test combat cmd_edit with --validate flag."""
 
     def test_edit_with_validate(self, tmp_path, capsys):
-        from u3edit.combat import cmd_edit
+        from ult3edit.combat import cmd_edit
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
             f.write(bytearray(192))
@@ -15457,7 +15457,7 @@ class TestCombatImportDescriptorBackcompat:
     """Test combat cmd_import accepts old 'descriptor' key."""
 
     def test_descriptor_key(self, tmp_path):
-        from u3edit.combat import cmd_import
+        from ult3edit.combat import cmd_import
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
             f.write(bytearray(192))
@@ -15482,7 +15482,7 @@ class TestCombatImportNonNumericMonsterKey:
     """Test combat cmd_import warns on non-numeric dict monster keys."""
 
     def test_non_numeric_monster_key(self, tmp_path, capsys):
-        from u3edit.combat import cmd_import
+        from ult3edit.combat import cmd_import
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
             f.write(bytearray(192))
@@ -15505,7 +15505,7 @@ class TestPatchStringsEditNoStrings:
     """Test patch cmd_strings_edit exits when binary has no inline strings."""
 
     def test_no_strings_exits(self, tmp_path):
-        from u3edit.patch import cmd_strings_edit
+        from ult3edit.patch import cmd_strings_edit
         path = os.path.join(str(tmp_path), 'ULT3')
         # Binary with no JSR $46BA pattern
         with open(path, 'wb') as f:
@@ -15537,7 +15537,7 @@ class TestPatchStringsEditNoCriteria:
         return path
 
     def test_no_criteria_exits(self, tmp_path):
-        from u3edit.patch import cmd_strings_edit
+        from ult3edit.patch import cmd_strings_edit
         path = self._make_ult3_with_string(tmp_path)
         args = argparse.Namespace(file=path, index=None, vanilla=None,
                                   address=None, text='TEST',
@@ -15550,7 +15550,7 @@ class TestPatchStringsEditByAddress:
     """Test patch cmd_strings_edit by --address lookup."""
 
     def test_edit_by_address(self, tmp_path, capsys):
-        from u3edit.patch import cmd_strings_edit
+        from ult3edit.patch import cmd_strings_edit
         data = bytearray(17408)
         # Place JSR $46BA at offset 100
         data[100] = 0x20
@@ -15576,7 +15576,7 @@ class TestPatchStringsImportNoStrings:
     """Test patch cmd_strings_import exits when binary has no inline strings."""
 
     def test_no_strings_exits(self, tmp_path):
-        from u3edit.patch import cmd_strings_import
+        from ult3edit.patch import cmd_strings_import
         path = os.path.join(str(tmp_path), 'ULT3')
         with open(path, 'wb') as f:
             f.write(bytearray(17408))
@@ -15607,7 +15607,7 @@ class TestPatchStringsImportErrors:
 
     def test_all_patches_fail_exits(self, tmp_path):
         """cmd_strings_import exits when replacement is too long."""
-        from u3edit.patch import cmd_strings_import
+        from ult3edit.patch import cmd_strings_import
         path = self._make_ult3_with_string(tmp_path, 'HI')
         jpath = os.path.join(str(tmp_path), 'patches.json')
         with open(jpath, 'w') as f:
@@ -15620,7 +15620,7 @@ class TestPatchStringsImportErrors:
 
     def test_no_match_warning(self, tmp_path, capsys):
         """Unmatched vanilla text produces warning."""
-        from u3edit.patch import cmd_strings_import
+        from ult3edit.patch import cmd_strings_import
         path = self._make_ult3_with_string(tmp_path, 'HI')
         jpath = os.path.join(str(tmp_path), 'patches.json')
         with open(jpath, 'w') as f:
@@ -15637,7 +15637,7 @@ class TestShapesImportOverlayStrings:
     """Test shapes cmd_import with overlay strings JSON format."""
 
     def test_import_overlay_strings(self, tmp_path, capsys):
-        from u3edit.shapes import cmd_import
+        from ult3edit.shapes import cmd_import
         # Build an SHP overlay with inline string "WEAPONS"
         data = bytearray(b'\x60' * 16)
         data += bytes([0x20, 0xBA, 0x46])  # JSR $46BA
@@ -15668,7 +15668,7 @@ class TestShapesImportUnrecognizedJSON:
     """Test shapes cmd_import rejects unrecognized JSON format."""
 
     def test_unrecognized_json_exits(self, tmp_path):
-        from u3edit.shapes import cmd_import
+        from ult3edit.shapes import cmd_import
         path = os.path.join(str(tmp_path), 'SHPS')
         with open(path, 'wb') as f:
             f.write(bytearray(2048))
@@ -15698,7 +15698,7 @@ class TestShapesEditStringErrors:
 
     def test_non_overlay_exits(self, tmp_path):
         """cmd_edit_string on a SHPS file exits with error."""
-        from u3edit.shapes import cmd_edit_string
+        from ult3edit.shapes import cmd_edit_string
         path = os.path.join(str(tmp_path), 'SHPS')
         with open(path, 'wb') as f:
             f.write(bytearray(2048))
@@ -15709,7 +15709,7 @@ class TestShapesEditStringErrors:
 
     def test_bad_offset_exits(self, tmp_path):
         """cmd_edit_string with nonexistent offset exits."""
-        from u3edit.shapes import cmd_edit_string
+        from ult3edit.shapes import cmd_edit_string
         path = self._make_overlay(tmp_path)
         args = argparse.Namespace(file=path, offset=9999, text='X',
                                   dry_run=False, backup=False, output=None)
@@ -15718,7 +15718,7 @@ class TestShapesEditStringErrors:
 
     def test_text_too_long_exits(self, tmp_path):
         """cmd_edit_string with text longer than slot exits."""
-        from u3edit.shapes import cmd_edit_string
+        from ult3edit.shapes import cmd_edit_string
         path = self._make_overlay(tmp_path, text='HI')
         args = argparse.Namespace(file=path, offset=19, text='THIS IS WAY TOO LONG',
                                   dry_run=False, backup=False, output=None)
@@ -15730,7 +15730,7 @@ class TestSpecialImportMetadataBackcompat:
     """Test special cmd_import accepts old 'metadata' key."""
 
     def test_metadata_key_imports_trailing(self, tmp_path):
-        from u3edit.special import cmd_import
+        from ult3edit.special import cmd_import
         path = os.path.join(str(tmp_path), 'BRND')
         with open(path, 'wb') as f:
             f.write(bytearray(128))
@@ -15753,7 +15753,7 @@ class TestTlkSearchInvalidRegex:
     """Test tlk cmd_search exits on invalid regex."""
 
     def test_bad_regex_exits(self, tmp_path):
-        from u3edit.tlk import cmd_search
+        from ult3edit.tlk import cmd_search
         args = argparse.Namespace(path=str(tmp_path), pattern='[unclosed',
                                   regex=True, ignore_case=False)
         with pytest.raises(SystemExit):
@@ -15764,23 +15764,23 @@ class TestBcdIsValidBcd:
     """Test is_valid_bcd function."""
 
     def test_valid_bcd_bytes(self):
-        from u3edit.bcd import is_valid_bcd
+        from ult3edit.bcd import is_valid_bcd
         assert is_valid_bcd(0x00)
         assert is_valid_bcd(0x99)
         assert is_valid_bcd(0x42)
 
     def test_invalid_high_nibble(self):
-        from u3edit.bcd import is_valid_bcd
+        from ult3edit.bcd import is_valid_bcd
         assert not is_valid_bcd(0xA0)
         assert not is_valid_bcd(0xF5)
 
     def test_invalid_low_nibble(self):
-        from u3edit.bcd import is_valid_bcd
+        from ult3edit.bcd import is_valid_bcd
         assert not is_valid_bcd(0x0A)
         assert not is_valid_bcd(0x1F)
 
     def test_both_nibbles_invalid(self):
-        from u3edit.bcd import is_valid_bcd
+        from ult3edit.bcd import is_valid_bcd
         assert not is_valid_bcd(0xFF)
 
 
@@ -15788,7 +15788,7 @@ class TestValidateMonsterEmpty:
     """Test validate_monster returns empty for empty monster."""
 
     def test_empty_monster_no_warnings(self):
-        from u3edit.bestiary import Monster, validate_monster
+        from ult3edit.bestiary import Monster, validate_monster
         attrs = [0] * 10
         m = Monster(attrs, 0)
         assert validate_monster(m) == []
@@ -15798,7 +15798,7 @@ class TestShapesCompileNoTiles:
     """Test shapes cmd_compile_tiles exits when .tiles file has no tiles."""
 
     def test_empty_source_exits(self, tmp_path):
-        from u3edit.shapes import cmd_compile_tiles
+        from ult3edit.shapes import cmd_compile_tiles
         src = os.path.join(str(tmp_path), 'empty.tiles')
         with open(src, 'w') as f:
             f.write('# Just a comment\n')
@@ -15811,7 +15811,7 @@ class TestMapDecompileUnknownBytes:
     """Test map cmd_decompile warns on unknown tile bytes."""
 
     def test_unknown_tile_byte_shows_question_mark(self, tmp_path, capsys):
-        from u3edit.map import cmd_decompile
+        from ult3edit.map import cmd_decompile
         # Create a small overworld map with an unknown tile byte
         data = bytearray(64 * 64)
         data[0] = 0xFE  # Not a standard tile
@@ -15829,7 +15829,7 @@ class TestDiffChangedCount:
     """Test FileDiff.change_count property."""
 
     def test_change_count(self):
-        from u3edit.diff import FileDiff, EntityDiff, FieldDiff
+        from ult3edit.diff import FileDiff, EntityDiff, FieldDiff
         fd = FileDiff('roster', 'ROST')
         e1 = EntityDiff('character', 'Slot 0')
         e1.fields = [FieldDiff('name', 'foo', 'bar')]
@@ -15840,7 +15840,7 @@ class TestDiffChangedCount:
         assert fd.change_count == 2
 
     def test_no_changes(self):
-        from u3edit.diff import FileDiff, EntityDiff
+        from ult3edit.diff import FileDiff, EntityDiff
         fd = FileDiff('roster', 'ROST')
         e = EntityDiff('character', 'Slot 0')  # no fields = unchanged
         fd.entities = [e]
@@ -15861,14 +15861,14 @@ class TestFlagDescMagicUserPrecedence:
 
     def test_magic_user_detected(self):
         """flags1=0x0C (bits 2+3 set) should show Magic User."""
-        from u3edit.bestiary import Monster
+        from ult3edit.bestiary import Monster
         attrs = [0x80, 0x80, 0x0C, 0, 10, 5, 3, 4, 0, 0]
         m = Monster(attrs, 0)
         assert 'Magic User' in m.flag_desc
 
     def test_undead_not_magic_user(self):
         """flags1=0x04 (only bit 2) should show Undead, not Magic User."""
-        from u3edit.bestiary import Monster
+        from ult3edit.bestiary import Monster
         attrs = [0x80, 0x80, 0x04, 0, 10, 5, 3, 4, 0, 0]
         m = Monster(attrs, 0)
         assert 'Undead' in m.flag_desc
@@ -15876,7 +15876,7 @@ class TestFlagDescMagicUserPrecedence:
 
     def test_ranged_not_magic_user(self):
         """flags1=0x08 (only bit 3) should show Ranged, not Magic User."""
-        from u3edit.bestiary import Monster
+        from ult3edit.bestiary import Monster
         attrs = [0x80, 0x80, 0x08, 0, 10, 5, 3, 4, 0, 0]
         m = Monster(attrs, 0)
         assert 'Ranged' in m.flag_desc
@@ -15884,7 +15884,7 @@ class TestFlagDescMagicUserPrecedence:
 
     def test_boss_magic_user(self):
         """flags1=0x8C (boss + magic user) shows both."""
-        from u3edit.bestiary import Monster
+        from ult3edit.bestiary import Monster
         attrs = [0x80, 0x80, 0x8C, 0, 10, 5, 3, 4, 0, 0]
         m = Monster(attrs, 0)
         assert 'Magic User' in m.flag_desc
@@ -15892,14 +15892,14 @@ class TestFlagDescMagicUserPrecedence:
 
     def test_bit0_set_not_magic_user(self):
         """flags1=0x01 (undefined bit 0) should NOT trigger Magic User."""
-        from u3edit.bestiary import Monster
+        from ult3edit.bestiary import Monster
         attrs = [0x80, 0x80, 0x01, 0, 10, 5, 3, 4, 0, 0]
         m = Monster(attrs, 0)
         assert 'Magic User' not in m.flag_desc
 
     def test_no_flags(self):
         """flags1=0x00 should show '-' (no flags)."""
-        from u3edit.bestiary import Monster
+        from ult3edit.bestiary import Monster
         attrs = [0x80, 0x80, 0x00, 0, 10, 5, 3, 4, 0, 0]
         m = Monster(attrs, 0)
         assert m.flag_desc == '-'
@@ -15909,8 +15909,8 @@ class TestMapCompileRowPadding:
     """Test that short overworld rows are padded with Grass (0x04), not Water (0x00)."""
 
     def test_short_overworld_row_padded_with_grass(self, tmp_path):
-        from u3edit.map import cmd_compile
-        from u3edit.constants import TILES
+        from ult3edit.map import cmd_compile
+        from ult3edit.constants import TILES
         # Create a .map file with one short row
         src = os.path.join(str(tmp_path), 'test.map')
         # Use '.' which is Grass (0x04) for the first few chars, then short
@@ -15929,7 +15929,7 @@ class TestMapCompileRowPadding:
         assert data[10] != 0x00
 
     def test_short_dungeon_row_padded_with_zero(self, tmp_path):
-        from u3edit.map import cmd_compile
+        from ult3edit.map import cmd_compile
         # Create a dungeon .map with short rows
         src = os.path.join(str(tmp_path), 'test.map')
         with open(src, 'w') as f:
@@ -15949,11 +15949,11 @@ class TestSoundFileDescriptions:
     """Test that SOSA/SOSM have correct descriptions."""
 
     def test_sosa_description(self):
-        from u3edit.sound import SOUND_FILES
+        from ult3edit.sound import SOUND_FILES
         assert 'map state' in SOUND_FILES['SOSA']['description'].lower()
 
     def test_sosm_description(self):
-        from u3edit.sound import SOUND_FILES
+        from ult3edit.sound import SOUND_FILES
         assert 'monster' in SOUND_FILES['SOSM']['description'].lower()
 
 
@@ -15961,15 +15961,15 @@ class TestBcd16Docstring:
     """Test bcd16_to_int decodes correctly (verifying fixed docstring)."""
 
     def test_bcd16_1234(self):
-        from u3edit.bcd import bcd16_to_int
+        from ult3edit.bcd import bcd16_to_int
         assert bcd16_to_int(0x12, 0x34) == 1234
 
     def test_bcd16_9999(self):
-        from u3edit.bcd import bcd16_to_int
+        from ult3edit.bcd import bcd16_to_int
         assert bcd16_to_int(0x99, 0x99) == 9999
 
     def test_bcd16_0100(self):
-        from u3edit.bcd import bcd16_to_int
+        from ult3edit.bcd import bcd16_to_int
         assert bcd16_to_int(0x01, 0x00) == 100
 
 
@@ -15982,7 +15982,7 @@ class TestShapesCmdViewTile:
     """Test shapes cmd_view with --tile N on a charset file."""
 
     def test_view_single_tile(self, tmp_path, capsys):
-        from u3edit.shapes import cmd_view
+        from ult3edit.shapes import cmd_view
         path = os.path.join(str(tmp_path), 'SHPS')
         # Create a valid SHPS file (2048 bytes)
         data = bytearray(2048)
@@ -16002,12 +16002,12 @@ class TestShapesDecompileTooSmall:
     """Test decompile_shps raises ValueError for too-small file."""
 
     def test_truncated_raises(self):
-        from u3edit.shapes import decompile_shps
+        from ult3edit.shapes import decompile_shps
         with pytest.raises(ValueError, match='too small'):
             decompile_shps(bytes(1024))
 
     def test_exact_size_ok(self):
-        from u3edit.shapes import decompile_shps
+        from ult3edit.shapes import decompile_shps
         result = decompile_shps(bytes(2048))
         assert '# Tile' in result
 
@@ -16016,7 +16016,7 @@ class TestMapOverviewPreview:
     """Test cmd_overview with --preview flag."""
 
     def test_preview_renders_scaled_map(self, tmp_path, capsys):
-        from u3edit.map import cmd_overview
+        from ult3edit.map import cmd_overview
         # Create MAPA (4096 bytes)
         mapa_path = os.path.join(str(tmp_path), 'MAPA')
         data = bytearray(4096)
@@ -16034,7 +16034,7 @@ class TestSoundCmdViewDir:
     """Test sound cmd_view directory mode with actual files present."""
 
     def test_dir_text_mode(self, tmp_path, capsys):
-        from u3edit.sound import cmd_view
+        from ult3edit.sound import cmd_view
         # Create an MBS-sized file (5456 bytes)
         mbs_path = os.path.join(str(tmp_path), 'MBS')
         with open(mbs_path, 'wb') as f:
@@ -16046,7 +16046,7 @@ class TestSoundCmdViewDir:
         assert 'MBS' in out
 
     def test_dir_json_mode(self, tmp_path, capsys):
-        from u3edit.sound import cmd_view
+        from ult3edit.sound import cmd_view
         mbs_path = os.path.join(str(tmp_path), 'MBS')
         with open(mbs_path, 'wb') as f:
             f.write(bytearray(5456))
@@ -16063,7 +16063,7 @@ class TestSoundCmdViewSingleMBS:
     """Test sound cmd_view on a single MBS file with structured output."""
 
     def test_mbs_file_view(self, tmp_path, capsys):
-        from u3edit.sound import cmd_view
+        from ult3edit.sound import cmd_view
         path = os.path.join(str(tmp_path), 'MBS')
         # Create MBS with some AY register writes (reg 0-13 are valid)
         data = bytearray(5456)
@@ -16085,7 +16085,7 @@ class TestSoundCmdViewUnknown:
     """Test sound cmd_view on an unrecognized file type."""
 
     def test_unknown_file_type(self, tmp_path, capsys):
-        from u3edit.sound import cmd_view
+        from ult3edit.sound import cmd_view
         path = os.path.join(str(tmp_path), 'MYSTERY')
         with open(path, 'wb') as f:
             f.write(bytearray(999))
@@ -16100,7 +16100,7 @@ class TestDiffFileDispatchCombat:
     """Test diff_file dispatches to diff_combat for CON files."""
 
     def test_diff_file_combat(self, tmp_path):
-        from u3edit.diff import diff_file
+        from ult3edit.diff import diff_file
         p1 = os.path.join(str(tmp_path), 'CONA')
         p2 = os.path.join(str(tmp_path), 'CONA_2')
         data = bytearray(192)
@@ -16118,7 +16118,7 @@ class TestDiffFileDispatchTlk:
     """Test diff_file dispatches to diff_tlk for TLK files."""
 
     def test_diff_file_tlk(self, tmp_path):
-        from u3edit.diff import diff_file
+        from ult3edit.diff import diff_file
         # Build a simple TLK file (text record + null terminator)
         rec = bytearray([ord('H') | 0x80, ord('I') | 0x80, 0x00])
         p1 = os.path.join(str(tmp_path), 'TLKA')
@@ -16137,7 +16137,7 @@ class TestDiffFileDispatchSpecial:
     """Test diff_file dispatches to diff_special for BRND/SHRN files."""
 
     def test_diff_file_special(self, tmp_path):
-        from u3edit.diff import diff_file
+        from ult3edit.diff import diff_file
         p1 = os.path.join(str(tmp_path), 'BRND')
         p2 = os.path.join(str(tmp_path), 'BRND_2')
         data = bytearray(128)
@@ -16155,7 +16155,7 @@ class TestDiffMapDungeon:
     """Test diff_map with dungeon-sized files (exposes width=64 issue)."""
 
     def test_diff_dungeon_detects_changes(self, tmp_path):
-        from u3edit.diff import diff_map
+        from ult3edit.diff import diff_map
         p1 = os.path.join(str(tmp_path), 'MAPM')
         p2 = os.path.join(str(tmp_path), 'MAPM_2')
         data1 = bytearray(2048)
@@ -16176,7 +16176,7 @@ class TestMapCompileLevelCommentMidLevel:
     """
 
     def test_level_comment_midlevel_splits(self, tmp_path):
-        from u3edit.map import cmd_compile
+        from ult3edit.map import cmd_compile
         src = os.path.join(str(tmp_path), 'test.map')
         with open(src, 'w') as f:
             f.write('# Level 1\n')
@@ -16202,7 +16202,7 @@ class TestCombatValidateZeroOverlap:
 
     def test_monster_pc_at_zero_no_overlap_warning(self):
         """Monster and PC both at (0,0) produce no overlap warning."""
-        from u3edit.combat import CombatMap, validate_combat_map
+        from ult3edit.combat import CombatMap, validate_combat_map
         data = bytearray(192)
         # Monster 0 at (0,0)
         data[0x80] = 0  # monster_x[0]
@@ -16227,7 +16227,7 @@ class TestTlkImportDestroysBinaryLeader:
     """Test that tlk cmd_import discards binary leader sections."""
 
     def test_binary_leader_not_preserved(self, tmp_path, capsys):
-        from u3edit.tlk import cmd_import
+        from ult3edit.tlk import cmd_import
         # Create TLK with binary leader (non-text bytes) then text record
         binary_leader = bytearray([0x01, 0x02, 0x03])  # not high-ASCII text
         separator = bytearray([0x00])
@@ -16255,7 +16255,7 @@ class TestTlkEditZeroTextRecords:
     """Test tlk cmd_edit error message when file has zero text records."""
 
     def test_zero_text_count_exits(self, tmp_path):
-        from u3edit.tlk import cmd_edit
+        from ult3edit.tlk import cmd_edit
         # Create TLK with only binary (non-text) content
         binary_data = bytearray([0x01, 0x02, 0x03, 0x00])
         path = os.path.join(str(tmp_path), 'TLKA')
@@ -16272,7 +16272,7 @@ class TestMapImportDungeonNoLevelsKey:
     """Test map cmd_import on dungeon file with JSON lacking 'levels' key."""
 
     def test_dungeon_without_levels_uses_else_branch(self, tmp_path, capsys):
-        from u3edit.map import cmd_import
+        from ult3edit.map import cmd_import
         # Create dungeon-sized file (2048 bytes)
         path = os.path.join(str(tmp_path), 'MAPM')
         data = bytearray(2048)
@@ -16296,7 +16296,7 @@ class TestMapCmdFindDungeon:
     """Test map cmd_find with dungeon-sized file."""
 
     def test_find_tile_in_dungeon(self, tmp_path, capsys):
-        from u3edit.map import cmd_find
+        from ult3edit.map import cmd_find
         # Create dungeon (2048 bytes, 8 levels x 16x16)
         data = bytearray(2048)
         data[0] = 0x01  # Wall at level 0, (0,0)
@@ -16313,7 +16313,7 @@ class TestCombatImportDoubleWrite:
     """Test combat cmd_import with both padding.pre_monster and descriptor.block1."""
 
     def test_descriptor_overwrites_padding(self, tmp_path):
-        from u3edit.combat import cmd_import
+        from ult3edit.combat import cmd_import
         path = os.path.join(str(tmp_path), 'CONA')
         with open(path, 'wb') as f:
             f.write(bytearray(192))
@@ -16339,7 +16339,7 @@ class TestShapesCmdViewBinaryFormat:
     """Test shapes cmd_view on a non-charset, non-overlay file (binary hex dump)."""
 
     def test_binary_hex_dump(self, tmp_path, capsys):
-        from u3edit.shapes import cmd_view
+        from ult3edit.shapes import cmd_view
         # Create a file that doesn't match any known format
         # Size not 2048 (SHPS), name not SHP0-7, not TEXT/1024
         path = os.path.join(str(tmp_path), 'UNKNOWN')
@@ -16357,7 +16357,7 @@ class TestRosterNameNonAscii:
 
     def test_non_ascii_chars_handled(self):
         """Non-ASCII chars should not crash (they get ORed with 0x80)."""
-        from u3edit.roster import Character
+        from ult3edit.roster import Character
         c = Character(bytearray(64))
         # Characters with ord() <= 127 are fine after | 0x80
         # Characters like 'é' (ord=233) produce 233 | 0x80 = 233 (fits in byte)
@@ -16370,7 +16370,7 @@ class TestDiffBinaryChangedBytes:
     """Test diff_binary changed_bytes FieldDiff uses old=0 sentinel."""
 
     def test_changed_bytes_old_is_zero(self, tmp_path):
-        from u3edit.diff import diff_binary
+        from ult3edit.diff import diff_binary
         p1 = os.path.join(str(tmp_path), 'FILE1')
         p2 = os.path.join(str(tmp_path), 'FILE2')
         with open(p1, 'wb') as f:
@@ -16393,7 +16393,7 @@ class TestDiffDetectMapNoSizeCheck:
     """Test diff detect_file_type accepts MAP files regardless of size."""
 
     def test_map_any_size_detected(self, tmp_path):
-        from u3edit.diff import detect_file_type
+        from ult3edit.diff import detect_file_type
         # A tiny file named MAPA is still detected as MAP
         path = os.path.join(str(tmp_path), 'MAPA')
         with open(path, 'wb') as f:
@@ -16401,7 +16401,7 @@ class TestDiffDetectMapNoSizeCheck:
         assert detect_file_type(path) == 'MAPA'
 
     def test_tlk_any_size_detected(self, tmp_path):
-        from u3edit.diff import detect_file_type
+        from ult3edit.diff import detect_file_type
         path = os.path.join(str(tmp_path), 'TLKA')
         with open(path, 'wb') as f:
             f.write(bytearray(10))
@@ -16412,7 +16412,7 @@ class TestShapesParseHeaderAmbiguity:
     """Test that _TILE_HEADER_RE matches before comment skip in parse_tiles_text."""
 
     def test_tile_header_comment_treated_as_header(self):
-        from u3edit.shapes import parse_tiles_text
+        from ult3edit.shapes import parse_tiles_text
         # A comment that looks like a tile header is treated as a header
         text = '# Tile 0x10: Some comment\n'
         # Add 8 pixel rows for tile 0x10 (GLYPH_HEIGHT=8)
@@ -16435,7 +16435,7 @@ class TestDiffMapDungeonCoordinates:
 
     def test_dungeon_tile_coordinates_correct(self, tmp_path):
         """Changed tile at dungeon position (3, 5) reports correct x,y."""
-        from u3edit.diff import diff_map
+        from ult3edit.diff import diff_map
         d1 = bytearray(MAP_DUNGEON_SIZE)
         d2 = bytearray(MAP_DUNGEON_SIZE)
         # Change tile at level 0, x=3, y=5 → offset = 5*16 + 3 = 83
@@ -16452,7 +16452,7 @@ class TestDiffMapDungeonCoordinates:
 
     def test_dungeon_change_on_level_1(self, tmp_path):
         """Changed tile on level 1 (offset 256+) uses width=16 for coordinates."""
-        from u3edit.diff import diff_map
+        from ult3edit.diff import diff_map
         d1 = bytearray(MAP_DUNGEON_SIZE)
         d2 = bytearray(MAP_DUNGEON_SIZE)
         # Level 1, x=10, y=2 → offset = 256 + 2*16 + 10 = 298
@@ -16470,7 +16470,7 @@ class TestDiffMapDungeonCoordinates:
 
     def test_overworld_still_uses_width_64(self, tmp_path):
         """Overworld (4096-byte) MAP still uses width=64."""
-        from u3edit.diff import diff_map
+        from ult3edit.diff import diff_map
         d1 = bytearray(MAP_OVERWORLD_SIZE)
         d2 = bytearray(MAP_OVERWORLD_SIZE)
         # x=40, y=3 → offset = 3*64 + 40 = 232
@@ -16490,21 +16490,21 @@ class TestDiskContextReadWrite:
     """Test DiskContext cache, modified, and _parse_hash_suffix edge cases."""
 
     def test_parse_hash_suffix_valid(self):
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         base, ft, at = DiskContext._parse_hash_suffix('ROST#069500')
         assert base == 'ROST'
         assert ft == 0x06
         assert at == 0x9500
 
     def test_parse_hash_suffix_no_hash(self):
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         base, ft, at = DiskContext._parse_hash_suffix('ROST')
         assert base == 'ROST'
         assert ft == 0x06
         assert at == 0x0000
 
     def test_parse_hash_suffix_short(self):
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         base, ft, at = DiskContext._parse_hash_suffix('FOO#06')
         assert base == 'FOO'
         assert ft == 0x06
@@ -16512,7 +16512,7 @@ class TestDiskContextReadWrite:
 
     def test_parse_hash_suffix_invalid_hex(self):
         """Non-hex characters in suffix with len >= 6 fall back to defaults."""
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         base, ft, at = DiskContext._parse_hash_suffix('FOO#GGGG00')
         assert base == 'FOO'
         assert ft == 0x06
@@ -16520,7 +16520,7 @@ class TestDiskContextReadWrite:
 
     def test_write_stages_data(self):
         """DiskContext.write() stages data in _modified dict."""
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         ctx = DiskContext('fake.po')
         ctx.write('ROST', b'\x00' * 10)
         assert 'ROST' in ctx._modified
@@ -16528,7 +16528,7 @@ class TestDiskContextReadWrite:
 
     def test_read_returns_modified_data(self):
         """read() returns staged modified data over cache."""
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         ctx = DiskContext('fake.po')
         ctx._cache['ROST'] = b'\x01' * 10
         ctx.write('ROST', b'\x02' * 10)
@@ -16536,20 +16536,20 @@ class TestDiskContextReadWrite:
 
     def test_read_returns_cached_data(self):
         """read() returns cached data when not modified."""
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         ctx = DiskContext('fake.po')
         ctx._cache['ROST'] = b'\x03' * 10
         assert ctx.read('ROST') == b'\x03' * 10
 
     def test_read_returns_none_no_tmpdir(self):
         """read() returns None when _tmpdir is None and no cache."""
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         ctx = DiskContext('fake.po')
         assert ctx.read('MISSING') is None
 
     def test_read_from_tmpdir(self, tmp_path):
         """read() scans _tmpdir files and populates cache + file_types."""
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         ctx = DiskContext('fake.po')
         ctx._tmpdir = str(tmp_path)
         # Create a file with hash suffix in tmpdir
@@ -16563,7 +16563,7 @@ class TestDiskContextReadWrite:
 
     def test_read_case_insensitive(self, tmp_path):
         """read() matches filenames case-insensitively."""
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         ctx = DiskContext('fake.po')
         ctx._tmpdir = str(tmp_path)
         fpath = os.path.join(str(tmp_path), 'rost#060000')
@@ -16578,9 +16578,9 @@ class TestDiskContextExit:
 
     def test_exit_cleans_tmpdir(self, tmp_path):
         """__exit__ removes the tmpdir."""
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         ctx = DiskContext('fake.po')
-        tmpdir = os.path.join(str(tmp_path), 'u3edit_test')
+        tmpdir = os.path.join(str(tmp_path), 'ult3edit_test')
         os.makedirs(tmpdir)
         ctx._tmpdir = tmpdir
         ctx.__exit__(None, None, None)
@@ -16588,7 +16588,7 @@ class TestDiskContextExit:
 
     def test_exit_returns_false(self):
         """__exit__ returns False (does not suppress exceptions)."""
-        from u3edit.disk import DiskContext
+        from ult3edit.disk import DiskContext
         ctx = DiskContext('fake.po')
         ctx._tmpdir = None
         result = ctx.__exit__(None, None, None)
@@ -16599,7 +16599,7 @@ class TestDiskAuditLogic:
     """Test cmd_audit logic with mocked disk_info/disk_list."""
 
     def test_audit_text_output(self, monkeypatch, capsys):
-        from u3edit import disk
+        from ult3edit import disk
         monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
             'blocks': '280',
             'volume': 'TEST',
@@ -16616,7 +16616,7 @@ class TestDiskAuditLogic:
         assert '280' in out  # total blocks shown
 
     def test_audit_json_output(self, monkeypatch, capsys):
-        from u3edit import disk
+        from ult3edit import disk
         monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
             'blocks': '280',
         })
@@ -16634,7 +16634,7 @@ class TestDiskAuditLogic:
         assert 'capacity_estimates' in data
 
     def test_audit_detail_flag(self, monkeypatch, capsys):
-        from u3edit import disk
+        from ult3edit import disk
         monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
             'blocks': '100',
         })
@@ -16649,7 +16649,7 @@ class TestDiskAuditLogic:
         assert 'BIN' in out
 
     def test_audit_error(self, monkeypatch, capsys):
-        from u3edit import disk
+        from ult3edit import disk
         monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
             'error': 'bad image',
         })
@@ -16664,7 +16664,7 @@ class TestDiskCmdHandlers:
     """Test disk CLI handler functions."""
 
     def test_cmd_info_error(self, monkeypatch, capsys):
-        from u3edit import disk
+        from ult3edit import disk
         monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
             'error': 'not found',
         })
@@ -16673,7 +16673,7 @@ class TestDiskCmdHandlers:
             disk.cmd_info(args)
 
     def test_cmd_info_text(self, monkeypatch, capsys):
-        from u3edit import disk
+        from ult3edit import disk
         monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
             'volume': 'GAME',
             'format': 'ProDOS',
@@ -16685,7 +16685,7 @@ class TestDiskCmdHandlers:
         assert 'ProDOS' in out
 
     def test_cmd_info_json(self, monkeypatch, capsys):
-        from u3edit import disk
+        from ult3edit import disk
         monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
             'volume': 'GAME',
         })
@@ -16696,14 +16696,14 @@ class TestDiskCmdHandlers:
         assert data['volume'] == 'GAME'
 
     def test_cmd_list_empty(self, monkeypatch, capsys):
-        from u3edit import disk
+        from ult3edit import disk
         monkeypatch.setattr(disk, 'disk_list', lambda image, path, **kw: [])
         args = argparse.Namespace(image='empty.po', path='/', json=False, output=None)
         with pytest.raises(SystemExit):
             disk.cmd_list(args)
 
     def test_cmd_list_text(self, monkeypatch, capsys):
-        from u3edit import disk
+        from ult3edit import disk
         monkeypatch.setattr(disk, 'disk_list', lambda image, path, **kw: [
             {'name': 'ROST', 'type': 'BIN', 'size': '1280'},
         ])
@@ -16714,7 +16714,7 @@ class TestDiskCmdHandlers:
         assert '1 files' in out
 
     def test_cmd_list_json(self, monkeypatch, capsys):
-        from u3edit import disk
+        from ult3edit import disk
         monkeypatch.setattr(disk, 'disk_list', lambda image, path, **kw: [
             {'name': 'ROST', 'type': 'BIN', 'size': '1280'},
         ])
@@ -16726,7 +16726,7 @@ class TestDiskCmdHandlers:
         assert data[0]['name'] == 'ROST'
 
     def test_cmd_extract_success(self, monkeypatch, capsys, tmp_path):
-        from u3edit import disk
+        from ult3edit import disk
         monkeypatch.setattr(disk, 'disk_extract_all', lambda *a, **kw: True)
         args = argparse.Namespace(image='game.po', output=str(tmp_path))
         disk.cmd_extract(args)
@@ -16734,7 +16734,7 @@ class TestDiskCmdHandlers:
         assert 'Extracted' in out
 
     def test_cmd_extract_failure(self, monkeypatch, capsys):
-        from u3edit import disk
+        from ult3edit import disk
         monkeypatch.setattr(disk, 'disk_extract_all', lambda *a, **kw: False)
         args = argparse.Namespace(image='bad.po', output=None)
         with pytest.raises(SystemExit):
@@ -16747,7 +16747,7 @@ class TestRosterValidateInventoryBcd:
     def test_invalid_bcd_in_weapon_inventory_not_caught(self):
         """Weapon inventory bytes with non-BCD values are NOT flagged.
         This documents the design gap — not a failure."""
-        from u3edit.roster import validate_character, Character
+        from ult3edit.roster import validate_character, Character
         data = bytearray(CHAR_RECORD_SIZE)
         # Make non-empty: set name
         data[0] = 0xC1  # 'A' in high-ASCII
@@ -16765,7 +16765,7 @@ class TestRosterValidateInventoryBcd:
 
     def test_invalid_bcd_in_armor_inventory_not_caught(self):
         """Armor inventory bytes with non-BCD values are NOT flagged."""
-        from u3edit.roster import validate_character, Character
+        from ult3edit.roster import validate_character, Character
         data = bytearray(CHAR_RECORD_SIZE)
         data[0] = 0xC1
         data[0x11] = 0x47
@@ -16783,7 +16783,7 @@ class TestSavePLRSOnlyDryRun:
     """save cmd_edit with only PLRS changes + dry_run reaches elif branch."""
 
     def test_plrs_only_dry_run_message(self, tmp_path, capsys):
-        from u3edit.save import cmd_edit
+        from ult3edit.save import cmd_edit
         # Create PRTY file
         prty_data = bytearray(PRTY_FILE_SIZE)
         prty_data[PRTY_OFF_SENTINEL] = 0xFF
@@ -16830,7 +16830,7 @@ class TestTlkFindWithoutReplace:
     """tlk cmd_edit with --find only (no --replace) exits with error."""
 
     def test_find_without_replace_exits(self, tmp_path, capsys):
-        from u3edit.tlk import cmd_edit
+        from ult3edit.tlk import cmd_edit
         tlk_path = os.path.join(str(tmp_path), 'TLKA')
         with open(tlk_path, 'wb') as f:
             f.write(b'\xC8\xC5\xCC\xCC\xCF\x00')  # "HELLO" in high-ASCII
@@ -16842,7 +16842,7 @@ class TestTlkFindWithoutReplace:
             cmd_edit(args)
 
     def test_replace_without_find_exits(self, tmp_path, capsys):
-        from u3edit.tlk import cmd_edit
+        from ult3edit.tlk import cmd_edit
         tlk_path = os.path.join(str(tmp_path), 'TLKA')
         with open(tlk_path, 'wb') as f:
             f.write(b'\xC8\xC5\xCC\xCC\xCF\x00')
@@ -16859,20 +16859,20 @@ class TestTlkIsTextRecordEdgeCases:
 
     def test_all_separators_returns_false(self):
         """Record with only line breaks has content_bytes=0 → False."""
-        from u3edit.tlk import is_text_record, TLK_LINE_BREAK
+        from ult3edit.tlk import is_text_record, TLK_LINE_BREAK
         data = bytes([TLK_LINE_BREAK, TLK_LINE_BREAK, TLK_LINE_BREAK])
         assert is_text_record(data) is False
 
     def test_exactly_70_percent_returns_false(self):
         """Exactly 70% high-ASCII returns False (threshold is > 0.7)."""
-        from u3edit.tlk import is_text_record
+        from ult3edit.tlk import is_text_record
         # 7 high-ASCII + 3 low bytes = 70% exactly
         data = bytes([0xC1] * 7 + [0x10] * 3)
         assert is_text_record(data) is False
 
     def test_71_percent_returns_true(self):
         """Just above 70% threshold returns True."""
-        from u3edit.tlk import is_text_record
+        from ult3edit.tlk import is_text_record
         # 8 high-ASCII + 3 low bytes = 72.7%
         data = bytes([0xC1] * 8 + [0x10] * 3)
         assert is_text_record(data) is True
@@ -16882,14 +16882,14 @@ class TestSpellDispatchFallback:
     """spell dispatch with unknown command prints usage."""
 
     def test_dispatch_unknown_command(self, capsys):
-        from u3edit.spell import dispatch
+        from ult3edit.spell import dispatch
         args = argparse.Namespace(spell_command='unknown')
         dispatch(args)
         err = capsys.readouterr().err
         assert 'Usage' in err
 
     def test_dispatch_none_command(self, capsys):
-        from u3edit.spell import dispatch
+        from ult3edit.spell import dispatch
         args = argparse.Namespace(spell_command=None)
         dispatch(args)
         err = capsys.readouterr().err
@@ -16900,7 +16900,7 @@ class TestDiskDispatchFallback:
     """disk dispatch with unknown command prints usage."""
 
     def test_dispatch_unknown(self, capsys):
-        from u3edit.disk import dispatch
+        from ult3edit.disk import dispatch
         args = argparse.Namespace(disk_command='unknown')
         dispatch(args)
         err = capsys.readouterr().err
@@ -16917,7 +16917,7 @@ class TestMapCompileOverworldPadding:
 
     def test_short_overworld_padded_with_grass(self, tmp_path):
         """Compile a 3x3 overworld map and verify padding is 0x04."""
-        from u3edit.map import cmd_compile
+        from ult3edit.map import cmd_compile
         # Create a tiny 3x3 map text file (. = Grass)
         map_src = tmp_path / 'tiny.map'
         map_src.write_text('...\n...\n...\n')
@@ -16936,7 +16936,7 @@ class TestMapCompileOverworldPadding:
 
     def test_dungeon_padded_with_zero(self, tmp_path):
         """Dungeon maps pad with 0x00 (open floor), not 0x04."""
-        from u3edit.map import cmd_compile
+        from ult3edit.map import cmd_compile
         map_src = tmp_path / 'dungeon.map'
         # Write a minimal dungeon map: 1 level with 1 row
         map_src.write_text('# Level 0\n' + '.' * 16 + '\n')
@@ -16952,17 +16952,17 @@ class TestSpecialConstantsImportable:
     """special.py constants moved to constants.py and importable."""
 
     def test_special_meta_offset_value(self):
-        from u3edit.constants import SPECIAL_META_OFFSET
+        from ult3edit.constants import SPECIAL_META_OFFSET
         assert SPECIAL_META_OFFSET == 121
 
     def test_special_meta_size_value(self):
-        from u3edit.constants import SPECIAL_META_SIZE
+        from ult3edit.constants import SPECIAL_META_SIZE
         assert SPECIAL_META_SIZE == 7
 
     def test_special_module_uses_constants(self):
         """Verify special.py imports these from constants, not local defs."""
-        import u3edit.special as sp
-        from u3edit.constants import SPECIAL_META_OFFSET, SPECIAL_META_SIZE
+        import ult3edit.special as sp
+        from ult3edit.constants import SPECIAL_META_OFFSET, SPECIAL_META_SIZE
         assert sp.SPECIAL_META_OFFSET == SPECIAL_META_OFFSET
         assert sp.SPECIAL_META_SIZE == SPECIAL_META_SIZE
 
@@ -16972,7 +16972,7 @@ class TestShapesCompileJsonStructure:
 
     def test_compile_json_has_tile_groups(self, tmp_path):
         """Compile 8 glyphs → 2 tiles, verify JSON has tile_id and frames."""
-        from u3edit.shapes import cmd_compile_tiles
+        from ult3edit.shapes import cmd_compile_tiles
         # Create a .tiles file with 2 tiles (8 glyphs, indices 0-7)
         lines = []
         for idx in range(8):
@@ -17000,7 +17000,7 @@ class TestShapesCompileJsonStructure:
 
     def test_compile_json_frame_indices(self, tmp_path):
         """Verify frame indices are sequential within each tile group."""
-        from u3edit.shapes import cmd_compile_tiles
+        from ult3edit.shapes import cmd_compile_tiles
         lines = []
         for idx in range(4):
             lines.append(f'# Glyph 0x{idx:02X}')
@@ -17024,7 +17024,7 @@ class TestDiffMapDungeonLevelFormat:
 
     def test_dungeon_diff_has_level_info(self, tmp_path):
         """Diff two dungeon MAPs, verify level info in text output."""
-        from u3edit.diff import diff_map, format_text, GameDiff
+        from ult3edit.diff import diff_map, format_text, GameDiff
         # Create two dungeon maps (2048 bytes) with one tile different
         d1 = bytearray(2048)
         d2 = bytearray(2048)
@@ -17049,7 +17049,7 @@ class TestDiffMapDungeonLevelFormat:
 
     def test_overworld_diff_no_level(self, tmp_path):
         """Overworld diffs show plain (X, Y) without level info."""
-        from u3edit.diff import diff_map, format_text, GameDiff
+        from ult3edit.diff import diff_map, format_text, GameDiff
         d1 = bytearray(4096)
         d2 = bytearray(4096)
         d1[64 * 10 + 20] = 0x00
@@ -17135,12 +17135,12 @@ class TestSoundModuleDocstring:
     """sound.py: module docstring describes SOSA/SOSM correctly."""
 
     def test_sosa_description(self):
-        from u3edit.sound import SOUND_FILES
+        from ult3edit.sound import SOUND_FILES
         desc = SOUND_FILES['SOSA']['description']
         assert 'map' in desc.lower() or 'overworld' in desc.lower()
 
     def test_sosm_description(self):
-        from u3edit.sound import SOUND_FILES
+        from ult3edit.sound import SOUND_FILES
         desc = SOUND_FILES['SOSM']['description']
         assert 'monster' in desc.lower() or 'overworld' in desc.lower()
 
@@ -17150,6 +17150,6 @@ class TestRosterNoDeadImport:
 
     def test_no_encode_high_ascii_import(self):
         """Verify roster module doesn't import encode_high_ascii."""
-        import u3edit.roster as r
+        import ult3edit.roster as r
         # Should NOT have encode_high_ascii as a module-level name
         assert not hasattr(r, 'encode_high_ascii')

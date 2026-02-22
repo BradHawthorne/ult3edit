@@ -152,7 +152,7 @@ Each TLK file corresponds to a location. Plan your NPC dialog by file.
 ## Naming Conventions
 
 All names must fit within the engine's 921-byte name table.
-Use `u3edit patch validate-names` to validate your budget.
+Use `ult3edit patch validate-names` to validate your budget.
 
 ### Terrain Names (39 slots)
 | Index | Vanilla | Yours | Max Length |
@@ -192,7 +192,7 @@ Use `u3edit patch validate-names` to validate your budget.
 | Cleric | 0 | Sanctu | |
 | ... | | ... | |
 
-**Budget check**: Run `u3edit patch validate-names names.names` to verify total
+**Budget check**: Run `ult3edit patch validate-names names.names` to verify total
 byte count stays under 891 bytes (921 - 30 reserved for BLOAD tail).
 
 ---

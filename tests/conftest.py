@@ -1,4 +1,4 @@
-"""Shared fixtures for u3edit tests.
+"""Shared fixtures for ult3edit tests.
 
 Builds synthesized binary data matching real Ultima III file formats.
 No real game files are needed to run the test suite.
@@ -8,8 +8,8 @@ import os
 import tempfile
 import pytest
 
-from u3edit.bcd import int_to_bcd, int_to_bcd16
-from u3edit.constants import (
+from ult3edit.bcd import int_to_bcd, int_to_bcd16
+from ult3edit.constants import (
     CHAR_RECORD_SIZE, CHAR_MAX_SLOTS, ROSTER_FILE_SIZE,
     MON_FILE_SIZE, MON_MONSTERS_PER_FILE, MON_ATTR_COUNT,
     MAP_OVERWORLD_SIZE, MAP_DUNGEON_SIZE,

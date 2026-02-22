@@ -6,10 +6,10 @@ overworld/dungeon maps, special locations, TLK dialog, sound (SOSA/SOSM/MBS),
 shapes (SHPS), dungeon drawing (DDRW), and text (TEXT).
 
 Usage:
-    u3edit diff file1 file2              # Compare two files of the same type
-    u3edit diff dir1 dir2                # Compare all game files in two directories
-    u3edit diff dir1 dir2 --summary      # Show change counts only
-    u3edit diff dir1 dir2 --json         # Output as JSON
+    ult3edit diff file1 file2              # Compare two files of the same type
+    ult3edit diff dir1 dir2                # Compare all game files in two directories
+    ult3edit diff dir1 dir2 --summary      # Show change counts only
+    ult3edit diff dir1 dir2 --json         # Output as JSON
 """
 
 import argparse

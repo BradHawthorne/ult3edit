@@ -1,6 +1,6 @@
 """Tests for equipment reference tool."""
 
-from u3edit.constants import (
+from ult3edit.constants import (
     WEAPONS, ARMORS, WEAPON_DAMAGE, WEAPON_PRICE, ARMOR_EVASION,
     CLASS_MAX_WEAPON, CLASS_MAX_ARMOR, CLASSES,
 )

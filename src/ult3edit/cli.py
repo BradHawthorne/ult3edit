@@ -1,23 +1,23 @@
-"""Unified CLI for u3edit: Ultima III data toolkit.
+"""Unified CLI for ult3edit: Ultima III data toolkit.
 
 Dispatches to all tool modules via a single entry point:
-    u3edit edit <disk_image>
-    u3edit roster view <file>
-    u3edit bestiary view <dir>
-    u3edit map view <file>
-    u3edit tlk view <dir>
-    u3edit combat view <dir>
-    u3edit save view <dir>
-    u3edit special view <dir>
-    u3edit text view <file>
-    u3edit spell view
-    u3edit equip view
-    u3edit shapes view <file>
-    u3edit sound view <file>
-    u3edit patch view <file>
-    u3edit ddrw view <file>
-    u3edit disk info <image>
-    u3edit diff <path1> <path2>
+    ult3edit edit <disk_image>
+    ult3edit roster view <file>
+    ult3edit bestiary view <dir>
+    ult3edit map view <file>
+    ult3edit tlk view <dir>
+    ult3edit combat view <dir>
+    ult3edit save view <dir>
+    ult3edit special view <dir>
+    ult3edit text view <file>
+    ult3edit spell view
+    ult3edit equip view
+    ult3edit shapes view <file>
+    ult3edit sound view <file>
+    ult3edit patch view <file>
+    ult3edit ddrw view <file>
+    ult3edit disk info <image>
+    ult3edit diff <path1> <path2>
 """
 
 import argparse
@@ -65,11 +65,11 @@ def _cmd_unified_edit(args) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        prog='u3edit',
+        prog='ult3edit',
         description='Ultima III: Exodus - Game Data Toolkit',
-        epilog='See https://github.com/BradHawthorne/u3edit for documentation.',
+        epilog='See https://github.com/BradHawthorne/ult3edit for documentation.',
     )
-    parser.add_argument('--version', action='version', version=f'u3edit {__version__}')
+    parser.add_argument('--version', action='version', version=f'ult3edit {__version__}')
 
     subparsers = parser.add_subparsers(dest='tool', help='Tool to run')
 

@@ -4,7 +4,7 @@ import json
 import os
 import pytest
 
-from u3edit.json_export import export_json
+from ult3edit.json_export import export_json
 
 
 class TestExportToFile:

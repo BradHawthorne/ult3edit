@@ -6922,7 +6922,7 @@ render_advance_ptr    inc  $FE             ; A=$0018 X=$0000 Y=$0097 ; [SP-1892]
 ;   The single largest data structure in ULT3 — all entity names in the
 ;   game packed as null-terminated high-ASCII strings. Every terrain type,
 ;   NPC, monster, weapon, armor, spell, race, and class name lives here.
-;   Total conversion mods replace this entire region via u3edit's
+;   Total conversion mods replace this entire region via ult3edit's
 ;   `patch compile-names` / `patch import` commands.
 ;
 ;   ENCODING: High-bit ASCII ($C1='A' through $DA='Z'). Null bytes ($00)

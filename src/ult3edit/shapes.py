@@ -1109,7 +1109,7 @@ def dispatch(args) -> None:
     elif cmd == 'decompile':
         cmd_decompile_tiles(args)
     else:
-        print("Usage: u3edit shapes "
+        print("Usage: ult3edit shapes "
               "{view|export|edit|import|info|edit-string|compile|decompile} ...",
               file=sys.stderr)
 
