@@ -9645,3 +9645,132 @@ class TestCombatMonsterOverlap:
         warnings = validate_combat_map(cm)
         overlap_warnings = [w for w in warnings if 'overlap' in w.lower()]
         assert len(overlap_warnings) == 0
+
+
+# =============================================================================
+# Dispatch and CLI integration tests
+# =============================================================================
+
+class TestDispatchIntegration:
+    """Tests for dispatch() functions and CLI filter flags."""
+
+    def test_equip_view_text(self, capsys):
+        """equip view text mode shows weapon and armor tables."""
+        from u3edit.equip import cmd_view
+        args = argparse.Namespace(json=False, output=None)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert 'Weapons' in out
+        assert 'Armor' in out
+        assert 'Dagger' in out
+        assert 'Class Equipment' in out
+
+    def test_equip_dispatch_view(self, capsys):
+        """equip dispatch routes 'view' correctly."""
+        from u3edit.equip import dispatch
+        args = argparse.Namespace(equip_command='view', json=False, output=None)
+        dispatch(args)
+        out = capsys.readouterr().out
+        assert 'Weapons' in out
+
+    def test_equip_dispatch_none(self, capsys):
+        """equip dispatch with no subcommand shows usage."""
+        from u3edit.equip import dispatch
+        args = argparse.Namespace(equip_command=None)
+        dispatch(args)
+        err = capsys.readouterr().err
+        assert 'Usage' in err
+
+    def test_spell_wizard_only(self, capsys):
+        """spell view --wizard-only shows only wizard spells."""
+        from u3edit.spell import cmd_view
+        args = argparse.Namespace(
+            json=False, output=None,
+            wizard_only=True, cleric_only=False)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert 'Wizard' in out
+        assert 'Cleric' not in out
+
+    def test_spell_cleric_only(self, capsys):
+        """spell view --cleric-only shows only cleric spells."""
+        from u3edit.spell import cmd_view
+        args = argparse.Namespace(
+            json=False, output=None,
+            wizard_only=False, cleric_only=True)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert 'Cleric' in out
+        assert 'Wizard' not in out
+
+    def test_spell_dispatch_none(self, capsys):
+        """spell dispatch with no subcommand shows usage."""
+        from u3edit.spell import dispatch
+        args = argparse.Namespace(spell_command=None)
+        dispatch(args)
+        err = capsys.readouterr().err
+        assert 'Usage' in err
+
+    def test_combat_dispatch_view(self, tmp_path, capsys):
+        """combat dispatch routes 'view' correctly."""
+        from u3edit.combat import dispatch
+        con = tmp_path / 'CONA'
+        con.write_bytes(bytes(CON_FILE_SIZE))
+        args = argparse.Namespace(
+            combat_command='view', path=str(con),
+            json=False, output=None, validate=False)
+        dispatch(args)
+        out = capsys.readouterr().out
+        assert len(out) > 0
+
+    def test_special_dispatch_view(self, tmp_path, capsys):
+        """special dispatch routes 'view' correctly."""
+        from u3edit.special import dispatch
+        brnd = tmp_path / 'BRND'
+        brnd.write_bytes(bytes(SPECIAL_FILE_SIZE))
+        args = argparse.Namespace(
+            special_command='view', path=str(brnd),
+            json=False, output=None)
+        dispatch(args)
+        out = capsys.readouterr().out
+        assert len(out) > 0
+
+    def test_save_dispatch_view(self, tmp_path, capsys):
+        """save dispatch routes 'view' correctly."""
+        from u3edit.save import dispatch
+        prty = tmp_path / 'PRTY'
+        data = bytearray(PRTY_FILE_SIZE)
+        data[5] = 0xFF
+        prty.write_bytes(bytes(data))
+        args = argparse.Namespace(
+            save_command='view', game_dir=str(tmp_path),
+            json=False, output=None, validate=False, brief=True)
+        dispatch(args)
+        out = capsys.readouterr().out
+        assert 'Save State' in out or 'Party' in out
+
+    def test_ddrw_dispatch_view(self, tmp_path, capsys):
+        """ddrw dispatch routes 'view' correctly."""
+        from u3edit.ddrw import dispatch
+        from u3edit.constants import DDRW_FILE_SIZE
+        ddrw = tmp_path / 'DDRW'
+        ddrw.write_bytes(bytes(DDRW_FILE_SIZE))
+        args = argparse.Namespace(
+            ddrw_command='view', path=str(ddrw),
+            json=False, output=None)
+        dispatch(args)
+        out = capsys.readouterr().out
+        assert len(out) > 0
+
+    def test_sound_dispatch_view(self, tmp_path, capsys):
+        """sound dispatch routes 'view' correctly."""
+        from u3edit.sound import dispatch
+        from u3edit.constants import SOSA_FILE_SIZE
+        sosa = tmp_path / 'SOSA'
+        sosa.write_bytes(bytes(SOSA_FILE_SIZE))
+        args = argparse.Namespace(
+            sound_command='view', path=str(sosa),
+            json=False, output=None)
+        dispatch(args)
+        out = capsys.readouterr().out
+        assert len(out) > 0
