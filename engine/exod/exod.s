@@ -8,8 +8,7 @@
 ;
 ; Memory Layout:
 ;   $2000-$2003  Entry — JMP to init code at $8220+
-;   $2003-$81FF  Data — HGR animation frames, tile graphics, coordinate
-;                tables, glyph data (~25 KB)
+;   $2003-$81FF  Data — HGR animation frames, tile graphics, glyph data (~25 KB)
 ;   $8220-$86FF  Code — Title sequence, animation engine, HGR ops, audio
 ;
 ; Code Functions ($8220+):
@@ -33,10 +32,8 @@
 ;   $856A  intro_reveal_anim      — Progressive column reveal animation
 ;   $85B8  intro_draw_column      — Draw single glyph column
 ;
-; Known Data Regions:
-;   $35E1  town_coordinate_table    — Town X/Y coordinate pairs (32 bytes)
-;   $35F9  dungeon_coordinate_table — Dungeon X/Y pairs (32 bytes)
-;   $384D  moongate_coordinate_table — Moongate X/Y pairs (16 bytes)
+; Note: EXOD contains no patchable data tables — the $2003-$81FF region
+; is entirely HGR animation frame data (anim_data_* labels).
 ;
 ; Architecture:
 ;   - HGR 140x192 with page 1/2 double-buffering ($C054/$C055)

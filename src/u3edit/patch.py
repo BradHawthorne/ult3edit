@@ -88,29 +88,8 @@ PATCHABLE_REGIONS: dict[str, dict[str, list]] = {
             'data_type': 'bytes',
         },
     },
-    'EXOD': {
-        # Town/castle entrance coordinates (from CIDAR analysis)
-        'town-coords': {
-            'offset': 0x35E1,
-            'max_length': 32,
-            'description': 'Town/castle entrance XY coordinates',
-            'data_type': 'coords',
-        },
-        # Dungeon entrance coordinates
-        'dungeon-coords': {
-            'offset': 0x35F9,
-            'max_length': 32,
-            'description': 'Dungeon entrance XY coordinates',
-            'data_type': 'coords',
-        },
-        # Moongate coordinates (EXOD copy)
-        'moongate-coords': {
-            'offset': 0x384D,
-            'max_length': 16,
-            'description': 'Moongate XY positions by phase',
-            'data_type': 'coords',
-        },
-    },
+    # EXOD has no verified patchable data regions — previously documented
+    # addresses ($35E1, $35F9, $384D) are actually animation frame data.
 }
 
 

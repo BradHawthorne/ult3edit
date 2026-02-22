@@ -374,11 +374,9 @@ u3edit patch view ULT3#065000 --json -o regions.json
 u3edit patch import ULT3#065000 regions.json --backup
 ```
 
-Targeted binary patches at CIDAR-identified offsets in ULT3/EXOD engine binaries.
+Targeted binary patches at CIDAR-identified offsets in the ULT3 engine binary.
 
 ULT3 regions: `name-table` (921 bytes — terrain, monster, weapon, armor, spell names), `moongate-x`/`moongate-y` (8 bytes each — coordinates per phase), `food-rate` (1 byte — depletion counter, default $04).
-
-EXOD regions: `town-coords`, `dungeon-coords` (entrance XY pairs), `moongate-coords` (phase positions).
 
 ### Inline String Editing (245 strings in ULT3)
 
@@ -411,7 +409,7 @@ For replacements that exceed the original length, use the source-level pipeline 
 
 ## Engine SDK
 
-The engine SDK provides byte-identical reassembly of all three engine binaries from CIDAR disassembly source, enabling source-level modifications with no length constraints.
+The engine SDK provides byte-identical reassembly of all three engine binaries from CIDAR disassembly source, enabling source-level modifications with no length constraints. All 864 labels are fully symbolicated with semantic names and documentation headers.
 
 ```bash
 # Verify byte-identical round-trip assembly
@@ -435,11 +433,11 @@ The `scenario_build.sh` script automatically selects source-level patching when 
 
 ### Engine Binaries
 
-| Binary | Size | Origin | Content |
-|--------|------|--------|---------|
-| ULT3 | 17,408 bytes | $5000 | Main engine (68% code, 245 inline strings) |
-| EXOD | 26,208 bytes | $2000 | Boot loader (87% data, character sets, tiles) |
-| SUBS | 3,584 bytes | $4100 | Shared library (string printer, HGR, math) |
+| Binary | Size | Origin | Labels | Content |
+|--------|------|--------|--------|---------|
+| ULT3 | 17,408 bytes | $5000 | 351 | Main engine — `game_main_loop`, `combat_*`, `magic_*`, `render_*` |
+| EXOD | 26,208 bytes | $2000 | 372 | Boot/intro — `intro_*`, `anim_data_*` (87% animation data) |
+| SUBS | 3,584 bytes | $4100 | 141 | Shared library — `print_inline_str`, `setup_char_ptr`, `play_sfx` |
 
 ### Scenario Template
 
@@ -556,7 +554,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-1553 tests covering all modules with synthesized game data (no real game files needed).
+1552 tests covering all modules with synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 

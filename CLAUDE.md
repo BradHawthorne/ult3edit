@@ -11,7 +11,7 @@ u3edit is a data toolkit for Ultima III: Exodus (Apple II, 1983). It provides CL
 ```bash
 pip install -e ".[dev]"              # Install with pytest
 pip install -e ".[tui]"              # Install with prompt_toolkit for TUI editors
-pytest -v                            # Run all 1553 tests
+pytest -v                            # Run all 1552 tests
 pytest tests/test_roster.py          # Run one test module
 pytest -v tests/test_bcd.py::TestBcdToInt::test_zero  # Run single test
 u3edit roster view path/to/ROST      # CLI usage pattern
@@ -94,7 +94,7 @@ Each game data type lives in `src/u3edit/{module}.py` (roster, bestiary, map, tl
 - **`text edit --record/--text`**: Per-record CLI editing for TEXT game strings (uppercased to match engine). Falls through to TUI when no CLI args provided.
 - **`shapes view/export/edit/edit-string/import/compile/decompile`**: SHPS character set tile graphics — glyph rendering, PNG export (stdlib, no Pillow), HGR color logic, SHP overlay inline string extraction and replacement (`edit-string --offset --text`), SHPS embedded code guard at $9F9, TEXT detection as HGR bitmap. `compile` reads `.tiles` text-art → SHPS binary or JSON. `decompile` reads SHPS binary → `.tiles` text-art.
 - **`sound view/edit/import`**: SOSA/SOSM/MBS data files — hex dump, AY-3-8910 register parsing and music stream decoding (notes, tempo, loops) for MBS. Note: SOSA (overworld map state) and SOSM (overworld monster positions) are save-state files, not sound data, despite being managed by the sound subcommand.
-- **`patch view/edit/dump/import/strings/strings-edit/strings-import/compile-names/decompile-names/validate-names`**: Engine binary patcher for CIDAR-identified offsets in ULT3/EXOD — name table (921 bytes, terrain/monster/weapon/armor/spell names), moongate coordinates, food depletion rate, town/dungeon coords. `view --json` → `import` round-trips all region types (text, bytes, coords). `strings` subcommand catalogs all 245 JSR $46BA inline strings with `--search` filter and `--json` export. `strings-edit` / `strings-import` for in-place inline string editing by index/vanilla/address. `compile-names` / `decompile-names` / `validate-names` for text-first `.names` file workflow.
+- **`patch view/edit/dump/import/strings/strings-edit/strings-import/compile-names/decompile-names/validate-names`**: Engine binary patcher for CIDAR-identified offsets in ULT3 — name table (921 bytes, terrain/monster/weapon/armor/spell names), moongate coordinates, food depletion rate. `view --json` → `import` round-trips all region types (text, bytes, coords). `strings` subcommand catalogs all 245 JSR $46BA inline strings with `--search` filter and `--json` export. `strings-edit` / `strings-import` for in-place inline string editing by index/vanilla/address. `compile-names` / `decompile-names` / `validate-names` for text-first `.names` file workflow.
 - **`ddrw view/edit/import`**: Dungeon drawing data (1792 bytes) with structured perspective vector and tile record parsing.
 - **`disk info/list/extract/audit`**: ProDOS disk image operations — show volume info, list files, extract all files, audit disk space (free blocks, alignment waste, capacity estimates). Requires external `diskiigs` tool.
 - **`TILE_CHARS_REVERSE` / `DUNGEON_TILE_CHARS_REVERSE`**: Reverse lookups in `constants.py` for char→tile-byte conversion (used by import commands). **`TILE_NAMES_REVERSE` / `DUNGEON_TILE_NAMES_REVERSE`**: Full name→tile-byte reverse lookups for JSON round-trip (e.g., "Grass"→0x04).
@@ -126,11 +126,11 @@ Reusable framework for building full game replacements:
 
 ## Engine SDK (`engine/`)
 
-Buildable engine source tree using the Rosetta toolchain (asmiigs/deasmiigs). All three engine binaries reassemble byte-identical from CIDAR disassembly:
+Buildable engine source tree using the Rosetta toolchain (asmiigs/deasmiigs). All three engine binaries reassemble byte-identical from CIDAR disassembly. **Fully symbolicated** — all 864 CIDAR-generated labels renamed to semantic names with documentation headers.
 
-- **`engine/subs/subs.s`**: SUBS shared library (3,584 bytes at $4100) — string printer, math, display
-- **`engine/ult3/ult3.s`**: Main engine (17,408 bytes at $5000) — game logic, combat, file I/O
-- **`engine/exod/exod.s`**: Boot loader (26,208 bytes at $2000) — world map, location entrances
+- **`engine/subs/subs.s`**: SUBS shared library (3,584 bytes at $4100, 141 labels) — `print_inline_str`, `setup_char_ptr`, `play_sfx`, `get_random`, `copy_roster_to_plrs`
+- **`engine/ult3/ult3.s`**: Main engine (17,408 bytes at $5000, 351 labels) — `game_main_loop`, `combat_*`, `magic_*`, `render_*`, `equip_*`, `char_*`, `move_*`
+- **`engine/exod/exod.s`**: Boot loader (26,208 bytes at $2000, 372 labels) — `intro_*`, `anim_data_*`. 87% animation data, 13% code. No patchable data regions (previously documented coordinate tables at $35E1/$35F9/$384D were actually animation frame data).
 - **`engine/originals/`**: Original binaries for byte-identical verification
 - **`engine/build.sh`**: Build script — assembles all 3 binaries, verifies byte-identical output
 - **`engine/verify.py`**: Python verification script for CI/programmatic use

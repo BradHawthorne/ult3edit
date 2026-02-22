@@ -1,7 +1,7 @@
 """Ultima III: Exodus - Combat Battlefield Viewer.
 
 CON files: 192 bytes (0xC0), loaded at $9900. Layout verified via engine
-code tracing (ULT3.s lookup_add at $7E18, spawn loop, PC init loop):
+code tracing (ULT3.s combat_tile_at_xy at $7E18, spawn loop, PC init loop):
   0x00-0x78: 11x11 battlefield tiles (121 bytes)
   0x79-0x7F: Unused padding (7 bytes, never read by engine)
   0x80-0x87: Monster start X positions [0-7]

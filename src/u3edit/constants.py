@@ -450,7 +450,7 @@ CON_LETTERS = 'ABCFGMQRS'
 
 # Combat map dimensions and layout (192 bytes, loaded at $9900)
 # Layout verified by tracing engine code in ULT3.s:
-#   0x00-0x78: 11x11 tile grid (121 bytes, accessed via lookup_add at $7E18)
+#   0x00-0x78: 11x11 tile grid (121 bytes, accessed via combat_tile_at_xy at $7E18)
 #   0x79-0x7F: Unused padding (7 bytes, never read by engine)
 #   0x80-0x87: Monster start X positions [0-7] (read during spawn)
 #   0x88-0x8F: Monster start Y positions [0-7] (read during spawn)

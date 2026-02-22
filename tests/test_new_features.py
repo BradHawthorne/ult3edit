@@ -1550,8 +1550,7 @@ class TestPatch:
 
     def test_get_regions_exod(self):
         regions = get_regions('EXOD')
-        assert 'town-coords' in regions
-        assert 'moongate-coords' in regions
+        assert regions == {}  # EXOD has no verified patchable regions
 
     def test_parse_text_region(self):
         data = self._make_ult3()
@@ -3168,15 +3167,6 @@ class TestPatchImport:
         data[0x272C] = 0x04
         return data
 
-    def _make_exod(self):
-        """Create a synthetic EXOD binary with known coord data."""
-        data = bytearray(26208)
-        # Town coords: 16 pairs at $35E1
-        for i in range(16):
-            data[0x35E1 + i * 2] = 10 + i
-            data[0x35E1 + i * 2 + 1] = 20 + i
-        return data
-
     def test_encode_coord_region(self):
         coords = [{'x': 10, 'y': 20}, {'x': 30, 'y': 40}]
         encoded = encode_coord_region(coords, 8)
@@ -3299,40 +3289,6 @@ class TestPatchImport:
             result = f.read()
         assert list(result[0x29A7:0x29A7 + 8]) == [10, 20, 30, 40, 50, 30, 20, 10]
         assert result[0x272C] == 2
-
-    def test_import_coord_region(self, tmp_path):
-        """Import town-coords from JSON."""
-        data = self._make_exod()
-        path = str(tmp_path / 'EXOD')
-        with open(path, 'wb') as f:
-            f.write(data)
-
-        new_coords = [{'x': 5, 'y': 10}, {'x': 15, 'y': 20}]
-        jdata = {
-            'regions': {
-                'town-coords': {'data': new_coords},
-            }
-        }
-        json_path = str(tmp_path / 'patch.json')
-        with open(json_path, 'w') as f:
-            json.dump(jdata, f)
-
-        args = type('Args', (), {
-            'file': path,
-            'json_file': json_path,
-            'region': None,
-            'output': None,
-            'backup': False,
-            'dry_run': False,
-        })()
-        patch_cmd_import(args)
-
-        with open(path, 'rb') as f:
-            result = f.read()
-        assert result[0x35E1] == 5
-        assert result[0x35E2] == 10
-        assert result[0x35E3] == 15
-        assert result[0x35E4] == 20
 
     def test_import_dry_run(self, tmp_path):
         """Dry run does not modify file."""
