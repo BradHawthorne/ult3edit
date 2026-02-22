@@ -200,7 +200,11 @@ def cmd_import(args) -> None:
         print("Error: JSON must contain a 'raw' byte array", file=sys.stderr)
         sys.exit(1)
 
-    data = bytes(raw)
+    try:
+        data = bytes(raw)
+    except (TypeError, ValueError) as e:
+        print(f"Error: Invalid byte values in 'raw' array: {e}", file=sys.stderr)
+        sys.exit(1)
 
     if len(data) != DDRW_FILE_SIZE:
         print(f"  Warning: expected {DDRW_FILE_SIZE} bytes, got {len(data)}",

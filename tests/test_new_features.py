@@ -11201,3 +11201,76 @@ class TestSpecialEditorSave:
         assert saved_data is not None
         # Padded tile data written over short original
         assert len(saved_data) >= SPECIAL_MAP_TILES
+
+
+# =============================================================================
+# Import type validation tests
+# =============================================================================
+
+class TestImportTypeValidation:
+    """Tests for graceful handling of invalid JSON values in import paths."""
+
+    def test_sound_import_non_int_in_raw_exits(self, tmp_path):
+        """sound cmd_import with non-integer in raw array exits gracefully."""
+        from u3edit.sound import cmd_import as sound_import
+        json_file = tmp_path / 'bad.json'
+        json_file.write_text(json.dumps({'raw': ['hello', 123]}))
+        snd_file = tmp_path / 'SOSA'
+        snd_file.write_bytes(bytes(4096))
+        args = argparse.Namespace(
+            file=str(snd_file), json_file=str(json_file),
+            backup=False, dry_run=False, output=None)
+        with pytest.raises(SystemExit):
+            sound_import(args)
+
+    def test_sound_import_non_list_raw_exits(self, tmp_path):
+        """sound cmd_import with non-list raw exits gracefully."""
+        from u3edit.sound import cmd_import as sound_import
+        json_file = tmp_path / 'bad.json'
+        json_file.write_text(json.dumps({'raw': 'not a list'}))
+        snd_file = tmp_path / 'SOSA'
+        snd_file.write_bytes(bytes(4096))
+        args = argparse.Namespace(
+            file=str(snd_file), json_file=str(json_file),
+            backup=False, dry_run=False, output=None)
+        with pytest.raises(SystemExit):
+            sound_import(args)
+
+    def test_ddrw_import_non_int_in_raw_exits(self, tmp_path):
+        """ddrw cmd_import with non-integer in raw array exits gracefully."""
+        from u3edit.ddrw import cmd_import as ddrw_import
+        json_file = tmp_path / 'bad.json'
+        json_file.write_text(json.dumps({'raw': [1, 2, 'bad', 4]}))
+        ddrw_file = tmp_path / 'DDRW'
+        ddrw_file.write_bytes(bytes(1792))
+        args = argparse.Namespace(
+            file=str(ddrw_file), json_file=str(json_file),
+            backup=False, dry_run=False, output=None)
+        with pytest.raises(SystemExit):
+            ddrw_import(args)
+
+    def test_ddrw_import_valid_raw_works(self, tmp_path):
+        """ddrw cmd_import with valid raw array succeeds."""
+        from u3edit.ddrw import cmd_import as ddrw_import
+        json_file = tmp_path / 'good.json'
+        json_file.write_text(json.dumps({'raw': [0] * 1792}))
+        ddrw_file = tmp_path / 'DDRW'
+        ddrw_file.write_bytes(bytes(1792))
+        args = argparse.Namespace(
+            file=str(ddrw_file), json_file=str(json_file),
+            backup=False, dry_run=False, output=str(ddrw_file))
+        ddrw_import(args)
+        assert len(ddrw_file.read_bytes()) == 1792
+
+    def test_sound_import_valid_raw_works(self, tmp_path):
+        """sound cmd_import with valid raw array succeeds."""
+        from u3edit.sound import cmd_import as sound_import
+        json_file = tmp_path / 'good.json'
+        json_file.write_text(json.dumps({'raw': [0] * 256}))
+        snd_file = tmp_path / 'SOSM'
+        snd_file.write_bytes(bytes(256))
+        args = argparse.Namespace(
+            file=str(snd_file), json_file=str(json_file),
+            backup=False, dry_run=False, output=str(snd_file))
+        sound_import(args)
+        assert len(snd_file.read_bytes()) == 256

@@ -378,7 +378,11 @@ def cmd_import(args) -> None:
         print("Error: JSON must contain a 'raw' byte array", file=sys.stderr)
         sys.exit(1)
 
-    data = bytes(raw)
+    try:
+        data = bytes(raw)
+    except (TypeError, ValueError) as e:
+        print(f"Error: Invalid byte values in 'raw' array: {e}", file=sys.stderr)
+        sys.exit(1)
 
     # Warn if size doesn't match any known sound file format
     known_sizes = {info['size']: name for name, info in SOUND_FILES.items()}
