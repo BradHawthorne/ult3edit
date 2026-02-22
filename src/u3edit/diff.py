@@ -220,10 +220,8 @@ def diff_combat(path1: str, path2: str, letter: str) -> FileDiff:
     ed = EntityDiff('combat_map', CON_NAMES.get(letter, f'CON{letter}'))
     ed.fields = diff_dicts(pos_d1, pos_d2)
     fd.entities.append(ed)
-    # Tile grid comparison
-    tiles1 = bytearray(b for row in (d1.get('tiles') or []) for b in row)
-    tiles2 = bytearray(b for row in (d2.get('tiles') or []) for b in row)
-    _diff_tile_grid(fd, bytes(tiles1), bytes(tiles2), 11, 11)
+    # Tile grid comparison — use raw bytes, not string chars from to_dict
+    _diff_tile_grid(fd, bytes(cm1.tiles), bytes(cm2.tiles), 11, 11)
     return fd
 
 

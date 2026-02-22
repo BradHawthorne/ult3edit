@@ -12238,3 +12238,682 @@ class TestTextCmdErrors:
             f.write(data)
         records = load_text_records(path)
         assert records[:3] == ['HELLO', 'WORLD', 'TEST']
+
+
+# =============================================================================
+# Equipment reference (equip.py)
+# =============================================================================
+
+class TestEquipView:
+    """Test equip.py cmd_view."""
+
+    def test_view_text_output(self, capsys):
+        """cmd_view in text mode outputs weapon and armor tables."""
+        from u3edit.equip import cmd_view
+        args = argparse.Namespace(json=False, output=None)
+        cmd_view(args)
+        captured = capsys.readouterr()
+        assert 'Weapons' in captured.out
+        assert 'Armor' in captured.out
+        assert 'Class Equipment Restrictions' in captured.out
+
+    def test_view_json_output(self, tmp_path):
+        """cmd_view in JSON mode produces valid structured data."""
+        from u3edit.equip import cmd_view
+        out_path = os.path.join(str(tmp_path), 'equip.json')
+        args = argparse.Namespace(json=True, output=out_path)
+        cmd_view(args)
+        with open(out_path) as f:
+            data = json.load(f)
+        assert 'weapons' in data
+        assert 'armors' in data
+        assert 'class_restrictions' in data
+        assert len(data['weapons']) > 0
+        assert 'damage' in data['weapons'][0]
+
+    def test_dispatch_no_command(self, capsys):
+        """dispatch with no subcommand prints usage."""
+        from u3edit.equip import dispatch
+        args = argparse.Namespace(equip_command=None)
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err
+
+
+# =============================================================================
+# Spell reference (spell.py)
+# =============================================================================
+
+class TestSpellView:
+    """Test spell.py cmd_view."""
+
+    def test_view_all_spells(self, capsys):
+        """cmd_view shows both wizard and cleric spells."""
+        from u3edit.spell import cmd_view
+        args = argparse.Namespace(
+            json=False, output=None,
+            wizard_only=False, cleric_only=False)
+        cmd_view(args)
+        captured = capsys.readouterr()
+        assert 'Wizard Spells' in captured.out
+        assert 'Cleric Spells' in captured.out
+
+    def test_view_wizard_only(self, capsys):
+        """cmd_view with --wizard-only hides cleric spells."""
+        from u3edit.spell import cmd_view
+        args = argparse.Namespace(
+            json=False, output=None,
+            wizard_only=True, cleric_only=False)
+        cmd_view(args)
+        captured = capsys.readouterr()
+        assert 'Wizard Spells' in captured.out
+        assert 'Cleric Spells' not in captured.out
+
+    def test_view_cleric_only(self, capsys):
+        """cmd_view with --cleric-only hides wizard spells."""
+        from u3edit.spell import cmd_view
+        args = argparse.Namespace(
+            json=False, output=None,
+            wizard_only=False, cleric_only=True)
+        cmd_view(args)
+        captured = capsys.readouterr()
+        assert 'Wizard Spells' not in captured.out
+        assert 'Cleric Spells' in captured.out
+
+    def test_view_json_output(self, tmp_path):
+        """cmd_view JSON mode produces structured spell data."""
+        from u3edit.spell import cmd_view
+        out_path = os.path.join(str(tmp_path), 'spells.json')
+        args = argparse.Namespace(
+            json=True, output=out_path,
+            wizard_only=False, cleric_only=False)
+        cmd_view(args)
+        with open(out_path) as f:
+            data = json.load(f)
+        assert 'wizard' in data
+        assert 'cleric' in data
+        assert len(data['wizard']) > 0
+        assert 'mp' in data['wizard'][0]
+
+    def test_dispatch_no_command(self, capsys):
+        """dispatch with no subcommand prints usage."""
+        from u3edit.spell import dispatch
+        args = argparse.Namespace(spell_command=None)
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err
+
+
+# =============================================================================
+# Diff module: core algorithm and per-type diff functions
+# =============================================================================
+
+class TestDiffAlgorithm:
+    """Test diff.py core diff_dicts and helpers."""
+
+    def test_diff_dicts_identical(self):
+        """Identical dicts produce no diffs."""
+        from u3edit.diff import diff_dicts
+        d = {'a': 1, 'b': 'hello', 'c': [1, 2]}
+        assert diff_dicts(d, d) == []
+
+    def test_diff_dicts_changed_field(self):
+        """Changed field produces a FieldDiff."""
+        from u3edit.diff import diff_dicts
+        result = diff_dicts({'a': 1}, {'a': 2})
+        assert len(result) == 1
+        assert result[0].path == 'a'
+        assert result[0].old == 1
+        assert result[0].new == 2
+
+    def test_diff_dicts_added_key(self):
+        """New key in second dict is detected."""
+        from u3edit.diff import diff_dicts
+        result = diff_dicts({}, {'a': 1})
+        assert len(result) == 1
+        assert result[0].path == 'a'
+        assert result[0].old is None
+        assert result[0].new == 1
+
+    def test_diff_dicts_removed_key(self):
+        """Missing key in second dict is detected."""
+        from u3edit.diff import diff_dicts
+        result = diff_dicts({'a': 1}, {})
+        assert len(result) == 1
+        assert result[0].old == 1
+        assert result[0].new is None
+
+    def test_diff_dicts_nested(self):
+        """Nested dict changes produce dotted paths."""
+        from u3edit.diff import diff_dicts
+        d1 = {'a': {'b': 1, 'c': 2}}
+        d2 = {'a': {'b': 1, 'c': 3}}
+        result = diff_dicts(d1, d2)
+        assert len(result) == 1
+        assert result[0].path == 'a.c'
+
+    def test_diff_dicts_list_change(self):
+        """List element change is detected with [index] path."""
+        from u3edit.diff import diff_dicts
+        d1 = {'items': [1, 2, 3]}
+        d2 = {'items': [1, 9, 3]}
+        result = diff_dicts(d1, d2)
+        assert len(result) == 1
+        assert '[1]' in result[0].path
+
+    def test_diff_dicts_list_length_change(self):
+        """Different list lengths produce diffs for extra elements."""
+        from u3edit.diff import diff_dicts
+        d1 = {'items': [1, 2]}
+        d2 = {'items': [1, 2, 3]}
+        result = diff_dicts(d1, d2)
+        assert len(result) == 1
+        assert result[0].new == 3
+
+
+class TestDiffTileGrid:
+    """Test _diff_tile_grid helper."""
+
+    def test_identical_grids(self):
+        """Identical grids produce no tile changes."""
+        from u3edit.diff import FileDiff, _diff_tile_grid
+        fd = FileDiff('test', 'test')
+        data = bytes(range(16))
+        _diff_tile_grid(fd, data, data, 4, 4)
+        assert fd.tile_changes == 0
+        assert fd.tile_positions == []
+
+    def test_one_changed_tile(self):
+        """One changed tile is detected with correct position."""
+        from u3edit.diff import FileDiff, _diff_tile_grid
+        fd = FileDiff('test', 'test')
+        d1 = bytes(16)
+        d2 = bytearray(16)
+        d2[5] = 0xFF  # (x=1, y=1) in a 4-wide grid
+        _diff_tile_grid(fd, d1, bytes(d2), 4, 4)
+        assert fd.tile_changes == 1
+        assert fd.tile_positions == [(1, 1)]
+
+
+class TestDiffRoster:
+    """Test diff_roster comparing two ROST files."""
+
+    def test_identical_rosters(self, tmp_path):
+        """Identical rosters produce no changes."""
+        from u3edit.diff import diff_roster
+        data = bytearray(ROSTER_FILE_SIZE)
+        p1 = os.path.join(str(tmp_path), 'ROST1')
+        p2 = os.path.join(str(tmp_path), 'ROST2')
+        with open(p1, 'wb') as f:
+            f.write(data)
+        with open(p2, 'wb') as f:
+            f.write(data)
+        fd = diff_roster(p1, p2)
+        assert not fd.changed
+
+    def test_changed_character(self, tmp_path):
+        """Changed character stat produces field diff."""
+        from u3edit.diff import diff_roster
+        data1 = bytearray(ROSTER_FILE_SIZE)
+        data2 = bytearray(ROSTER_FILE_SIZE)
+        # Set name in both so slot is non-empty
+        for i, ch in enumerate('HERO'):
+            data1[i] = ord(ch) | 0x80
+            data2[i] = ord(ch) | 0x80
+        data1[CHAR_STATUS] = ord('G')
+        data2[CHAR_STATUS] = ord('G')
+        # Change HP in second file
+        data2[CHAR_HP_HI] = 0x05
+        p1 = os.path.join(str(tmp_path), 'ROST1')
+        p2 = os.path.join(str(tmp_path), 'ROST2')
+        with open(p1, 'wb') as f:
+            f.write(data1)
+        with open(p2, 'wb') as f:
+            f.write(data2)
+        fd = diff_roster(p1, p2)
+        assert fd.changed
+
+    def test_added_character(self, tmp_path):
+        """Empty slot in file1, character in file2 → added_entities."""
+        from u3edit.diff import diff_roster
+        data1 = bytearray(ROSTER_FILE_SIZE)
+        data2 = bytearray(ROSTER_FILE_SIZE)
+        for i, ch in enumerate('HERO'):
+            data2[i] = ord(ch) | 0x80
+        data2[CHAR_STATUS] = ord('G')
+        p1 = os.path.join(str(tmp_path), 'ROST1')
+        p2 = os.path.join(str(tmp_path), 'ROST2')
+        with open(p1, 'wb') as f:
+            f.write(data1)
+        with open(p2, 'wb') as f:
+            f.write(data2)
+        fd = diff_roster(p1, p2)
+        assert len(fd.added_entities) >= 1
+
+
+class TestDiffCombat:
+    """Test diff_combat comparing two CON files."""
+
+    def test_identical_combat_maps(self, tmp_path):
+        """Identical CON files produce no changes."""
+        from u3edit.diff import diff_combat
+        data = bytearray(CON_FILE_SIZE)
+        p1 = os.path.join(str(tmp_path), 'CONA1')
+        p2 = os.path.join(str(tmp_path), 'CONA2')
+        with open(p1, 'wb') as f:
+            f.write(data)
+        with open(p2, 'wb') as f:
+            f.write(data)
+        fd = diff_combat(p1, p2, 'A')
+        assert fd.tile_changes == 0
+
+    def test_changed_tile(self, tmp_path):
+        """Changed tile in CON file is detected."""
+        from u3edit.diff import diff_combat
+        data1 = bytearray(CON_FILE_SIZE)
+        data2 = bytearray(CON_FILE_SIZE)
+        data2[0] = 0x10  # Change first tile
+        p1 = os.path.join(str(tmp_path), 'CONA1')
+        p2 = os.path.join(str(tmp_path), 'CONA2')
+        with open(p1, 'wb') as f:
+            f.write(data1)
+        with open(p2, 'wb') as f:
+            f.write(data2)
+        fd = diff_combat(p1, p2, 'A')
+        assert fd.tile_changes >= 1
+
+
+class TestDiffTlk:
+    """Test diff_tlk comparing TLK dialog files."""
+
+    def test_identical_tlk(self, tmp_path):
+        """Identical TLK files produce no changes."""
+        from u3edit.diff import diff_tlk
+        from u3edit.tlk import encode_record
+        data = encode_record(['HELLO WORLD'])
+        p1 = os.path.join(str(tmp_path), 'TLKA1')
+        p2 = os.path.join(str(tmp_path), 'TLKA2')
+        with open(p1, 'wb') as f:
+            f.write(data)
+        with open(p2, 'wb') as f:
+            f.write(data)
+        fd = diff_tlk(p1, p2, 'A')
+        assert not fd.changed
+
+    def test_changed_record(self, tmp_path):
+        """Changed dialog record is detected."""
+        from u3edit.diff import diff_tlk
+        from u3edit.tlk import encode_record
+        d1 = encode_record(['HELLO WORLD'])
+        d2 = encode_record(['GOODBYE WORLD'])
+        p1 = os.path.join(str(tmp_path), 'TLKA1')
+        p2 = os.path.join(str(tmp_path), 'TLKA2')
+        with open(p1, 'wb') as f:
+            f.write(d1)
+        with open(p2, 'wb') as f:
+            f.write(d2)
+        fd = diff_tlk(p1, p2, 'A')
+        assert fd.changed
+
+    def test_added_record(self, tmp_path):
+        """Extra record in file2 shows as added."""
+        from u3edit.diff import diff_tlk
+        from u3edit.tlk import encode_record
+        d1 = encode_record(['HELLO'])
+        d2 = encode_record(['HELLO']) + encode_record(['EXTRA'])
+        p1 = os.path.join(str(tmp_path), 'TLKA1')
+        p2 = os.path.join(str(tmp_path), 'TLKA2')
+        with open(p1, 'wb') as f:
+            f.write(d1)
+        with open(p2, 'wb') as f:
+            f.write(d2)
+        fd = diff_tlk(p1, p2, 'A')
+        assert len(fd.added_entities) >= 1
+
+
+class TestDiffBinary:
+    """Test diff_binary for sound/shapes/ddrw files."""
+
+    def test_identical_binary(self, tmp_path):
+        """Identical binary files show no changes."""
+        from u3edit.diff import diff_binary
+        data = bytes(100)
+        p1 = os.path.join(str(tmp_path), 'FILE1')
+        p2 = os.path.join(str(tmp_path), 'FILE2')
+        with open(p1, 'wb') as f:
+            f.write(data)
+        with open(p2, 'wb') as f:
+            f.write(data)
+        fd = diff_binary(p1, p2, 'TEST')
+        assert not fd.changed
+
+    def test_changed_binary(self, tmp_path):
+        """Changed bytes detected in binary diff."""
+        from u3edit.diff import diff_binary
+        d1 = bytes(100)
+        d2 = bytearray(100)
+        d2[50] = 0xFF
+        p1 = os.path.join(str(tmp_path), 'FILE1')
+        p2 = os.path.join(str(tmp_path), 'FILE2')
+        with open(p1, 'wb') as f:
+            f.write(d1)
+        with open(p2, 'wb') as f:
+            f.write(bytes(d2))
+        fd = diff_binary(p1, p2, 'TEST')
+        assert fd.changed
+
+    def test_different_size_binary(self, tmp_path):
+        """Different-sized binaries show size diff."""
+        from u3edit.diff import diff_binary
+        p1 = os.path.join(str(tmp_path), 'FILE1')
+        p2 = os.path.join(str(tmp_path), 'FILE2')
+        with open(p1, 'wb') as f:
+            f.write(bytes(100))
+        with open(p2, 'wb') as f:
+            f.write(bytes(200))
+        fd = diff_binary(p1, p2, 'TEST')
+        assert fd.changed
+        sizes = [f for f in fd.entities[0].fields if f.path == 'size']
+        assert len(sizes) == 1
+
+
+class TestDiffMap:
+    """Test diff_map for overworld/dungeon map comparison."""
+
+    def test_identical_maps(self, tmp_path):
+        """Identical maps show no changes."""
+        from u3edit.diff import diff_map
+        data = bytes(MAP_OVERWORLD_SIZE)
+        p1 = os.path.join(str(tmp_path), 'MAP1')
+        p2 = os.path.join(str(tmp_path), 'MAP2')
+        with open(p1, 'wb') as f:
+            f.write(data)
+        with open(p2, 'wb') as f:
+            f.write(data)
+        fd = diff_map(p1, p2, 'MAPA')
+        assert fd.tile_changes == 0
+
+    def test_changed_map_tile(self, tmp_path):
+        """Changed tile in overworld map is detected."""
+        from u3edit.diff import diff_map
+        d1 = bytes(MAP_OVERWORLD_SIZE)
+        d2 = bytearray(MAP_OVERWORLD_SIZE)
+        d2[100] = 0xFF
+        p1 = os.path.join(str(tmp_path), 'MAP1')
+        p2 = os.path.join(str(tmp_path), 'MAP2')
+        with open(p1, 'wb') as f:
+            f.write(d1)
+        with open(p2, 'wb') as f:
+            f.write(bytes(d2))
+        fd = diff_map(p1, p2, 'MAPA')
+        assert fd.tile_changes >= 1
+
+
+# =============================================================================
+# Bestiary cmd_dump and cmd_import
+# =============================================================================
+
+class TestBestiaryCmdDump:
+    """Test bestiary.py cmd_dump hex display."""
+
+    def test_cmd_dump_runs(self, tmp_path, capsys):
+        """cmd_dump executes without error on a valid MON file."""
+        from u3edit.bestiary import cmd_dump
+        data = bytearray(MON_FILE_SIZE)
+        # Set some recognizable data in first monster tile
+        data[0] = 0xAA
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(file=path)
+        cmd_dump(args)
+        captured = capsys.readouterr()
+        assert 'MON File Dump' in captured.out
+        assert 'Columnar' in captured.out
+        assert 'AA' in captured.out
+
+
+class TestBestiaryCmdImport:
+    """Test bestiary.py cmd_import."""
+
+    def test_import_list_format(self, tmp_path):
+        """Import from JSON list format."""
+        from u3edit.bestiary import cmd_import as bestiary_import
+        data = bytearray(MON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'mons.json')
+        with open(json_path, 'w') as f:
+            json.dump([{'index': 0, 'hp': 50, 'attack': 10}], f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=False)
+        bestiary_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        # HP is row 4, monster 0 → offset 4*16+0 = 64
+        assert result[64] == 50
+
+    def test_import_dict_format(self, tmp_path):
+        """Import from dict-of-dicts format with numeric string keys."""
+        from u3edit.bestiary import cmd_import as bestiary_import
+        data = bytearray(MON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'mons.json')
+        with open(json_path, 'w') as f:
+            json.dump({'monsters': {'0': {'hp': 75}}}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=False)
+        bestiary_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[64] == 75
+
+    def test_import_dry_run(self, tmp_path):
+        """Import with dry-run doesn't write."""
+        from u3edit.bestiary import cmd_import as bestiary_import
+        data = bytearray(MON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'mons.json')
+        with open(json_path, 'w') as f:
+            json.dump([{'index': 0, 'hp': 99}], f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=True)
+        bestiary_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[64] == 0  # unchanged
+
+    def test_import_with_shortcuts(self, tmp_path):
+        """Import with flag shortcuts (boss, poison, etc.)."""
+        from u3edit.bestiary import cmd_import as bestiary_import
+        from u3edit.constants import MON_FLAG1_BOSS, MON_ABIL1_POISON
+        data = bytearray(MON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'mons.json')
+        with open(json_path, 'w') as f:
+            json.dump([{'index': 0, 'boss': True, 'poison': True}], f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=False)
+        bestiary_import(args)
+        from u3edit.bestiary import load_mon_file
+        mons = load_mon_file(path)
+        assert mons[0].flags1 & MON_FLAG1_BOSS
+        assert mons[0].ability1 & MON_ABIL1_POISON
+
+
+# =============================================================================
+# Map cmd_overview and cmd_legend
+# =============================================================================
+
+class TestMapCmdOverview:
+    """Test map.py cmd_overview."""
+
+    def test_overview_no_maps_exits(self, tmp_path):
+        """cmd_overview with no MAP files in dir exits."""
+        from u3edit.map import cmd_overview
+        args = argparse.Namespace(
+            game_dir=str(tmp_path), json=False, output=None, preview=False)
+        with pytest.raises(SystemExit):
+            cmd_overview(args)
+
+    def test_overview_with_maps(self, tmp_path, capsys):
+        """cmd_overview lists found MAP files."""
+        from u3edit.map import cmd_overview
+        # Create a MAPA (overworld) file
+        mapa = os.path.join(str(tmp_path), 'MAPA')
+        with open(mapa, 'wb') as f:
+            f.write(bytes(MAP_OVERWORLD_SIZE))
+        args = argparse.Namespace(
+            game_dir=str(tmp_path), json=False, output=None, preview=False)
+        cmd_overview(args)
+        captured = capsys.readouterr()
+        assert 'MAPA' in captured.out
+        assert 'Overworld' in captured.out or 'overworld' in captured.out.lower()
+
+    def test_overview_json(self, tmp_path):
+        """cmd_overview JSON mode produces valid data."""
+        from u3edit.map import cmd_overview
+        mapa = os.path.join(str(tmp_path), 'MAPA')
+        with open(mapa, 'wb') as f:
+            f.write(bytes(MAP_OVERWORLD_SIZE))
+        out_path = os.path.join(str(tmp_path), 'maps.json')
+        args = argparse.Namespace(
+            game_dir=str(tmp_path), json=True, output=out_path, preview=False)
+        cmd_overview(args)
+        with open(out_path) as f:
+            data = json.load(f)
+        assert 'MAPA' in data
+        assert data['MAPA']['type'] == 'overworld'
+
+
+class TestMapCmdLegend:
+    """Test map.py cmd_legend."""
+
+    def test_legend_output(self, capsys):
+        """cmd_legend outputs tile legend text."""
+        from u3edit.map import cmd_legend
+        args = argparse.Namespace(json=False)
+        cmd_legend(args)
+        captured = capsys.readouterr()
+        assert 'Tile Legend' in captured.out
+        assert 'Overworld' in captured.out
+        assert 'Dungeon' in captured.out
+
+    def test_legend_json_hides_dungeon_section(self, capsys):
+        """cmd_legend with --json hides dungeon tiles section header."""
+        from u3edit.map import cmd_legend
+        args = argparse.Namespace(json=True)
+        cmd_legend(args)
+        captured = capsys.readouterr()
+        assert 'Overworld' in captured.out
+        # In JSON mode, the "Dungeon Tiles:" section header is hidden
+        assert 'Dungeon Tiles:' not in captured.out
+
+
+# =============================================================================
+# Roster cmd_check_progress CLI wrapper
+# =============================================================================
+
+class TestRosterCmdCheckProgress:
+    """Test cmd_check_progress CLI command."""
+
+    def _make_roster_with_chars(self, tmp_path, count=4, marks=0xF,
+                                 cards=0xF, weapon=15, armor=7):
+        """Create a roster file with specified characters."""
+        data = bytearray(ROSTER_FILE_SIZE)
+        for i in range(count):
+            off = i * CHAR_RECORD_SIZE
+            name = f'HERO{i}'
+            for j, ch in enumerate(name):
+                data[off + j] = ord(ch) | 0x80
+            data[off + CHAR_STATUS] = ord('G')
+            data[off + CHAR_HP_HI] = 0x01
+            data[off + CHAR_MARKS_CARDS] = (marks << 4) | cards
+            data[off + CHAR_READIED_WEAPON] = weapon
+            data[off + CHAR_WORN_ARMOR] = armor
+        path = os.path.join(str(tmp_path), 'ROST')
+        with open(path, 'wb') as f:
+            f.write(data)
+        return path
+
+    def test_check_progress_text_ready(self, tmp_path, capsys):
+        """cmd_check_progress shows READY verdict for complete party."""
+        from u3edit.roster import cmd_check_progress
+        path = self._make_roster_with_chars(tmp_path)
+        args = argparse.Namespace(
+            file=path, json=False, output=None)
+        cmd_check_progress(args)
+        captured = capsys.readouterr()
+        assert 'READY TO FACE EXODUS' in captured.out
+
+    def test_check_progress_text_not_ready(self, tmp_path, capsys):
+        """cmd_check_progress shows not-ready for incomplete party."""
+        from u3edit.roster import cmd_check_progress
+        path = self._make_roster_with_chars(
+            tmp_path, count=2, marks=0, cards=0, weapon=0, armor=0)
+        args = argparse.Namespace(
+            file=path, json=False, output=None)
+        cmd_check_progress(args)
+        captured = capsys.readouterr()
+        assert 'Not yet ready' in captured.out
+        assert 'Need 4 alive characters' in captured.out
+
+    def test_check_progress_json(self, tmp_path):
+        """cmd_check_progress JSON mode produces valid output."""
+        from u3edit.roster import cmd_check_progress
+        path = self._make_roster_with_chars(tmp_path)
+        out_path = os.path.join(str(tmp_path), 'progress.json')
+        args = argparse.Namespace(
+            file=path, json=True, output=out_path)
+        cmd_check_progress(args)
+        with open(out_path) as f:
+            data = json.load(f)
+        assert data['exodus_ready'] is True
+        assert data['marks_complete'] is True
+        assert data['cards_complete'] is True
+
+
+# =============================================================================
+# Diff file-level dispatch (diff_file)
+# =============================================================================
+
+class TestDiffFileDispatch:
+    """Test diff_file auto-detection and dispatch."""
+
+    def test_diff_file_roster(self, tmp_path):
+        """diff_file dispatches correctly for ROST files."""
+        from u3edit.diff import diff_file
+        data = bytearray(ROSTER_FILE_SIZE)
+        p1 = os.path.join(str(tmp_path), 'ROST')
+        p2 = os.path.join(str(tmp_path), 'ROST2')
+        # Use different name for second to test detection from first
+        with open(p1, 'wb') as f:
+            f.write(data)
+        with open(p2, 'wb') as f:
+            f.write(data)
+        fd = diff_file(p1, p2)
+        assert fd is not None
+        assert fd.file_type == 'ROST'
+
+    def test_diff_file_unknown_returns_none(self, tmp_path):
+        """diff_file with unrecognizable files returns None."""
+        from u3edit.diff import diff_file
+        p1 = os.path.join(str(tmp_path), 'UNKNOWN1')
+        p2 = os.path.join(str(tmp_path), 'UNKNOWN2')
+        with open(p1, 'wb') as f:
+            f.write(bytes(42))
+        with open(p2, 'wb') as f:
+            f.write(bytes(42))
+        fd = diff_file(p1, p2)
+        assert fd is None
