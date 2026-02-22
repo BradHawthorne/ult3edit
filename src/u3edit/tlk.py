@@ -66,7 +66,7 @@ def encode_record(lines: list[str]) -> bytes:
         if idx > 0:
             out.append(TLK_LINE_BREAK)
         for ch in line:
-            out.append((ord(ch) & 0x7F) | 0x80)
+            out.append((ord(ch.upper()) & 0x7F) | 0x80)
     out.append(TLK_RECORD_END)
     return bytes(out)
 
@@ -203,6 +203,11 @@ def cmd_edit(args) -> None:
     if find_text is not None and replace_text is not None:
         _cmd_find_replace(args, find_text, replace_text)
         return
+
+    if find_text is not None or replace_text is not None:
+        print("Error: --find and --replace must be used together",
+              file=sys.stderr)
+        sys.exit(1)
 
     if record is None or text is None:
         print("Error: Either --record/--text or --find/--replace required",

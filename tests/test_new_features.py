@@ -9116,12 +9116,12 @@ class TestTlkCmdView:
         """View a single TLK file."""
         from u3edit.tlk import cmd_view
         tlk = tmp_path / 'TLKA'
-        self._make_tlk(tlk, 'Test dialog')
+        self._make_tlk(tlk, 'TEST DIALOG')
         args = argparse.Namespace(
             path=str(tlk), json=False, output=None)
         cmd_view(args)
         out = capsys.readouterr().out
-        assert 'Test dialog' in out
+        assert 'TEST DIALOG' in out
 
     def test_view_json(self, tmp_path):
         """View --json produces valid JSON."""
@@ -9168,7 +9168,7 @@ class TestTlkCmdImport:
         cmd_import(args)
         records = load_tlk_records(str(tlk_path))
         assert len(records) == 2
-        assert 'Hello traveler' in records[0][0]
+        assert 'HELLO TRAVELER' in records[0][0]
 
     def test_import_dry_run(self, tmp_path, capsys):
         """Dry run doesn't write changes."""
@@ -9774,3 +9774,147 @@ class TestDispatchIntegration:
         dispatch(args)
         out = capsys.readouterr().out
         assert len(out) > 0
+
+
+# =============================================================================
+# Bug fix tests: text phantom records, TLK case, TLK find/replace error
+# =============================================================================
+
+class TestTextImportNoPhantomRecords:
+    """Tests for text.cmd_import zeroing stale bytes."""
+
+    def test_import_shorter_records_no_phantoms(self, tmp_path, capsys):
+        """Importing fewer/shorter records doesn't leave stale data."""
+        from u3edit.text import cmd_import, load_text_records
+        from u3edit.fileutil import encode_high_ascii
+        # Build a TEXT file with 3 original records
+        data = bytearray(TEXT_FILE_SIZE)
+        offset = 0
+        for text in ['ULTIMA III', 'EXODUS', 'PRESS ANY KEY']:
+            enc = encode_high_ascii(text, len(text))
+            data[offset:offset + len(enc)] = enc
+            data[offset + len(enc)] = 0x00
+            offset += len(enc) + 1
+        path = tmp_path / 'TEXT'
+        path.write_bytes(bytes(data))
+        # Import only 2 shorter records
+        json_path = tmp_path / 'text.json'
+        json_path.write_text(json.dumps([
+            {'text': 'SHORT'},
+            {'text': 'TWO'},
+        ]))
+        args = argparse.Namespace(
+            file=str(path), json_file=str(json_path),
+            dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        records = load_text_records(str(path))
+        assert len(records) == 2
+        assert records[0] == 'SHORT'
+        assert records[1] == 'TWO'
+
+    def test_import_same_count_exact(self, tmp_path, capsys):
+        """Importing same number of records produces exact count."""
+        from u3edit.text import cmd_import, load_text_records
+        from u3edit.fileutil import encode_high_ascii
+        data = bytearray(TEXT_FILE_SIZE)
+        offset = 0
+        for text in ['AAA', 'BBB']:
+            enc = encode_high_ascii(text, len(text))
+            data[offset:offset + len(enc)] = enc
+            data[offset + len(enc)] = 0x00
+            offset += len(enc) + 1
+        path = tmp_path / 'TEXT'
+        path.write_bytes(bytes(data))
+        json_path = tmp_path / 'text.json'
+        json_path.write_text(json.dumps([
+            {'text': 'CCC'},
+            {'text': 'DDD'},
+        ]))
+        args = argparse.Namespace(
+            file=str(path), json_file=str(json_path),
+            dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        records = load_text_records(str(path))
+        assert len(records) == 2
+
+    def test_stale_bytes_zeroed(self, tmp_path, capsys):
+        """Bytes after final record are zeroed."""
+        from u3edit.text import cmd_import
+        from u3edit.fileutil import encode_high_ascii
+        # Fill file with 0xFF to detect stale data
+        data = bytearray([0xFF] * TEXT_FILE_SIZE)
+        path = tmp_path / 'TEXT'
+        path.write_bytes(bytes(data))
+        json_path = tmp_path / 'text.json'
+        json_path.write_text(json.dumps([{'text': 'HI'}]))
+        args = argparse.Namespace(
+            file=str(path), json_file=str(json_path),
+            dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        result = path.read_bytes()
+        # 'HI' = 2 high-ASCII bytes + null = 3 bytes at offset 0
+        # Everything after offset 3 should be zeroed
+        assert all(b == 0 for b in result[3:])
+
+
+class TestTlkEncodeRecordCase:
+    """Tests for TLK encode_record uppercase forcing."""
+
+    def test_encode_forces_uppercase(self):
+        """encode_record converts lowercase to uppercase high-ASCII."""
+        from u3edit.tlk import encode_record
+        data = encode_record(['hello'])
+        # Each char should be uppercase: H=0xC8, E=0xC5, L=0xCC, L=0xCC, O=0xCF
+        assert data[0] == 0xC8  # H
+        assert data[1] == 0xC5  # E
+        assert data[2] == 0xCC  # L
+        assert data[3] == 0xCC  # L
+        assert data[4] == 0xCF  # O
+        assert data[5] == 0x00  # TLK_RECORD_END
+
+    def test_encode_preserves_uppercase(self):
+        """encode_record keeps already-uppercase text unchanged."""
+        from u3edit.tlk import encode_record
+        data = encode_record(['HELLO'])
+        assert data[0] == 0xC8  # H
+        assert data[4] == 0xCF  # O
+
+    def test_encode_mixed_case(self):
+        """encode_record normalizes mixed case to uppercase."""
+        from u3edit.tlk import encode_record
+        data = encode_record(['HeLLo'])
+        assert data[0] == 0xC8  # H
+        assert data[1] == 0xC5  # E (was lowercase e)
+        assert data[4] == 0xCF  # O (was lowercase o)
+
+
+class TestTlkFindReplaceError:
+    """Tests for TLK --find without --replace error message."""
+
+    def test_find_without_replace_exits(self, tmp_path, capsys):
+        """--find without --replace gives correct error message."""
+        from u3edit.tlk import cmd_edit
+        tlk = tmp_path / 'TLKA'
+        tlk.write_bytes(bytes(64))
+        args = argparse.Namespace(
+            file=str(tlk), find='hello', replace=None,
+            record=None, text=None,
+            dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+        err = capsys.readouterr().err
+        assert 'must be used together' in err
+
+    def test_replace_without_find_exits(self, tmp_path, capsys):
+        """--replace without --find gives correct error message."""
+        from u3edit.tlk import cmd_edit
+        tlk = tmp_path / 'TLKA'
+        tlk.write_bytes(bytes(64))
+        args = argparse.Namespace(
+            file=str(tlk), find=None, replace='world',
+            record=None, text=None,
+            dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+        err = capsys.readouterr().err
+        assert 'must be used together' in err

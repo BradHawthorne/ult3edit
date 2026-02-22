@@ -131,6 +131,10 @@ def cmd_import(args) -> None:
         offset = end
         count += 1
 
+    # Zero remaining bytes to prevent stale data creating phantom records
+    if offset < len(data):
+        data[offset:] = bytearray(len(data) - offset)
+
     print(f"Import: {count} text record(s)")
     if dry_run:
         print("Dry run - no changes written.")
