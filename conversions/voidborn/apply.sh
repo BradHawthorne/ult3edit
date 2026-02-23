@@ -454,7 +454,12 @@ if [ -d "$SOURCES_DIR" ]; then
     fi
 
     # Import sound data from source stubs
-    for snd in sosa sosm mbs; do
+    # NOTE: MBS is excluded because it contains executable code (Mockingboard
+    # music player) at $9A00 that TEST calls via JSR $9A00 on all boot paths.
+    # Replacing MBS with pure data (mbs.json has $82 END + zeros) causes BRK $00
+    # crash. SOSA/SOSM are pure data files (overworld map state/monster positions)
+    # and are safe to replace.
+    for snd in sosa sosm; do
         SND_UPPER=$(echo "$snd" | tr '[:lower:]' '[:upper:]')
         SND_FILE=$(find_file "$SND_UPPER")
         JSON="${SOURCES_DIR}/${snd}.json"
@@ -462,7 +467,7 @@ if [ -d "$SOURCES_DIR" ]; then
             ult3edit sound import "$SND_FILE" "$JSON" 2>/dev/null || true
         fi
     done
-    echo "  Imported sound data from 3 JSON sources"
+    echo "  Imported sound data (SOSA/SOSM; MBS kept vanilla — contains player code)"
 
     # Import dungeon drawing data
     DDRW_FILE=$(find_file "DDRW")
@@ -480,12 +485,12 @@ if [ -d "$SOURCES_DIR" ]; then
     BIN_PATCHES="${SOURCES_DIR}/engine_strings.json"
     ULT3=$(find_file "ULT3")
 
-    if [ -f "$FULL_PATCHES" ] && [ -f "${ENGINE_DIR}/scenario_build.sh" ]; then
-        echo "  Applying engine string patches (source-level build)..."
-        bash "${ENGINE_DIR}/scenario_build.sh" "${SCRIPT_DIR}" \
-            --apply-to "$GAME_DIR" 2>/dev/null || true
-        echo "  Applied engine inline string patches via reassembly"
-    elif [ -f "$BIN_PATCHES" ] && [ -f "$ULT3" ]; then
+    # NOTE: Source-level build (scenario_build.sh) reassembles from the
+    # uncracked original source, producing a binary incompatible with cracked
+    # disk images (33 byte differences including boot sequence patches like
+    # JSR $B60F -> BIT $B60F). Always use binary-level patches which modify
+    # the existing ULT3 in-place, preserving crack/loader compatibility.
+    if [ -f "$BIN_PATCHES" ] && [ -f "$ULT3" ]; then
         echo "  Applying engine string patches (binary, in-place)..."
         ult3edit patch strings-import "$ULT3" "$BIN_PATCHES" \
             --backup 2>/dev/null || true
