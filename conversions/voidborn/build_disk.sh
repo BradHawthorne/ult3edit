@@ -280,7 +280,7 @@ def write_file(data):
         return master_blk, 3, 1 + len(idx_blks) + data_blocks_needed
 
 # --- Build directory entry ---
-def make_entry(storage_type, name, file_type, key_block, blocks_used, eof, aux_type):
+def make_entry(storage_type, name, file_type, key_block, blocks_used, eof, aux_type, header_pointer=0):
     entry = bytearray(ENTRY_LENGTH)
     name_bytes = name.encode('ascii')[:15]
     entry[0x00] = (storage_type << 4) | len(name_bytes)
@@ -296,6 +296,9 @@ def make_entry(storage_type, name, file_type, key_block, blocks_used, eof, aux_t
     entry[0x1E] = 0xE3  # access: read/write/rename/destroy
     entry[0x1F] = aux_type & 0xFF
     entry[0x20] = (aux_type >> 8) & 0xFF
+    # header_pointer: back-pointer to parent directory key block (required by ProDOS MLI)
+    entry[0x25] = header_pointer & 0xFF
+    entry[0x26] = (header_pointer >> 8) & 0xFF
     return entry
 
 # --- Enforce engine memory layout constraints ---
@@ -372,7 +375,7 @@ for i, blk in enumerate(game_dir_blocks):
             break
         rec = game_entries[file_idx]
         name, ftype, aux, key, stype, blks, eof, _ = rec
-        entry = make_entry(stype, name, ftype, key, blks, eof, aux)
+        entry = make_entry(stype, name, ftype, key, blks, eof, aux, header_pointer=game_dir_blocks[0])
         offset = 4 + slot * ENTRY_LENGTH
         block_data[offset:offset+ENTRY_LENGTH] = entry
         file_idx += 1
@@ -391,7 +394,7 @@ prodos_order = {'PRODOS': 0, 'LOADER.SYSTEM': 1}
 root_recs.sort(key=lambda r: (prodos_order.get(r[0], 99), r[0]))
 for rec in root_recs:
     name, ftype, aux, key, stype, blks, eof, _ = rec
-    entry = make_entry(stype, name, ftype, key, blks, eof, aux)
+    entry = make_entry(stype, name, ftype, key, blks, eof, aux, header_pointer=vol_dir_blocks[0])
     root_entries.append(entry)
 
 # GAME subdirectory entry last
@@ -409,6 +412,9 @@ game_entry[0x15] = (len(game_dir_blocks) * BLOCK_SIZE) & 0xFF
 game_entry[0x16] = ((len(game_dir_blocks) * BLOCK_SIZE) >> 8) & 0xFF
 game_entry[0x17] = ((len(game_dir_blocks) * BLOCK_SIZE) >> 16) & 0xFF
 game_entry[0x1E] = 0xE3  # access
+# header_pointer: back-pointer to volume directory key block
+game_entry[0x25] = vol_dir_blocks[0] & 0xFF
+game_entry[0x26] = (vol_dir_blocks[0] >> 8) & 0xFF
 root_entries.append(game_entry)
 
 root_file_count = len(root_entries)
@@ -459,8 +465,9 @@ for i, blk in enumerate(vol_dir_blocks):
     write_block(blk, block_data)
 
 # Fix GAME subdir parent entry number (which slot is GAME in the volume dir?)
-# GAME is the last root entry = slot len(root_entries) (slot 0 is volume header)
-game_parent_entry = len(root_entries)
+# ProDOS counts entries 1-based: entry 1 = header, entry 2 = first file, etc.
+# GAME is root_entries[len-1] at slot len(root_entries), so entry = slot + 1
+game_parent_entry = len(root_entries) + 1
 disk[game_dir_blocks[0] * BLOCK_SIZE + 4 + 0x25] = game_parent_entry
 
 # --- Write volume bitmap ---
