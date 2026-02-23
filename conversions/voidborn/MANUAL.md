@@ -1048,7 +1048,7 @@ Exodus: Voidborn is a total conversion for Ultima III: Exodus (Apple II,
 1983). It modifies all game data — names, maps, dialog, monsters, graphics,
 sound, and save state — while preserving the original engine mechanics.
 
-Built with **ult3edit** (https://github.com/BradHawthorne/ult3edit), 844 tests.
+Built with **ult3edit** (https://github.com/BradHawthorne/ult3edit), 1696 tests.
 
 ---
 

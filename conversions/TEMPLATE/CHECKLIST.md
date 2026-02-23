@@ -196,13 +196,12 @@ Inline text strings in shop overlay code files.
 
 **Find available string offsets**: `ult3edit shapes view SHP0 --strings`
 
-## 11. Sound Effects
+## 11. Overworld Save State
 
 | Item | ult3edit Command | Notes |
 |------|----------------|-------|
-| [ ] SOSA — Speaker sound patterns | `sound edit SOSA --offset HEX --data HEX` | 4096 bytes |
-| [ ] SOSM — Sound map table | `sound edit SOSM --offset HEX --data HEX` | 256 bytes |
-| [ ] Bulk import from JSON | `sound import FILE data.json` | |
+| [ ] SOSA — Overworld map state | `sound import SOSA data.json` | 4096 bytes, dynamic copy of MAPA |
+| [ ] SOSM — Overworld monster positions | `sound import SOSM data.json` | 256 bytes, creature tracking |
 
 ## 12. Music
 
@@ -250,6 +249,63 @@ ult3edit patch import ULT3 names.json
 | [ ] DDRW perspective data | `ddrw edit DDRW --offset HEX --data HEX` | 1792 bytes total |
 | [ ] Bulk import from JSON | `ddrw import DDRW data.json` | |
 
+## 16. Title Screen Graphics (EXOD)
+
+26,208-byte intro/boot binary containing HGR animation frames, text crawl
+coordinates, and glyph animation data.
+
+| Item | ult3edit Command | Notes |
+|------|----------------|-------|
+| [ ] Title screen frame | `exod import EXOD art.png --frame title` | PNG → HGR conversion |
+| [ ] Other animation frames | `exod import EXOD art.png --frame NAME` | serpent, castle, exodus, frame3, frame4 |
+| [ ] Full canvas | `exod import EXOD art.png --frame canvas` | All 280x192 pixels |
+| [ ] Text crawl ("BY ...") | `exod crawl import EXOD crawl.json` | Coordinate pairs JSON |
+| [ ] Compose crawl from text | `exod crawl compose "BY AUTHOR" -o crawl.json` | 5x7 bitmap font |
+| [ ] Glyph table (view only) | `exod glyph view EXOD` | Column-reveal animation |
+
+**Text crawl workflow**:
+```bash
+# Compose new crawl text from a string
+ult3edit exod crawl compose "BY YOUR NAME" -o crawl.json --render preview.png
+
+# Import into EXOD binary
+ult3edit exod crawl import EXOD crawl.json --backup
+```
+
+**Title art workflow**:
+```bash
+# Export current frames as PNG templates
+ult3edit exod export EXOD -o frames/
+
+# Edit PNGs externally, then import
+ult3edit exod import EXOD my_title.png --frame title --backup
+```
+
+## 17. Engine Inline Strings (245 strings in ULT3)
+
+All text displayed by the engine's inline string printer (JSR $46BA).
+
+| Item | ult3edit Command | Notes |
+|------|----------------|-------|
+| [ ] Quest item strings | `patch strings-edit ULT3 --vanilla "..." --text "..."` | CARD OF DEATH, etc. |
+| [ ] Combat messages | `patch strings-edit ULT3 --vanilla "..." --text "..."` | KILLED!, MISSED!, etc. |
+| [ ] Movement prompts | `patch strings-edit ULT3 --vanilla "..." --text "..."` | NORTH, BOARD, etc. |
+| [ ] Magic system strings | `patch strings-edit ULT3 --vanilla "..." --text "..."` | SPELL TYPE, etc. |
+| [ ] Shop/equipment strings | `patch strings-edit ULT3 --vanilla "..." --text "..."` | WHICH WEAPON:, etc. |
+| [ ] Bulk import from JSON | `patch strings-import ULT3 patches.json` | All strings at once |
+
+**Catalog current strings**: `ult3edit patch strings ULT3 --json -o catalog.json`
+
+**Binary patching** (replacement must fit original space):
+```bash
+ult3edit patch strings-edit ULT3 --vanilla "CARD OF DEATH" --text "SHARD OF VOID"
+```
+
+**Source patching** (no length limits, requires asmiigs):
+```bash
+python engine/tools/source_patcher.py engine/ult3/ult3.s patches.json
+```
+
 ---
 
 ## Verification
@@ -282,10 +338,12 @@ ult3edit combat view CONG --validate
 | Dialog | 19 (TLK A-S) | All NPC text |
 | Tile Graphics | 1 (SHPS) | 256 glyphs |
 | Shop Overlays | 8 (SHP0-SHP7) | Inline strings |
-| Sound Effects | 2 (SOSA, SOSM) | Audio data |
+| Overworld State | 2 (SOSA, SOSM) | Map state + monsters |
 | Music | 1 (MBS) | Mockingboard |
 | Engine Names | 1 (ULT3) | 921-byte table |
 | Engine Config | 1 (ULT3) | Moongates, food |
+| Engine Strings | 1 (ULT3) | 245 inline strings |
 | Title Text | 1 (TEXT) | 2 records |
 | Dungeon Drawing | 1 (DDRW) | Rendering data |
-| **Total** | **~84 files** | **All game data** |
+| Title Graphics | 1 (EXOD) | Frames, crawl, glyphs |
+| **Total** | **~86 files** | **All game data** |

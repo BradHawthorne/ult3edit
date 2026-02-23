@@ -310,11 +310,32 @@ Fully symbolicated — all labels renamed to `intro_*` / `anim_data_*`.
 | $850C | `intro_sound_effect` | Speaker tone generation |
 | $856A | `intro_reveal_anim` | Progressive column reveal |
 
-### Patchable Regions
+### Patchable Data Regions
 
-No verified patchable data regions. Previously documented addresses ($35E1,
-$35F9, $384D) were incorrectly identified as coordinate tables — they are
-animation frame data (`anim_data_*` labels).
+| Name | File Offset | Address | Size | Type |
+|------|-------------|---------|------|------|
+| Text Crawl | $6000 | $8000 | ~533 | (X,Y) byte pairs, $00 terminated |
+| Glyph Table | $0400 | $2400 | ~6,912 | 5-entry pointer table → 7 sub-pointers → 208-byte pixel blocks |
+| HGR Frames | $2000-$3FFF | $4000-$5FFF | 8,192 | 6 animation frames on HGR page 2 |
+
+**Text crawl** at $6000: Stream of (X, Y) coordinate pairs for the
+"BY LORD BRITISH" pixel-plotted text. Y bytes stored as $BF - screen_y
+(inverted). Terminated by $00 X byte. Each point plotted as double-wide
+white pixel. Use `ult3edit exod crawl` subcommands to view/export/import/
+render/compose.
+
+**Glyph table** at $0400: Two-level pointer chain. 5-entry main table
+(indices 0-3 drawn, 4 is sentinel) → 7 sub-pointer entries per glyph
+(column variants for the reveal animation) → 208-byte pixel data blocks
+(16 HGR rows x 13 bytes per row). Use `ult3edit exod glyph` subcommands.
+
+**HGR frames**: 6 animation frames (title, serpent, castle, exodus,
+frame3, frame4) stored on HGR page 2. Standard Apple II interleaved
+scanline layout. Use `ult3edit exod export/import` for PNG conversion.
+
+Previously documented addresses ($35E1, $35F9, $384D) were incorrectly
+identified as coordinate tables — they are animation frame data
+(`anim_data_*` labels).
 
 ---
 

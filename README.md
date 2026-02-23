@@ -460,7 +460,7 @@ ult3edit diff ROST1 ROST2 --summary
 ult3edit diff ROST1 ROST2 --json -o diff.json
 ```
 
-Auto-detects file types and compares across all data formats (roster, bestiary, combat, save, maps, special, TLK).
+Auto-detects file types and compares across all data formats (roster, bestiary, combat, save, maps, special, TLK, sound, shapes, DDRW, TEXT).
 
 ## Disk Image Operations
 
@@ -555,7 +555,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-1552 tests covering all modules with synthesized game data (no real game files needed).
+1696 tests covering all modules with synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 
@@ -675,22 +675,6 @@ bash conversions/voidborn/apply.sh path/to/game.po
 - **DDRW** dungeon drawing data JSON
 - **Title** screen text
 - **Text crawl** coordinate data (composed via bitmap font)
-
-## Engine SDK
-
-The `engine/` directory contains a buildable engine source tree using the [Rosetta](https://github.com/BradHawthorne/rosetta) toolchain (asmiigs/deasmiigs). All three engine binaries (SUBS, ULT3, EXOD) reassemble byte-identical from CIDAR disassembly.
-
-- **Fully symbolicated** — all 864 labels renamed to semantic names
-- **Fully annotated** — every code function has academic-level documentation
-- **Two-tier scenario build** — source-level patching (no string length limits) with binary-level fallback
-
-```bash
-# Build and verify all 3 engine binaries
-cd engine && bash build.sh
-
-# Patch engine strings for a total conversion
-python engine/tools/source_patcher.py engine/ult3/ult3.s patches.json
-```
 
 ## License
 
