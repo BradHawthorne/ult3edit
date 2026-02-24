@@ -2,8 +2,10 @@
 
 import os
 
+import pytest
+
 from ult3edit.fileutil import (
-    resolve_game_file, find_game_files, decode_high_ascii, encode_high_ascii,
+    resolve_game_file, find_game_files, decode_high_ascii, encode_high_ascii, backup_file,
 )
 
 
@@ -85,3 +87,30 @@ class TestEncodeHighAscii:
         encoded = encode_high_ascii(original, 10)
         decoded = decode_high_ascii(encoded)
         assert decoded == original
+
+
+# ── Migrated from test_new_features.py ──
+
+class TestBackupFile:
+    def test_creates_bak_file(self, tmp_dir, sample_roster_file):
+        bak_path = backup_file(sample_roster_file)
+        assert bak_path == sample_roster_file + '.bak'
+        assert os.path.exists(bak_path)
+
+    def test_bak_matches_original(self, tmp_dir, sample_roster_file):
+        with open(sample_roster_file, 'rb') as f:
+            original = f.read()
+        backup_file(sample_roster_file)
+        with open(sample_roster_file + '.bak', 'rb') as f:
+            bak = f.read()
+        assert original == bak
+
+    def test_missing_file_raises(self, tmp_dir):
+        with pytest.raises(FileNotFoundError):
+            backup_file(os.path.join(tmp_dir, 'nonexistent'))
+
+
+# =============================================================================
+# Roster validation
+# =============================================================================
+

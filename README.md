@@ -114,9 +114,9 @@ ult3edit disk list game.po
 | `sound` | Sound data editor (SOSA, SOSM, MBS) | `view`, `edit`, `import` |
 | `patch` | Engine binary patcher (CIDAR offsets) | `view`, `edit`, `dump`, `import`, `strings`, `strings-edit`, `strings-import`, `compile-names`, `decompile-names`, `validate-names` |
 | `ddrw` | Dungeon drawing data editor | `view`, `edit`, `import` |
-| `exod` | Intro/title screen graphics editor | `view`, `export`, `import`, `crawl {view,export,import,render,compose}`, `glyph {view,export}` |
+| `exod` | Intro/title screen graphics editor | `view`, `export`, `import`, `crawl {view,export,import,render,compose}`, `glyph {view,export,import}` |
 | `diff` | Game data comparison tool | (compares two files or directories) |
-| `disk` | ProDOS disk image operations | `info`, `list`, `extract`, `audit` |
+| `disk` | ProDOS disk image operations | `info`, `list`, `extract`, `audit`, `build` |
 
 Each tool is also available standalone: `ult3-roster`, `ult3-bestiary`, `ult3-map`, etc.
 
@@ -339,6 +339,55 @@ ult3edit shapes info SHPS#060800
 
 SHPS is a 2048-byte character set (256 glyphs x 8 bytes). Tile IDs use multiples of 4 — the low 2 bits select animation frame, so each tile is 4 consecutive glyphs.
 
+## Editing Title Screen Graphics (EXOD)
+
+```bash
+# View EXOD frame structure (title, serpent, castle, exodus, etc.)
+ult3edit exod view EXOD#062000
+
+# Export all frames as PNG templates (scaled 2x)
+ult3edit exod export EXOD#062000 -o frames/
+
+# Export a single frame
+ult3edit exod export EXOD#062000 --frame title -o frames/
+
+# Import a PNG as a title frame (with Floyd-Steinberg dithering)
+ult3edit exod import EXOD#062000 mytitle.png --frame title --dither --backup
+```
+
+### Text Crawl Editing
+
+The intro text crawl is stored as pixel-plotted coordinate data. You can view, edit, or regenerate it from a text string:
+
+```bash
+# View current crawl coordinates
+ult3edit exod crawl view EXOD#062000
+
+# Export crawl as JSON
+ult3edit exod crawl export EXOD#062000 -o crawl.json
+
+# Generate new crawl from a text string (using built-in 5x7 bitmap font)
+ult3edit exod crawl compose "BY YOUR NAME" -o crawl.json --render preview.png
+
+# Import crawl back into EXOD
+ult3edit exod crawl import EXOD#062000 crawl.json --backup
+```
+
+### Glyph Table Editing
+
+EXOD contains a 2-variant glyph table used during the intro sequence:
+
+```bash
+# View glyph pointer table
+ult3edit exod glyph view EXOD#062000
+
+# Export glyph data as PNG
+ult3edit exod glyph export EXOD#062000 -o glyphs/
+
+# Import PNG as glyph data
+ult3edit exod glyph import EXOD#062000 glyph.png --glyph 0 --variant 3 --backup
+```
+
 ## Editing Sound Data
 
 ```bash
@@ -487,6 +536,16 @@ ult3edit disk audit game.po --detail
 ult3edit disk audit game.po --json -o audit.json
 ```
 
+### Building Disk Images
+
+```bash
+# Build a ProDOS disk image from extracted files
+ult3edit disk build game.po path/to/extracted/
+
+# With custom volume name and boot blocks from vanilla
+ult3edit disk build game.po path/to/extracted/ --vol-name MYGAME --boot-from vanilla.po
+```
+
 Uses the native ProDOS disk image builder (no external tools required).
 
 ## File Formats
@@ -558,7 +617,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-1696 tests covering all modules with synthesized game data (no real game files needed).
+1813 tests covering all modules with synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 

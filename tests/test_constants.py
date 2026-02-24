@@ -4,7 +4,7 @@ from ult3edit.constants import (
     TILES, DUNGEON_TILES, WEAPONS, ARMORS, RACES, CLASSES,
     MARKS_BITS, CARDS_BITS, MONSTER_NAMES, WEAPON_DAMAGE, WEAPON_PRICE, ARMOR_EVASION, CLASS_MAX_WEAPON, CLASS_MAX_ARMOR,
     WIZARD_SPELLS, CLERIC_SPELLS, MON_GROUP_NAMES,
-    tile_char, tile_name,
+    tile_char, tile_name, TILE_CHARS_REVERSE, DUNGEON_TILE_CHARS_REVERSE,
 )
 
 
@@ -174,3 +174,28 @@ class TestSpells:
     def test_costs_increase(self):
         costs = [cost for _, cost in WIZARD_SPELLS]
         assert costs[-1] >= costs[0]
+
+
+# ── Migrated from test_new_features.py ──
+
+class TestTileReverseLookups:
+    def test_overworld_reverse(self):
+        assert TILE_CHARS_REVERSE['~'] == 0x00  # Water
+        assert TILE_CHARS_REVERSE['.'] == 0x04  # Grass
+        assert TILE_CHARS_REVERSE['T'] == 0x0C  # Forest
+
+    def test_dungeon_reverse(self):
+        assert DUNGEON_TILE_CHARS_REVERSE['.'] == 0x00  # Open
+        assert DUNGEON_TILE_CHARS_REVERSE['#'] == 0x01  # Wall
+        assert DUNGEON_TILE_CHARS_REVERSE['D'] == 0x02  # Door
+
+    def test_reverse_matches_forward(self):
+        from ult3edit.constants import TILES
+        for tile_id, (ch, _) in TILES.items():
+            assert TILE_CHARS_REVERSE[ch] == tile_id
+
+
+# =============================================================================
+# Dry run (no file written)
+# =============================================================================
+

@@ -1,5 +1,6 @@
 """Tests for combat battlefield tool."""
 
+import argparse
 import json
 import os
 import types
@@ -10,6 +11,7 @@ from ult3edit.combat import CombatMap, cmd_edit, cmd_import, _has_cli_edit_args,
 from ult3edit.constants import (
     CON_MAP_WIDTH, CON_MAP_HEIGHT, CON_FILE_SIZE,
     CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET, CON_PC_X_OFFSET, CON_PC_Y_OFFSET,
+    TILE_CHARS_REVERSE,
 )
 
 
@@ -291,3 +293,1011 @@ class TestValidateCombatMap:
         cm = CombatMap(bytes(data))
         warnings = validate_combat_map(cm)
         assert any('overlaps' in w for w in warnings)
+
+
+# ── Migrated from test_new_features.py ──
+
+class TestCombatImport:
+    def test_import_combat_map(self, tmp_dir, sample_con_bytes):
+        """cmd_import() applies monster position changes from JSON."""
+        from ult3edit.combat import cmd_import as combat_cmd_import, CombatMap
+        path = os.path.join(tmp_dir, 'CONA')
+        with open(path, 'wb') as f:
+            f.write(sample_con_bytes)
+
+        cm = CombatMap(sample_con_bytes)
+        d = cm.to_dict()
+        d['monsters'][0]['x'] = 7
+        d['monsters'][1]['y'] = 9
+
+        json_path = os.path.join(tmp_dir, 'con.json')
+        with open(json_path, 'w') as f:
+            json.dump(d, f)
+
+        args = type('Args', (), {
+            'file': path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': False,
+        })()
+        combat_cmd_import(args)
+
+        with open(path, 'rb') as f:
+            result = f.read()
+        cm2 = CombatMap(result)
+        assert cm2.monster_x[0] == 7
+        assert cm2.monster_y[1] == 9
+
+    def test_import_combat_tiles(self, tmp_dir, sample_con_bytes):
+        """cmd_import() applies tile changes from JSON."""
+        from ult3edit.combat import cmd_import as combat_cmd_import, CombatMap
+        path = os.path.join(tmp_dir, 'CONA')
+        with open(path, 'wb') as f:
+            f.write(sample_con_bytes)
+
+        cm = CombatMap(sample_con_bytes)
+        d = cm.to_dict()
+        # Set tile (0,0) to a known char
+        d['tiles'][0][0] = '~'  # Water tile
+
+        json_path = os.path.join(tmp_dir, 'con.json')
+        with open(json_path, 'w') as f:
+            json.dump(d, f)
+
+        args = type('Args', (), {
+            'file': path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': False,
+        })()
+        combat_cmd_import(args)
+
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[0] == TILE_CHARS_REVERSE['~']
+
+    def test_import_combat_dry_run(self, tmp_dir, sample_con_bytes):
+        """cmd_import() with dry_run does not modify file."""
+        from ult3edit.combat import cmd_import as combat_cmd_import, CombatMap
+        path = os.path.join(tmp_dir, 'CONA')
+        with open(path, 'wb') as f:
+            f.write(sample_con_bytes)
+
+        cm = CombatMap(sample_con_bytes)
+        d = cm.to_dict()
+        d['monsters'][0]['x'] = 99
+
+        json_path = os.path.join(tmp_dir, 'con.json')
+        with open(json_path, 'w') as f:
+            json.dump(d, f)
+
+        args = type('Args', (), {
+            'file': path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': True,
+        })()
+        combat_cmd_import(args)
+
+        with open(path, 'rb') as f:
+            result = f.read()
+        # Original data should be unchanged
+        assert result == sample_con_bytes
+
+    def test_import_combat_round_trip(self, tmp_dir, sample_con_bytes):
+        """Full view→import round-trip preserves all data including padding."""
+        from ult3edit.combat import cmd_import as combat_cmd_import, CombatMap
+        path = os.path.join(tmp_dir, 'CONA')
+        with open(path, 'wb') as f:
+            f.write(sample_con_bytes)
+
+        cm = CombatMap(sample_con_bytes)
+        d = cm.to_dict()
+
+        json_path = os.path.join(tmp_dir, 'con.json')
+        with open(json_path, 'w') as f:
+            json.dump(d, f)
+
+        out_path = os.path.join(tmp_dir, 'CONA_OUT')
+        args = type('Args', (), {
+            'file': path, 'json_file': json_path,
+            'output': out_path, 'backup': False, 'dry_run': False,
+        })()
+        combat_cmd_import(args)
+
+        with open(out_path, 'rb') as f:
+            result = f.read()
+        # All editable data should survive round-trip
+        cm2 = CombatMap(result)
+        assert cm2.tiles == cm.tiles, "tile grid mismatch"
+        assert cm2.monster_x == cm.monster_x
+        assert cm2.monster_y == cm.monster_y
+        assert cm2.pc_x == cm.pc_x
+        assert cm2.pc_y == cm.pc_y
+        # Padding preserved
+        assert cm2.padding1 == cm.padding1
+        assert cm2.padding2 == cm.padding2
+
+
+# =============================================================================
+# Special import
+# =============================================================================
+
+
+class TestCombatLayout:
+    def test_padding_and_runtime_parsed(self, sample_con_bytes):
+        from ult3edit.combat import CombatMap
+        cm = CombatMap(sample_con_bytes)
+        assert len(cm.padding1) == 7
+        assert len(cm.runtime_monster) == 16
+        assert len(cm.runtime_pc) == 8
+        assert len(cm.padding2) == 16
+
+    def test_layout_in_dict(self, sample_con_bytes):
+        from ult3edit.combat import CombatMap
+        cm = CombatMap(sample_con_bytes)
+        d = cm.to_dict()
+        assert 'padding' in d
+        assert 'pre_monster' in d['padding']
+        assert 'tail' in d['padding']
+        assert 'runtime' in d
+        assert 'monster_save_and_status' in d['runtime']
+        assert 'pc_save_and_tile' in d['runtime']
+
+    def test_padding_nonzero(self):
+        """Padding with non-zero data should be preserved."""
+        from ult3edit.combat import CombatMap
+        from ult3edit.constants import CON_PADDING1_OFFSET
+        data = bytearray(192)
+        data[CON_PADDING1_OFFSET] = 0x42
+        data[CON_PADDING1_OFFSET + 1] = 0x55
+        cm = CombatMap(data)
+        assert cm.padding1[0] == 0x42
+        assert cm.padding1[1] == 0x55
+
+    def test_padding_render_shows_nonzero(self):
+        from ult3edit.combat import CombatMap
+        from ult3edit.constants import CON_PADDING1_OFFSET
+        data = bytearray(192)
+        data[CON_PADDING1_OFFSET] = 0xAB
+        cm = CombatMap(data)
+        rendered = cm.render()
+        assert 'Padding (0x79)' in rendered
+        assert 'AB' in rendered
+
+
+# =============================================================================
+# Sound MBS music stream tests
+# =============================================================================
+
+
+# =============================================================================
+# Special location trailing bytes tests (unused padding, verified via engine)
+# =============================================================================
+
+
+class TestCombatMonsterZeroZero:
+    def test_to_dict_includes_zero_zero_monster(self):
+        from ult3edit.combat import CombatMap
+        from ult3edit.constants import CON_FILE_SIZE
+        data = bytearray(CON_FILE_SIZE)
+        cmap = CombatMap(data)
+        # Monster 0 at (0,0), monster 1 at (5,3)
+        cmap.monster_x[0] = 0
+        cmap.monster_y[0] = 0
+        cmap.monster_x[1] = 5
+        cmap.monster_y[1] = 3
+        d = cmap.to_dict()
+        assert len(d['monsters']) == 8  # All 8 slots exported
+        assert d['monsters'][0] == {'x': 0, 'y': 0}
+        assert d['monsters'][1] == {'x': 5, 'y': 3}
+
+    def test_roundtrip_preserves_positions(self):
+        from ult3edit.combat import CombatMap
+        from ult3edit.constants import CON_FILE_SIZE, CON_MONSTER_COUNT
+        data = bytearray(CON_FILE_SIZE)
+        cmap = CombatMap(data)
+        cmap.monster_x[0] = 0
+        cmap.monster_y[0] = 0
+        cmap.monster_x[1] = 5
+        cmap.monster_y[1] = 3
+        d = cmap.to_dict()
+        # Simulate import into fresh map
+        data2 = bytearray(CON_FILE_SIZE)
+        cmap2 = CombatMap(data2)
+        for i, m in enumerate(d['monsters'][:CON_MONSTER_COUNT]):
+            cmap2.monster_x[i] = m['x']
+            cmap2.monster_y[i] = m['y']
+        assert cmap2.monster_x[0] == 0
+        assert cmap2.monster_y[0] == 0
+        assert cmap2.monster_x[1] == 5
+        assert cmap2.monster_y[1] == 3
+
+
+# =============================================================================
+# Fix: Equipment setters accept name strings
+# =============================================================================
+
+
+class TestCombatDictImport:
+    """Test that combat import accepts dict-of-dicts JSON format."""
+
+    def test_import_dict_format(self, tmp_path):
+        """Import combat map from dict-keyed JSON (Voidborn source format)."""
+        con_file = tmp_path / 'CONA'
+        con_file.write_bytes(bytearray(CON_FILE_SIZE))
+        json_file = tmp_path / 'combat.json'
+        json_file.write_text(json.dumps({
+            "tiles": [
+                "...........",
+                "...........",
+                "...........",
+                "...........",
+                "...........",
+                "...........",
+                "...........",
+                "...........",
+                "...........",
+                "...........",
+                "..........."
+            ],
+            "monsters": {
+                "0": {"x": 3, "y": 2},
+                "1": {"x": 7, "y": 4}
+            },
+            "pcs": {
+                "0": {"x": 1, "y": 9},
+                "1": {"x": 3, "y": 9}
+            }
+        }))
+        import argparse
+        from ult3edit.combat import cmd_import as combat_import
+        args = argparse.Namespace(
+            file=str(con_file), json_file=str(json_file),
+            backup=False, dry_run=False, output=None)
+        combat_import(args)
+        data = con_file.read_bytes()
+        from ult3edit.constants import (
+            CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET,
+            CON_PC_X_OFFSET, CON_PC_Y_OFFSET,
+        )
+        assert data[CON_MONSTER_X_OFFSET + 0] == 3
+        assert data[CON_MONSTER_Y_OFFSET + 0] == 2
+        assert data[CON_MONSTER_X_OFFSET + 1] == 7
+        assert data[CON_MONSTER_Y_OFFSET + 1] == 4
+        assert data[CON_PC_X_OFFSET + 0] == 1
+        assert data[CON_PC_Y_OFFSET + 0] == 9
+
+    def test_import_list_format_still_works(self, tmp_path):
+        """Original list format import still works after dict support."""
+        con_file = tmp_path / 'CONA'
+        con_file.write_bytes(bytearray(CON_FILE_SIZE))
+        json_file = tmp_path / 'combat.json'
+        json_file.write_text(json.dumps({
+            "tiles": ["...........",] * 11,
+            "monsters": [{"x": 5, "y": 5}],
+            "pcs": [{"x": 2, "y": 8}]
+        }))
+        import argparse
+        from ult3edit.combat import cmd_import as combat_import
+        args = argparse.Namespace(
+            file=str(con_file), json_file=str(json_file),
+            backup=False, dry_run=False, output=None)
+        combat_import(args)
+        data = con_file.read_bytes()
+        from ult3edit.constants import CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET
+        assert data[CON_MONSTER_X_OFFSET] == 5
+        assert data[CON_MONSTER_Y_OFFSET] == 5
+
+
+class TestCombatTileChars:
+    """Validate combat source tile characters are in TILE_CHARS_REVERSE."""
+
+    SOURCES_DIR = os.path.join(os.path.dirname(__file__),
+                                '..', 'conversions', 'voidborn', 'sources')
+
+    def test_all_combat_tiles_valid(self):
+        """Every tile char in combat JSONs maps to a known tile byte."""
+        valid_chars = set(TILE_CHARS_REVERSE.keys())
+        for letter in 'abcfgmqrs':
+            path = os.path.join(self.SOURCES_DIR, f'combat_{letter}.json')
+            if not os.path.exists(path):
+                continue
+            with open(path, 'r') as f:
+                data = json.load(f)
+            for row_idx, row in enumerate(data.get('tiles', [])):
+                for col_idx, ch in enumerate(row):
+                    assert ch in valid_chars, \
+                        (f"combat_{letter}.json tile[{row_idx}][{col_idx}]="
+                         f"'{ch}' not in TILE_CHARS_REVERSE")
+
+
+# =============================================================================
+# Dungeon ladder connectivity
+# =============================================================================
+
+
+class TestCombatMapTruncated:
+    """Test CombatMap handles truncated data correctly."""
+
+    def test_truncated_padding_defaults_to_zeros(self):
+        """Truncated file gets zero-filled padding arrays."""
+        from ult3edit.combat import CombatMap
+        from ult3edit.constants import CON_PADDING1_SIZE
+        # 150 bytes: past monster positions but short of full runtime data
+        data = bytes(150)
+        cm = CombatMap(data)
+        # padding1 needs offset 121+7=128 bytes; 150 >= 128 so should work
+        assert len(cm.padding1) == CON_PADDING1_SIZE
+        # runtime_monster needs offset 0x90+16=160; 150 < 160 so defaults
+        assert len(cm.runtime_monster) == 16
+        assert cm.runtime_monster == [0] * 16
+
+    def test_full_file_preserves_all_arrays(self):
+        """Full 192-byte file preserves all padding/runtime data."""
+        from ult3edit.combat import CombatMap
+        from ult3edit.constants import CON_FILE_SIZE
+        data = bytearray(CON_FILE_SIZE)
+        data[0xB0] = 0xAA  # padding2[0]
+        data[0x79] = 0xBB  # padding1[0]
+        cm = CombatMap(bytes(data))
+        assert cm.padding1[0] == 0xBB
+        assert cm.padding2[0] == 0xAA
+        assert len(cm.runtime_monster) == 16
+        assert len(cm.runtime_pc) == 8
+
+
+class TestCombatImportBoundsValidation:
+    """Test combat import position clamping to 11x11 grid."""
+
+    def test_monster_oob_clamped_and_warns(self, tmp_path):
+        """Monster positions >10 are clamped to 10 with a warning."""
+        from ult3edit.combat import cmd_import
+        from ult3edit.constants import (
+            CON_FILE_SIZE, CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET)
+        binfile = tmp_path / 'CON'
+        binfile.write_bytes(bytes(CON_FILE_SIZE))
+        jdata = {'monsters': [{'x': 50, 'y': 200}]}
+        jfile = tmp_path / 'con.json'
+        jfile.write_text(json.dumps(jdata))
+        out = tmp_path / 'OUT'
+        args = argparse.Namespace(
+            file=str(binfile), json_file=str(jfile),
+            output=str(out), backup=False, dry_run=False)
+        import io
+        import contextlib
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            cmd_import(args)
+        assert 'outside' in stderr.getvalue()
+        result = out.read_bytes()
+        assert result[CON_MONSTER_X_OFFSET] == 10
+        assert result[CON_MONSTER_Y_OFFSET] == 10
+
+    def test_pc_oob_clamped_and_warns(self, tmp_path):
+        """PC positions >10 are clamped to 10 with a warning."""
+        from ult3edit.combat import cmd_import
+        from ult3edit.constants import (
+            CON_FILE_SIZE, CON_PC_X_OFFSET, CON_PC_Y_OFFSET)
+        binfile = tmp_path / 'CON'
+        binfile.write_bytes(bytes(CON_FILE_SIZE))
+        jdata = {'pcs': [{'x': 15, 'y': -1}]}
+        jfile = tmp_path / 'con.json'
+        jfile.write_text(json.dumps(jdata))
+        out = tmp_path / 'OUT'
+        args = argparse.Namespace(
+            file=str(binfile), json_file=str(jfile),
+            output=str(out), backup=False, dry_run=False)
+        import io
+        import contextlib
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            cmd_import(args)
+        assert 'outside' in stderr.getvalue()
+        result = out.read_bytes()
+        assert result[CON_PC_X_OFFSET] == 10
+        assert result[CON_PC_Y_OFFSET] == 0
+
+    def test_valid_positions_no_warning(self, tmp_path):
+        """Positions within 0-10 produce no warning."""
+        from ult3edit.combat import cmd_import
+        from ult3edit.constants import CON_FILE_SIZE
+        binfile = tmp_path / 'CON'
+        binfile.write_bytes(bytes(CON_FILE_SIZE))
+        jdata = {'monsters': [{'x': 5, 'y': 5}],
+                 'pcs': [{'x': 0, 'y': 10}]}
+        jfile = tmp_path / 'con.json'
+        jfile.write_text(json.dumps(jdata))
+        out = tmp_path / 'OUT'
+        args = argparse.Namespace(
+            file=str(binfile), json_file=str(jfile),
+            output=str(out), backup=False, dry_run=False)
+        import io
+        import contextlib
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            cmd_import(args)
+        assert 'outside' not in stderr.getvalue()
+
+
+# ============================================================================
+# DDRW command tests (Task #112)
+# ============================================================================
+
+
+# ============================================================================
+# Sound command tests (Task #112)
+# ============================================================================
+
+
+# ============================================================================
+# Diff command tests (Task #112)
+# ============================================================================
+
+
+class TestCombatCmdViewDir:
+    """Tests for combat cmd_view in directory scan mode."""
+
+    def test_view_directory(self, tmp_path, capsys):
+        """View all CON files in a directory."""
+        from ult3edit.combat import cmd_view
+        con = tmp_path / 'CONA'
+        con.write_bytes(bytes(CON_FILE_SIZE))
+        args = argparse.Namespace(
+            path=str(tmp_path), json=False, output=None,
+            validate=False)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        assert 'CONA' in out or 'arena' in out.lower()
+
+    def test_view_directory_json(self, tmp_path):
+        """View directory --json produces valid JSON."""
+        from ult3edit.combat import cmd_view
+        con = tmp_path / 'CONA'
+        con.write_bytes(bytes(CON_FILE_SIZE))
+        outfile = tmp_path / 'combat.json'
+        args = argparse.Namespace(
+            path=str(tmp_path), json=True, output=str(outfile),
+            validate=False)
+        cmd_view(args)
+        result = json.loads(outfile.read_text())
+        assert 'CONA' in result
+
+    def test_view_empty_dir_exits(self, tmp_path):
+        """Directory with no CON files causes sys.exit."""
+        from ult3edit.combat import cmd_view
+        args = argparse.Namespace(
+            path=str(tmp_path), json=False, output=None,
+            validate=False)
+        with pytest.raises(SystemExit):
+            cmd_view(args)
+
+
+# =============================================================================
+# Special cmd_view directory mode
+# =============================================================================
+
+
+class TestCombatMonsterOverlap:
+    """Tests for validate_combat_map monster-monster overlap detection."""
+
+    def test_monster_monster_overlap_warns(self):
+        """Two monsters at the same position produce a warning."""
+        from ult3edit.combat import CombatMap, validate_combat_map
+        data = bytearray(CON_FILE_SIZE)
+        cm = CombatMap(data)
+        # Place monster 0 and monster 1 at same position
+        cm.monster_x[0] = 5
+        cm.monster_y[0] = 5
+        cm.monster_x[1] = 5
+        cm.monster_y[1] = 5
+        warnings = validate_combat_map(cm)
+        overlap_warnings = [w for w in warnings if 'overlap' in w.lower()]
+        assert len(overlap_warnings) == 1
+        assert 'Monster 1' in overlap_warnings[0]
+
+    def test_no_overlap_no_warning(self):
+        """Monsters at different positions produce no overlap warning."""
+        from ult3edit.combat import CombatMap, validate_combat_map
+        data = bytearray(CON_FILE_SIZE)
+        cm = CombatMap(data)
+        cm.monster_x[0] = 3
+        cm.monster_y[0] = 3
+        cm.monster_x[1] = 7
+        cm.monster_y[1] = 7
+        warnings = validate_combat_map(cm)
+        overlap_warnings = [w for w in warnings if 'overlap' in w.lower()]
+        assert len(overlap_warnings) == 0
+
+
+# =============================================================================
+# Dispatch and CLI integration tests
+# =============================================================================
+
+
+class TestCombatPaddingRoundTrip:
+    """Verify CON padding and runtime arrays survive save→reload."""
+
+    def test_padding_and_runtime_preservation(self, tmp_path):
+        """Non-zero padding and runtime bytes survive CombatMap round-trip."""
+        from ult3edit.combat import CombatMap
+        from ult3edit.constants import (
+            CON_PADDING1_OFFSET, CON_PADDING1_SIZE,
+            CON_RUNTIME_MONSAVE_OFFSET,
+            CON_RUNTIME_PCSAVE_OFFSET,
+            CON_PADDING2_OFFSET, CON_PADDING2_SIZE,
+        )
+
+        data = bytearray(CON_FILE_SIZE)
+        for i in range(CON_PADDING1_SIZE):
+            data[CON_PADDING1_OFFSET + i] = 0xAA
+        for i in range(16):
+            data[CON_RUNTIME_MONSAVE_OFFSET + i] = 0xBB
+        for i in range(8):
+            data[CON_RUNTIME_PCSAVE_OFFSET + i] = 0xCC
+        for i in range(CON_PADDING2_SIZE):
+            data[CON_PADDING2_OFFSET + i] = 0xDD
+
+        cm = CombatMap(data)
+        assert cm.padding1 == [0xAA] * CON_PADDING1_SIZE
+        assert cm.runtime_monster == [0xBB] * 16
+        assert cm.runtime_pc == [0xCC] * 8
+        assert cm.padding2 == [0xDD] * CON_PADDING2_SIZE
+
+    def test_json_roundtrip_preserves_padding(self, tmp_path):
+        """Export CON to JSON dict, import it back, verify padding intact."""
+        from ult3edit.combat import CombatMap, cmd_import as combat_import
+        from ult3edit.constants import (
+            CON_PADDING1_OFFSET, CON_PADDING1_SIZE,
+            CON_PADDING2_OFFSET, CON_PADDING2_SIZE,
+            CON_RUNTIME_MONSAVE_OFFSET, CON_RUNTIME_PCSAVE_OFFSET,
+        )
+
+        data = bytearray(CON_FILE_SIZE)
+        data[0] = 0x04
+        for i in range(CON_PADDING1_SIZE):
+            data[CON_PADDING1_OFFSET + i] = 0x11
+        for i in range(16):
+            data[CON_RUNTIME_MONSAVE_OFFSET + i] = 0x22
+        for i in range(8):
+            data[CON_RUNTIME_PCSAVE_OFFSET + i] = 0x33
+        for i in range(CON_PADDING2_SIZE):
+            data[CON_PADDING2_OFFSET + i] = 0x44
+
+        con_file = tmp_path / 'CONA'
+        con_file.write_bytes(bytes(data))
+
+        cm = CombatMap(data)
+        jdata = cm.to_dict()
+
+        json_file = tmp_path / 'con.json'
+        json_file.write_text(json.dumps(jdata))
+
+        args = argparse.Namespace(
+            file=str(con_file), json_file=str(json_file),
+            backup=False, dry_run=False, output=None)
+        combat_import(args)
+
+        result = con_file.read_bytes()
+        for i in range(CON_PADDING1_SIZE):
+            assert result[CON_PADDING1_OFFSET + i] == 0x11
+        for i in range(16):
+            assert result[CON_RUNTIME_MONSAVE_OFFSET + i] == 0x22
+        for i in range(8):
+            assert result[CON_RUNTIME_PCSAVE_OFFSET + i] == 0x33
+        for i in range(CON_PADDING2_SIZE):
+            assert result[CON_PADDING2_OFFSET + i] == 0x44
+
+
+class TestCombatValidateEdgeCases:
+    """Tests for combat validation edge cases."""
+
+    def test_all_positions_populated(self):
+        """Validate with all 8 monster + 4 PC positions set."""
+        from ult3edit.combat import CombatMap, validate_combat_map
+        from ult3edit.constants import (CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET,
+                                       CON_PC_X_OFFSET, CON_PC_Y_OFFSET)
+        data = bytearray(CON_FILE_SIZE)
+        # Place 8 monsters in different positions
+        for i in range(8):
+            data[CON_MONSTER_X_OFFSET + i] = i + 1
+            data[CON_MONSTER_Y_OFFSET + i] = i + 1
+        # Place 4 PCs in different positions
+        for i in range(4):
+            data[CON_PC_X_OFFSET + i] = i + 1
+            data[CON_PC_Y_OFFSET + i] = 10 - i
+        cm = CombatMap(data)
+        warnings = validate_combat_map(cm)
+        # No overlaps — all positions are unique
+        overlap_warnings = [w for w in warnings if 'overlap' in w.lower()]
+        assert len(overlap_warnings) == 0
+
+    def test_monster_pc_overlap_detected(self):
+        """Validate detects monster-PC overlap at same position."""
+        from ult3edit.combat import CombatMap, validate_combat_map
+        from ult3edit.constants import (CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET,
+                                       CON_PC_X_OFFSET, CON_PC_Y_OFFSET)
+        data = bytearray(CON_FILE_SIZE)
+        # Monster 0 at (5, 5)
+        data[CON_MONSTER_X_OFFSET] = 5
+        data[CON_MONSTER_Y_OFFSET] = 5
+        # PC 0 at (5, 5) — same position
+        data[CON_PC_X_OFFSET] = 5
+        data[CON_PC_Y_OFFSET] = 5
+        cm = CombatMap(data)
+        warnings = validate_combat_map(cm)
+        overlap_warnings = [w for w in warnings if 'overlap' in w.lower()]
+        assert len(overlap_warnings) >= 1
+
+    def test_tile_misalignment_count(self):
+        """Validate counts multiple misaligned tiles."""
+        from ult3edit.combat import CombatMap, validate_combat_map
+        data = bytearray(CON_FILE_SIZE)
+        # Set 3 misaligned tiles (not multiples of 4)
+        data[0] = 0x01  # misaligned
+        data[1] = 0x02  # misaligned
+        data[2] = 0x03  # misaligned
+        data[3] = 0x04  # aligned
+        cm = CombatMap(data)
+        warnings = validate_combat_map(cm)
+        alignment_warnings = [w for w in warnings if 'alignment' in w.lower()
+                              or 'aligned' in w.lower()]
+        assert len(alignment_warnings) == 1
+        assert '3' in alignment_warnings[0]  # 3 misaligned tiles
+
+
+# =============================================================================
+# BCD edge cases
+# =============================================================================
+
+
+class TestCombatCmdImport:
+    """Test combat.py cmd_import."""
+
+    def test_import_tiles_and_positions(self, tmp_path):
+        """Import tiles and positions from JSON."""
+        from ult3edit.combat import cmd_import as combat_import
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        # Build JSON with some tiles and monster/PC positions
+        jdata = {
+            'tiles': [['.' for _ in range(11)] for _ in range(11)],
+            'monsters': [{'x': 5, 'y': 3}],
+            'pcs': [{'x': 1, 'y': 1}],
+        }
+        json_path = os.path.join(str(tmp_path), 'con.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=False)
+        combat_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        # Check monster X position (offset 0x80)
+        from ult3edit.constants import CON_MONSTER_X_OFFSET, CON_MONSTER_Y_OFFSET
+        assert result[CON_MONSTER_X_OFFSET] == 5
+        assert result[CON_MONSTER_Y_OFFSET] == 3
+
+    def test_import_dry_run(self, tmp_path):
+        """Import with dry-run doesn't write."""
+        from ult3edit.combat import cmd_import as combat_import
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        jdata = {'tiles': [['~' for _ in range(11)] for _ in range(11)]}
+        json_path = os.path.join(str(tmp_path), 'con.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=True)
+        combat_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result == bytes(CON_FILE_SIZE)  # unchanged
+
+    def test_import_clamps_out_of_bounds(self, tmp_path):
+        """Positions outside grid bounds are clamped."""
+        from ult3edit.combat import cmd_import as combat_import
+        from ult3edit.constants import CON_MONSTER_X_OFFSET, CON_MAP_WIDTH
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        jdata = {'monsters': [{'x': 99, 'y': -5}]}
+        json_path = os.path.join(str(tmp_path), 'con.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=False)
+        combat_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[CON_MONSTER_X_OFFSET] == CON_MAP_WIDTH - 1
+        from ult3edit.constants import CON_MONSTER_Y_OFFSET
+        assert result[CON_MONSTER_Y_OFFSET] == 0
+
+
+# =============================================================================
+# Special cmd_view / cmd_import
+# =============================================================================
+
+
+class TestCombatCmdView:
+    """Test combat.py cmd_view."""
+
+    def test_view_single_file(self, tmp_path, capsys):
+        """cmd_view on a single CON file."""
+        from ult3edit.combat import cmd_view as combat_view
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            path=path, json=False, output=None, validate=False)
+        combat_view(args)
+        captured = capsys.readouterr()
+        assert 'Combat Map' in captured.out or 'CONA' in captured.out
+
+    def test_view_json_mode(self, tmp_path):
+        """cmd_view JSON mode on single file."""
+        from ult3edit.combat import cmd_view as combat_view
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        out_path = os.path.join(str(tmp_path), 'combat.json')
+        args = argparse.Namespace(
+            path=path, json=True, output=out_path, validate=False)
+        combat_view(args)
+        with open(out_path) as f:
+            jdata = json.load(f)
+        assert 'tiles' in jdata
+        assert 'monsters' in jdata
+        assert 'pcs' in jdata
+
+    def test_view_directory_no_files(self, tmp_path):
+        """cmd_view on directory with no CON files exits."""
+        from ult3edit.combat import cmd_view as combat_view
+        args = argparse.Namespace(
+            path=str(tmp_path), json=False, output=None, validate=False)
+        with pytest.raises(SystemExit):
+            combat_view(args)
+
+
+# =============================================================================
+# Diff module: diff_special, diff_save, FileDiff/EntityDiff properties
+# =============================================================================
+
+
+class TestCombatCmdEditGaps:
+    """Test combat cmd_edit CLI error paths."""
+
+    def test_tile_out_of_bounds(self, tmp_path):
+        """cmd_edit --tile with coords out of bounds exits."""
+        from ult3edit.combat import cmd_edit
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, tile=(99, 99, 0x10),
+            monster_pos=None, pc_pos=None,
+            dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_monster_pos_index_out_of_range(self, tmp_path):
+        """cmd_edit --monster-pos with bad index exits."""
+        from ult3edit.combat import cmd_edit
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, tile=None,
+            monster_pos=(99, 0, 0), pc_pos=None,
+            dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_pc_pos_index_out_of_range(self, tmp_path):
+        """cmd_edit --pc-pos with bad index exits."""
+        from ult3edit.combat import cmd_edit
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, tile=None,
+            monster_pos=None, pc_pos=(99, 0, 0),
+            dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_tile_value_out_of_range(self, tmp_path):
+        """cmd_edit --tile with value > 255 exits."""
+        from ult3edit.combat import cmd_edit
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, tile=(0, 0, 999),
+            monster_pos=None, pc_pos=None,
+            dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_monster_pos_coords_out_of_bounds(self, tmp_path):
+        """cmd_edit --monster-pos with position out of map bounds exits."""
+        from ult3edit.combat import cmd_edit
+        data = bytearray(CON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, tile=None,
+            monster_pos=(0, 99, 99), pc_pos=None,
+            dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+
+class TestCombatCmdViewGaps:
+    """Test combat cmd_view directory error."""
+
+    def test_no_con_files_in_dir(self, tmp_path):
+        """cmd_view on directory with no CON files exits."""
+        from ult3edit.combat import cmd_view
+        args = argparse.Namespace(
+            path=str(tmp_path), json=False, output=None, validate=False)
+        with pytest.raises(SystemExit):
+            cmd_view(args)
+
+
+class TestCombatValidateView:
+    """Test combat cmd_view with --validate flag."""
+
+    def test_view_file_with_validate(self, tmp_path, capsys):
+        from ult3edit.combat import cmd_view
+        path = os.path.join(str(tmp_path), 'CONA')
+        data = bytearray(192)
+        # Set overlapping PC positions to trigger a warning
+        data[0xA0] = 5  # pc0 x
+        data[0xA4] = 5  # pc0 y
+        data[0xA1] = 5  # pc1 x (same as pc0)
+        data[0xA5] = 5  # pc1 y (same as pc0)
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(path=path, json=False, output=None,
+                                  validate=True)
+        cmd_view(args)
+
+    def test_view_dir_json_with_validate(self, tmp_path, capsys):
+        from ult3edit.combat import cmd_view
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(bytearray(192))
+        args = argparse.Namespace(path=str(tmp_path), json=True, output=None,
+                                  validate=True)
+        cmd_view(args)
+        out = capsys.readouterr().out
+        result = json.loads(out)
+        assert 'CONA' in result
+        assert 'warnings' in result['CONA']
+
+
+class TestCombatEditValidate:
+    """Test combat cmd_edit with --validate flag."""
+
+    def test_edit_with_validate(self, tmp_path, capsys):
+        from ult3edit.combat import cmd_edit
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(bytearray(192))
+        args = argparse.Namespace(
+            file=path, tile=(0, 0, 4), monster_pos=None,
+            pc_pos=None, dry_run=True, backup=False,
+            output=None, validate=True)
+        cmd_edit(args)
+
+
+class TestCombatImportDescriptorBackcompat:
+    """Test combat cmd_import accepts old 'descriptor' key."""
+
+    def test_descriptor_key(self, tmp_path):
+        from ult3edit.combat import cmd_import
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(bytearray(192))
+        jdata = {
+            'tiles': [],
+            'monsters': [],
+            'pcs': [],
+            'descriptor': {'block1': [0xAA] * 7}
+        }
+        json_path = os.path.join(str(tmp_path), 'con.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(file=path, json_file=json_path,
+                                  dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[0x79] == 0xAA
+
+
+class TestCombatImportNonNumericMonsterKey:
+    """Test combat cmd_import warns on non-numeric dict monster keys."""
+
+    def test_non_numeric_monster_key(self, tmp_path, capsys):
+        from ult3edit.combat import cmd_import
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(bytearray(192))
+        jdata = {
+            'tiles': [],
+            'monsters': {'abc': {'x': 0, 'y': 0}, '0': {'x': 5, 'y': 5}},
+            'pcs': [],
+        }
+        json_path = os.path.join(str(tmp_path), 'con.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(file=path, json_file=json_path,
+                                  dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        err = capsys.readouterr().err
+        assert 'non-numeric' in err
+
+
+class TestCombatValidateZeroOverlap:
+    """Test that entities at (0,0) are excluded from overlap checks."""
+
+    def test_monster_pc_at_zero_no_overlap_warning(self):
+        """Monster and PC both at (0,0) produce no overlap warning."""
+        from ult3edit.combat import CombatMap, validate_combat_map
+        data = bytearray(192)
+        # Monster 0 at (0,0)
+        data[0x80] = 0  # monster_x[0]
+        data[0x88] = 0  # monster_y[0]
+        # PC 0 at (0,0)
+        data[0xA0] = 0  # pc_x[0]
+        data[0xA4] = 0  # pc_y[0]
+        cm = CombatMap(data)
+        warnings = validate_combat_map(cm)
+        # Current behavior: (0,0) is excluded from overlap checks
+        # so no overlap warning is produced even though they overlap
+        overlap_warnings = [w for w in warnings if 'overlap' in w.lower()]
+        assert len(overlap_warnings) == 0  # Documents the known gap
+
+
+# ============================================================================
+# Batch 12: Final gap coverage
+# ============================================================================
+
+
+class TestCombatImportDoubleWrite:
+    """Test combat cmd_import with both padding.pre_monster and descriptor.block1."""
+
+    def test_descriptor_overwrites_padding(self, tmp_path):
+        from ult3edit.combat import cmd_import
+        path = os.path.join(str(tmp_path), 'CONA')
+        with open(path, 'wb') as f:
+            f.write(bytearray(192))
+        # JSON with both keys — descriptor.block1 should win (last write)
+        jdata = {
+            'tiles': [], 'monsters': [], 'pcs': [],
+            'padding': {'pre_monster': [0x11] * 7},
+            'descriptor': {'block1': [0x22] * 7}
+        }
+        jpath = os.path.join(str(tmp_path), 'con.json')
+        with open(jpath, 'w') as f:
+            json.dump(jdata, f)
+        args = argparse.Namespace(file=path, json_file=jpath,
+                                  dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        # descriptor.block1 overwrites padding.pre_monster
+        assert result[0x79] == 0x22
+

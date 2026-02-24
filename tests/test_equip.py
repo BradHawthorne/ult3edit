@@ -1,5 +1,9 @@
 """Tests for equipment reference tool."""
 
+import argparse
+import json
+import os
+
 from ult3edit.constants import (
     WEAPONS, ARMORS, WEAPON_DAMAGE, WEAPON_PRICE, ARMOR_EVASION,
     CLASS_MAX_WEAPON, CLASS_MAX_ARMOR, CLASSES,
@@ -48,3 +52,47 @@ class TestClassRestrictions:
     def test_wizard_limited(self):
         assert CLASS_MAX_WEAPON['Wizard'] <= 2  # Dagger or less
         assert CLASS_MAX_ARMOR['Wizard'] <= 2  # Cloth or less
+
+
+# ── Migrated from test_new_features.py ──
+
+class TestEquipView:
+    """Test equip.py cmd_view."""
+
+    def test_view_text_output(self, capsys):
+        """cmd_view in text mode outputs weapon and armor tables."""
+        from ult3edit.equip import cmd_view
+        args = argparse.Namespace(json=False, output=None)
+        cmd_view(args)
+        captured = capsys.readouterr()
+        assert 'Weapons' in captured.out
+        assert 'Armor' in captured.out
+        assert 'Class Equipment Restrictions' in captured.out
+
+    def test_view_json_output(self, tmp_path):
+        """cmd_view in JSON mode produces valid structured data."""
+        from ult3edit.equip import cmd_view
+        out_path = os.path.join(str(tmp_path), 'equip.json')
+        args = argparse.Namespace(json=True, output=out_path)
+        cmd_view(args)
+        with open(out_path) as f:
+            data = json.load(f)
+        assert 'weapons' in data
+        assert 'armors' in data
+        assert 'class_restrictions' in data
+        assert len(data['weapons']) > 0
+        assert 'damage' in data['weapons'][0]
+
+    def test_dispatch_no_command(self, capsys):
+        """dispatch with no subcommand prints usage."""
+        from ult3edit.equip import dispatch
+        args = argparse.Namespace(equip_command=None)
+        dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Usage' in captured.err
+
+
+# =============================================================================
+# Spell reference (spell.py)
+# =============================================================================
+

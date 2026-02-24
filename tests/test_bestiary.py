@@ -4,11 +4,13 @@ import argparse
 import json
 import os
 
+import pytest
+
 from ult3edit.bestiary import (
     Monster, load_mon_file, save_mon_file, cmd_edit, cmd_import, validate_monster,
 )
 from ult3edit.constants import (
-    MON_MONSTERS_PER_FILE,
+    MON_FILE_SIZE, MON_MONSTERS_PER_FILE,
     MON_FLAG1_UNDEAD, MON_FLAG1_RANGED, MON_FLAG1_MAGIC_USER, MON_FLAG1_BOSS,
     MON_ABIL1_POISON, MON_ABIL1_TELEPORT, MON_ABIL2_RESISTANT,
 )
@@ -460,3 +462,666 @@ class TestValidateMonster:
         m = Monster(attrs, 0)
         warnings = validate_monster(m)
         assert any('ability1' in w for w in warnings)
+
+
+# ── Migrated from test_new_features.py ──
+
+class TestBestiaryImport:
+    def test_import_monster_data(self, tmp_dir, sample_mon_bytes):
+        path = os.path.join(tmp_dir, 'MONA')
+        with open(path, 'wb') as f:
+            f.write(sample_mon_bytes)
+
+        monsters = load_mon_file(path)
+
+        # Modify via JSON-style update
+        monsters[0].hp = 99
+        monsters[0].attack = 50
+        save_mon_file(path, monsters, sample_mon_bytes)
+
+        monsters2 = load_mon_file(path)
+        assert monsters2[0].hp == 99
+        assert monsters2[0].attack == 50
+
+    def test_import_dry_run(self, tmp_dir, sample_mon_bytes):
+        """Import with --dry-run should not write changes."""
+        import types
+        from ult3edit.bestiary import cmd_import as bestiary_import
+        path = os.path.join(tmp_dir, 'MONA')
+        with open(path, 'wb') as f:
+            f.write(sample_mon_bytes)
+        with open(path, 'rb') as f:
+            original = f.read()
+        mon_json = [{'index': 0, 'hp': 255, 'attack': 255}]
+        json_path = os.path.join(tmp_dir, 'monsters.json')
+        with open(json_path, 'w') as f:
+            json.dump(mon_json, f)
+        args = types.SimpleNamespace(
+            file=path, json_file=json_path,
+            output=None, backup=False, dry_run=True,
+        )
+        bestiary_import(args)
+        with open(path, 'rb') as f:
+            after = f.read()
+        assert original == after
+
+
+# =============================================================================
+# Map CLI editing
+# =============================================================================
+
+
+class TestBestiaryDictImport:
+    """Test that bestiary import accepts dict-of-dicts JSON format."""
+
+    def test_import_dict_format(self, tmp_path):
+        """Import bestiary from dict-keyed JSON (Voidborn source format)."""
+        mon_file = tmp_path / 'MONA'
+        mon_file.write_bytes(bytearray(MON_FILE_SIZE))
+        json_file = tmp_path / 'bestiary.json'
+        json_file.write_text(json.dumps({
+            "monsters": {
+                "0": {"hp": 60, "attack": 35, "defense": 25, "speed": 20},
+                "3": {"hp": 100, "attack": 50, "defense": 40, "speed": 30}
+            }
+        }))
+        # Run import via cmd_import
+        import argparse
+        from ult3edit.bestiary import cmd_import as bestiary_import
+        args = argparse.Namespace(
+            file=str(mon_file), json_file=str(json_file),
+            backup=False, dry_run=False, output=None)
+        bestiary_import(args)
+        monsters = load_mon_file(str(mon_file))
+        assert monsters[0].hp == 60
+        assert monsters[0].attack == 35
+        assert monsters[3].hp == 100
+        assert monsters[3].attack == 50
+        # Unmodified monster should be 0
+        assert monsters[1].hp == 0
+
+    def test_import_flag_shortcuts(self, tmp_path):
+        """Import bestiary with flag shortcuts (boss, poison, etc.)."""
+        mon_file = tmp_path / 'MONA'
+        mon_file.write_bytes(bytearray(MON_FILE_SIZE))
+        json_file = tmp_path / 'bestiary.json'
+        json_file.write_text(json.dumps({
+            "monsters": {
+                "0": {"hp": 80, "boss": True, "poison": True},
+                "1": {"hp": 50, "negate": True, "resistant": True}
+            }
+        }))
+        import argparse
+        from ult3edit.bestiary import cmd_import as bestiary_import
+        from ult3edit.constants import (
+            MON_FLAG1_BOSS, MON_ABIL1_POISON,
+            MON_ABIL1_NEGATE, MON_ABIL2_RESISTANT,
+        )
+        args = argparse.Namespace(
+            file=str(mon_file), json_file=str(json_file),
+            backup=False, dry_run=False, output=None)
+        bestiary_import(args)
+        monsters = load_mon_file(str(mon_file))
+        assert monsters[0].hp == 80
+        assert monsters[0].flags1 & MON_FLAG1_BOSS
+        assert monsters[0].ability1 & MON_ABIL1_POISON
+        assert monsters[1].ability1 & MON_ABIL1_NEGATE
+        assert monsters[1].ability2 & MON_ABIL2_RESISTANT
+
+    def test_import_list_format_still_works(self, tmp_path):
+        """Original list format import still works after dict support."""
+        mon_file = tmp_path / 'MONA'
+        mon_file.write_bytes(bytearray(MON_FILE_SIZE))
+        json_file = tmp_path / 'bestiary.json'
+        json_file.write_text(json.dumps([
+            {"index": 0, "hp": 77, "attack": 44}
+        ]))
+        import argparse
+        from ult3edit.bestiary import cmd_import as bestiary_import
+        args = argparse.Namespace(
+            file=str(mon_file), json_file=str(json_file),
+            backup=False, dry_run=False, output=None)
+        bestiary_import(args)
+        monsters = load_mon_file(str(mon_file))
+        assert monsters[0].hp == 77
+
+
+class TestBestiaryShortcutRawConflict:
+    """Verify shortcuts OR into raw attributes, not overwritten by them."""
+
+    def test_shortcut_applied_after_raw(self, tmp_path):
+        """Boss shortcut is preserved even when flags1 raw value is 0."""
+        from ult3edit.bestiary import (
+            load_mon_file, cmd_import,
+            MON_FLAG1_BOSS
+        )
+        # Create empty MON file
+        mon_data = bytearray(256)
+        mon_path = str(tmp_path / 'MONA')
+        with open(mon_path, 'wb') as f:
+            f.write(mon_data)
+
+        # JSON with both boss shortcut AND raw flags1=0
+        jdata = {
+            "monsters": {
+                "0": {"hp": 100, "attack": 50, "flags1": 0, "boss": True}
+            }
+        }
+        json_path = str(tmp_path / 'bestiary.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+
+        # Import
+        args = type('Args', (), {
+            'file': mon_path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': False
+        })()
+        cmd_import(args)
+
+        # Verify boss flag is set
+        monsters = load_mon_file(mon_path)
+        assert monsters[0].flags1 & MON_FLAG1_BOSS, \
+            "Boss flag should be set even when flags1 raw value is 0"
+
+    def test_shortcut_ors_into_existing_flags(self, tmp_path):
+        """Multiple shortcuts all accumulate."""
+        from ult3edit.bestiary import (
+            load_mon_file, cmd_import,
+            MON_FLAG1_BOSS, MON_ABIL1_POISON, MON_ABIL1_NEGATE
+        )
+        mon_data = bytearray(256)
+        mon_path = str(tmp_path / 'MONA')
+        with open(mon_path, 'wb') as f:
+            f.write(mon_data)
+
+        jdata = {
+            "monsters": {
+                "0": {"hp": 200, "boss": True, "poison": True, "negate": True}
+            }
+        }
+        json_path = str(tmp_path / 'bestiary.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+
+        args = type('Args', (), {
+            'file': mon_path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': False
+        })()
+        cmd_import(args)
+
+        monsters = load_mon_file(mon_path)
+        assert monsters[0].flags1 & MON_FLAG1_BOSS
+        assert monsters[0].ability1 & MON_ABIL1_POISON
+        assert monsters[0].ability1 & MON_ABIL1_NEGATE
+
+
+# =============================================================================
+# Non-numeric dict key handling
+# =============================================================================
+
+
+class TestBestiaryErrorPaths:
+    """Tests for bestiary cmd_edit error exits."""
+
+    def test_edit_no_monster_no_all(self, tmp_path):
+        """cmd_edit without --monster or --all exits."""
+        from ult3edit.bestiary import cmd_edit
+        mon = tmp_path / 'MONA'
+        mon.write_bytes(bytes(MON_FILE_SIZE))
+        args = argparse.Namespace(
+            file=str(mon), monster=None, all=False,
+            dry_run=False, backup=False, output=None,
+            validate=False, hp=None, tile=None, flags=None,
+            name=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_edit_monster_out_of_range(self, tmp_path):
+        """cmd_edit with monster index > 15 exits."""
+        from ult3edit.bestiary import cmd_edit
+        mon = tmp_path / 'MONA'
+        mon.write_bytes(bytes(MON_FILE_SIZE))
+        args = argparse.Namespace(
+            file=str(mon), monster=99, all=False,
+            dry_run=False, backup=False, output=None,
+            validate=False, hp=50, tile=None, flags=None,
+            name=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+
+class TestBestiaryColumnarRoundTrip:
+    """Verify MON columnar layout survives import/export correctly."""
+
+    def test_columnar_layout_preservation(self, tmp_path):
+        """Set attributes for all 16 monsters, verify column-major layout."""
+        data = bytearray(MON_FILE_SIZE)
+        for attr in range(10):
+            for monster in range(16):
+                data[attr * 16 + monster] = (attr * 16 + monster) & 0xFF
+
+        mon_file = tmp_path / 'MONA'
+        mon_file.write_bytes(bytes(data))
+
+        monsters = load_mon_file(str(mon_file))
+        # Verify each monster reads correct values from its column slot
+        for m in monsters:
+            idx = m.index
+            assert m.tile1 == (0 * 16 + idx) & 0xFF  # row 0
+            assert m.hp == (4 * 16 + idx) & 0xFF      # row 4
+
+        # Save with original_data to preserve rows 10-15
+        save_mon_file(str(mon_file), monsters, original_data=bytes(data))
+        result = mon_file.read_bytes()
+        assert result == bytes(data)
+
+    def test_unused_rows_preserved(self, tmp_path):
+        """Rows 10-15 (runtime workspace) survive save→reload with original_data."""
+        data = bytearray(MON_FILE_SIZE)
+        for row in range(10, 16):
+            for col in range(16):
+                data[row * 16 + col] = 0xAA
+        for row in range(10):
+            for col in range(16):
+                data[row * 16 + col] = row
+
+        mon_file = tmp_path / 'MONA'
+        mon_file.write_bytes(bytes(data))
+
+        monsters = load_mon_file(str(mon_file))
+        save_mon_file(str(mon_file), monsters, original_data=bytes(data))
+        result = mon_file.read_bytes()
+        for row in range(10, 16):
+            for col in range(16):
+                assert result[row * 16 + col] == 0xAA, \
+                    f"Row {row}, col {col} corrupted"
+
+
+class TestBestiaryCmdDump:
+    """Test bestiary.py cmd_dump hex display."""
+
+    def test_cmd_dump_runs(self, tmp_path, capsys):
+        """cmd_dump executes without error on a valid MON file."""
+        from ult3edit.bestiary import cmd_dump
+        data = bytearray(MON_FILE_SIZE)
+        # Set some recognizable data in first monster tile
+        data[0] = 0xAA
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(file=path)
+        cmd_dump(args)
+        captured = capsys.readouterr()
+        assert 'MON File Dump' in captured.out
+        assert 'Columnar' in captured.out
+        assert 'AA' in captured.out
+
+
+class TestBestiaryCmdImport:
+    """Test bestiary.py cmd_import."""
+
+    def test_import_list_format(self, tmp_path):
+        """Import from JSON list format."""
+        from ult3edit.bestiary import cmd_import as bestiary_import
+        data = bytearray(MON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'mons.json')
+        with open(json_path, 'w') as f:
+            json.dump([{'index': 0, 'hp': 50, 'attack': 10}], f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=False)
+        bestiary_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        # HP is row 4, monster 0 → offset 4*16+0 = 64
+        assert result[64] == 50
+
+    def test_import_dict_format(self, tmp_path):
+        """Import from dict-of-dicts format with numeric string keys."""
+        from ult3edit.bestiary import cmd_import as bestiary_import
+        data = bytearray(MON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'mons.json')
+        with open(json_path, 'w') as f:
+            json.dump({'monsters': {'0': {'hp': 75}}}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=False)
+        bestiary_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[64] == 75
+
+    def test_import_dry_run(self, tmp_path):
+        """Import with dry-run doesn't write."""
+        from ult3edit.bestiary import cmd_import as bestiary_import
+        data = bytearray(MON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'mons.json')
+        with open(json_path, 'w') as f:
+            json.dump([{'index': 0, 'hp': 99}], f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=True)
+        bestiary_import(args)
+        with open(path, 'rb') as f:
+            result = f.read()
+        assert result[64] == 0  # unchanged
+
+    def test_import_with_shortcuts(self, tmp_path):
+        """Import with flag shortcuts (boss, poison, etc.)."""
+        from ult3edit.bestiary import cmd_import as bestiary_import
+        from ult3edit.constants import MON_FLAG1_BOSS, MON_ABIL1_POISON
+        data = bytearray(MON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'mons.json')
+        with open(json_path, 'w') as f:
+            json.dump([{'index': 0, 'boss': True, 'poison': True}], f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path, output=None,
+            backup=False, dry_run=False)
+        bestiary_import(args)
+        from ult3edit.bestiary import load_mon_file
+        mons = load_mon_file(path)
+        assert mons[0].flags1 & MON_FLAG1_BOSS
+        assert mons[0].ability1 & MON_ABIL1_POISON
+
+
+# =============================================================================
+# Map cmd_overview and cmd_legend
+# =============================================================================
+
+
+class TestBestiaryValidate:
+    """Test bestiary.py validate_monster edge cases."""
+
+    def test_validate_empty_monster(self):
+        """Empty monster produces no warnings."""
+        from ult3edit.bestiary import Monster, validate_monster
+        attrs = [0] * 10  # tile1=0, hp=0 → is_empty
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert len(warnings) == 0
+
+    def test_validate_undefined_flag_bits(self):
+        """Undefined flag bits produce warning."""
+        from ult3edit.bestiary import Monster, validate_monster
+        # attrs: tile1, tile2, flags1, flags2, hp, atk, def, spd, abil1, abil2
+        attrs = [0x10, 0x10, 0x60, 0, 10, 5, 5, 5, 0, 0]
+        # flags1=0x60: bits 5,6 set → undefined (defined = 0x04|0x08|0x0C|0x80)
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert any('flag1' in w.lower() or 'undefined' in w.lower()
+                    for w in warnings)
+
+    def test_validate_undefined_ability_bits(self):
+        """Undefined ability bits produce warning."""
+        from ult3edit.bestiary import Monster, validate_monster
+        attrs = [0x10, 0x10, 0, 0, 10, 5, 5, 5, 0x10, 0]
+        # ability1=0x10: bit 4 — not in defined set (0x01|0x02|0x04|0x40|0x80)
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert any('ability1' in w.lower() or 'undefined' in w.lower()
+                    for w in warnings)
+
+
+# =============================================================================
+# Map cmd_view JSON mode
+# =============================================================================
+
+
+class TestBestiaryCmdViewJson:
+    """Test bestiary cmd_view JSON export."""
+
+    def test_view_json_output(self, tmp_path):
+        """cmd_view JSON mode exports monster data."""
+        from ult3edit.bestiary import cmd_view as bestiary_view
+        # Create a MON file with one non-empty monster
+        data = bytearray(MON_FILE_SIZE)
+        data[0] = 0x10  # tile1 for monster 0
+        data[4 * 16] = 20  # HP for monster 0
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        out_path = os.path.join(str(tmp_path), 'bestiary.json')
+        args = argparse.Namespace(
+            game_dir=str(tmp_path), json=True, output=out_path,
+            validate=False, file=None)
+        bestiary_view(args)
+        with open(out_path) as f:
+            jdata = json.load(f)
+        assert 'MONA' in jdata
+        assert len(jdata['MONA']['monsters']) >= 1
+
+    def test_view_no_files_exits(self, tmp_path):
+        """cmd_view with no MON files exits."""
+        from ult3edit.bestiary import cmd_view as bestiary_view
+        args = argparse.Namespace(
+            game_dir=str(tmp_path), json=False, output=None,
+            validate=False, file=None)
+        with pytest.raises(SystemExit):
+            bestiary_view(args)
+
+
+# =============================================================================
+# Roster cmd_edit --all mode
+# =============================================================================
+
+
+class TestBestiaryCmdEditGaps:
+    """Test bestiary cmd_edit gaps."""
+
+    def test_edit_no_monster_no_all(self, tmp_path):
+        """cmd_edit exits if neither --monster nor --all given."""
+        from ult3edit.bestiary import cmd_edit
+        data = bytearray(MON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, monster=None, all=False,
+            dry_run=False, backup=False, output=None, validate=False,
+            tile1=None, tile2=None, hp=None, attack=None, defense=None,
+            speed=None, flags1=None, flags2=None, ability1=None, ability2=None,
+            boss=None, undead=None, ranged=None, divide=None, poison=None,
+            sleep=None, negate=None, teleport=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_edit_monster_out_of_range(self, tmp_path):
+        """cmd_edit exits if monster index >= 16."""
+        from ult3edit.bestiary import cmd_edit
+        data = bytearray(MON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, monster=20, all=False,
+            dry_run=False, backup=False, output=None, validate=False,
+            tile1=None, tile2=None, hp=None, attack=None, defense=None,
+            speed=None, flags1=None, flags2=None, ability1=None, ability2=None,
+            boss=None, undead=None, ranged=None, divide=None, poison=None,
+            sleep=None, negate=None, teleport=None)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+
+    def test_edit_no_modifications(self, tmp_path, capsys):
+        """cmd_edit with no edit flags prints 'No modifications specified'."""
+        from ult3edit.bestiary import cmd_edit
+        data = bytearray(MON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, monster=0, all=False,
+            dry_run=False, backup=False, output=None, validate=False,
+            tile1=None, tile2=None, hp=None, attack=None, defense=None,
+            speed=None, flags1=None, flags2=None, ability1=None, ability2=None,
+            boss=None, undead=None, ranged=None, divide=None, poison=None,
+            sleep=None, negate=None, teleport=None)
+        cmd_edit(args)
+        captured = capsys.readouterr()
+        assert 'No modifications' in captured.out
+
+    def test_import_non_numeric_key_warning(self, tmp_path, capsys):
+        """Import with non-numeric dict key prints warning."""
+        from ult3edit.bestiary import cmd_import
+        data = bytearray(MON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({'monsters': {'abc': {'hp': 50}, '0': {'hp': 100}}}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        captured = capsys.readouterr()
+        assert 'non-numeric' in captured.err
+
+    def test_import_monster_out_of_range_skipped(self, tmp_path):
+        """Import with monster index >= 16 silently skips."""
+        from ult3edit.bestiary import cmd_import
+        data = bytearray(MON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump([{'index': 99, 'hp': 50}], f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            dry_run=False, backup=False, output=None)
+        cmd_import(args)  # Should not crash
+
+    def test_load_mon_file_too_small(self, tmp_path):
+        """load_mon_file returns empty list for undersized file."""
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(b'\x00' * 10)  # Much less than 160 bytes
+        monsters = load_mon_file(path)
+        assert monsters == []
+
+
+class TestBestiaryCmdViewGaps:
+    """Test bestiary cmd_view directory error."""
+
+    def test_no_mon_files_in_dir(self, tmp_path):
+        """cmd_view on directory with no MON files exits."""
+        from ult3edit.bestiary import cmd_view
+        args = argparse.Namespace(
+            game_dir=str(tmp_path), json=False, output=None,
+            validate=False, file=None)
+        with pytest.raises(SystemExit):
+            cmd_view(args)
+
+
+class TestBestiaryAbility2Validation:
+    """Test validate_monster catches undefined ability2 bits."""
+
+    def test_valid_resistant_no_warning(self):
+        """Resistant (0xC0) is a defined bit — no warning."""
+        from ult3edit.bestiary import Monster, validate_monster
+        from ult3edit.constants import MON_ABIL2_RESISTANT
+        attrs = [0x80, 0x80, 0, 0, 10, 5, 3, 4, 0, MON_ABIL2_RESISTANT]
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert not any('ability2' in w for w in warnings)
+
+    def test_undefined_ability2_bits_warned(self):
+        """Bits outside 0xC0 produce a warning."""
+        from ult3edit.bestiary import Monster, validate_monster
+        attrs = [0x80, 0x80, 0, 0, 10, 5, 3, 4, 0, 0x01]
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert any('ability2' in w.lower() for w in warnings)
+
+    def test_mixed_ability2_bits(self):
+        """Resistant + undefined bits still warns about the undefined ones."""
+        from ult3edit.bestiary import Monster, validate_monster
+        attrs = [0x80, 0x80, 0, 0, 10, 5, 3, 4, 0, 0xC1]
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert any('$01' in w for w in warnings)
+
+    def test_ability2_zero_no_warning(self):
+        """ability2=0 is valid — no warning."""
+        from ult3edit.bestiary import Monster, validate_monster
+        attrs = [0x80, 0x80, 0, 0, 10, 5, 3, 4, 0, 0]
+        m = Monster(attrs, 0)
+        warnings = validate_monster(m)
+        assert not any('ability2' in w for w in warnings)
+
+
+class TestValidateMonsterEmpty:
+    """Test validate_monster returns empty for empty monster."""
+
+    def test_empty_monster_no_warnings(self):
+        from ult3edit.bestiary import Monster, validate_monster
+        attrs = [0] * 10
+        m = Monster(attrs, 0)
+        assert validate_monster(m) == []
+
+
+class TestFlagDescMagicUserPrecedence:
+    """Test that Monster.flag_desc correctly identifies Magic User type.
+
+    Bug: `f1 & 0x0C == MON_FLAG1_MAGIC_USER` was parsed as `f1 & True`
+    due to operator precedence. Fixed to `(f1 & 0x0C) == MON_FLAG1_MAGIC_USER`.
+    """
+
+    def test_magic_user_detected(self):
+        """flags1=0x0C (bits 2+3 set) should show Magic User."""
+        from ult3edit.bestiary import Monster
+        attrs = [0x80, 0x80, 0x0C, 0, 10, 5, 3, 4, 0, 0]
+        m = Monster(attrs, 0)
+        assert 'Magic User' in m.flag_desc
+
+    def test_undead_not_magic_user(self):
+        """flags1=0x04 (only bit 2) should show Undead, not Magic User."""
+        from ult3edit.bestiary import Monster
+        attrs = [0x80, 0x80, 0x04, 0, 10, 5, 3, 4, 0, 0]
+        m = Monster(attrs, 0)
+        assert 'Undead' in m.flag_desc
+        assert 'Magic User' not in m.flag_desc
+
+    def test_ranged_not_magic_user(self):
+        """flags1=0x08 (only bit 3) should show Ranged, not Magic User."""
+        from ult3edit.bestiary import Monster
+        attrs = [0x80, 0x80, 0x08, 0, 10, 5, 3, 4, 0, 0]
+        m = Monster(attrs, 0)
+        assert 'Ranged' in m.flag_desc
+        assert 'Magic User' not in m.flag_desc
+
+    def test_boss_magic_user(self):
+        """flags1=0x8C (boss + magic user) shows both."""
+        from ult3edit.bestiary import Monster
+        attrs = [0x80, 0x80, 0x8C, 0, 10, 5, 3, 4, 0, 0]
+        m = Monster(attrs, 0)
+        assert 'Magic User' in m.flag_desc
+        assert 'Boss' in m.flag_desc
+
+    def test_bit0_set_not_magic_user(self):
+        """flags1=0x01 (undefined bit 0) should NOT trigger Magic User."""
+        from ult3edit.bestiary import Monster
+        attrs = [0x80, 0x80, 0x01, 0, 10, 5, 3, 4, 0, 0]
+        m = Monster(attrs, 0)
+        assert 'Magic User' not in m.flag_desc
+
+    def test_no_flags(self):
+        """flags1=0x00 should show '-' (no flags)."""
+        from ult3edit.bestiary import Monster
+        attrs = [0x80, 0x80, 0x00, 0, 10, 5, 3, 4, 0, 0]
+        m = Monster(attrs, 0)
+        assert m.flag_desc == '-'
+

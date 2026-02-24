@@ -1,6 +1,7 @@
 """Tests for disk module (diskiigs integration + native ProDOS builder)."""
 
 import argparse
+import json
 import os
 import pytest
 from unittest.mock import patch, MagicMock
@@ -349,3 +350,338 @@ class TestBuildCLI:
                                   '--boot-from', 'vanilla.po'])
         assert args.vol_name == 'VOIDBORN'
         assert args.boot_from == 'vanilla.po'
+
+
+# ── Migrated from test_new_features.py ──
+
+class TestDiskAudit:
+    def test_audit_output_format(self):
+        """Verify the audit function imports cleanly."""
+        from ult3edit.disk import cmd_audit
+        # Just verify it's callable
+        assert callable(cmd_audit)
+
+
+# =============================================================================
+# CLI parity tests — main() matches register_parser()
+# =============================================================================
+
+
+
+class TestDiskContextParseHash:
+    """Test DiskContext._parse_hash_suffix."""
+
+    def test_with_hash_suffix(self):
+        from ult3edit.disk import DiskContext
+        name, ft, at = DiskContext._parse_hash_suffix('ROST#069500')
+        assert name == 'ROST'
+        assert ft == 0x06
+        assert at == 0x9500
+
+    def test_without_hash(self):
+        from ult3edit.disk import DiskContext
+        name, ft, at = DiskContext._parse_hash_suffix('ROST')
+        assert name == 'ROST'
+        assert ft == 0x06
+        assert at == 0x0000
+
+    def test_short_suffix(self):
+        from ult3edit.disk import DiskContext
+        name, ft, at = DiskContext._parse_hash_suffix('FOO#AB')
+        assert name == 'FOO'
+        assert ft == 0x06  # fallback
+        assert at == 0x0000
+
+    def test_all_zeros(self):
+        from ult3edit.disk import DiskContext
+        name, ft, at = DiskContext._parse_hash_suffix('MAP#000000')
+        assert name == 'MAP'
+        assert ft == 0x00
+        assert at == 0x0000
+
+
+class TestDiskContextLeakGuard:
+    """Tests for DiskContext temp directory cleanup on __enter__ failure."""
+
+    def test_enter_failure_cleans_tmpdir(self, tmp_path):
+        """DiskContext cleans up temp dir when disk extraction raises."""
+        from ult3edit.disk import DiskContext
+        # Use a non-existent image path and non-existent tool
+        fake_image = str(tmp_path / 'nonexistent.po')
+        ctx = DiskContext(fake_image, diskiigs_path='/nonexistent/tool')
+        with pytest.raises(Exception):
+            ctx.__enter__()
+        # After failure, _tmpdir should be cleaned up (set to None)
+        assert ctx._tmpdir is None
+
+
+class TestDiskContextReadWrite:
+    """Test DiskContext cache, modified, and _parse_hash_suffix edge cases."""
+
+    def test_parse_hash_suffix_valid(self):
+        from ult3edit.disk import DiskContext
+        base, ft, at = DiskContext._parse_hash_suffix('ROST#069500')
+        assert base == 'ROST'
+        assert ft == 0x06
+        assert at == 0x9500
+
+    def test_parse_hash_suffix_no_hash(self):
+        from ult3edit.disk import DiskContext
+        base, ft, at = DiskContext._parse_hash_suffix('ROST')
+        assert base == 'ROST'
+        assert ft == 0x06
+        assert at == 0x0000
+
+    def test_parse_hash_suffix_short(self):
+        from ult3edit.disk import DiskContext
+        base, ft, at = DiskContext._parse_hash_suffix('FOO#06')
+        assert base == 'FOO'
+        assert ft == 0x06
+        assert at == 0x0000
+
+    def test_parse_hash_suffix_invalid_hex(self):
+        """Non-hex characters in suffix with len >= 6 fall back to defaults."""
+        from ult3edit.disk import DiskContext
+        base, ft, at = DiskContext._parse_hash_suffix('FOO#GGGG00')
+        assert base == 'FOO'
+        assert ft == 0x06
+        assert at == 0x0000
+
+    def test_write_stages_data(self):
+        """DiskContext.write() stages data in _modified dict."""
+        from ult3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        ctx.write('ROST', b'\x00' * 10)
+        assert 'ROST' in ctx._modified
+        assert ctx._modified['ROST'] == b'\x00' * 10
+
+    def test_read_returns_modified_data(self):
+        """read() returns staged modified data over cache."""
+        from ult3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        ctx._cache['ROST'] = b'\x01' * 10
+        ctx.write('ROST', b'\x02' * 10)
+        assert ctx.read('ROST') == b'\x02' * 10
+
+    def test_read_returns_cached_data(self):
+        """read() returns cached data when not modified."""
+        from ult3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        ctx._cache['ROST'] = b'\x03' * 10
+        assert ctx.read('ROST') == b'\x03' * 10
+
+    def test_read_returns_none_no_tmpdir(self):
+        """read() returns None when _tmpdir is None and no cache."""
+        from ult3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        assert ctx.read('MISSING') is None
+
+    def test_read_from_tmpdir(self, tmp_path):
+        """read() scans _tmpdir files and populates cache + file_types."""
+        from ult3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        ctx._tmpdir = str(tmp_path)
+        # Create a file with hash suffix in tmpdir
+        rost_path = os.path.join(str(tmp_path), 'ROST#069500')
+        with open(rost_path, 'wb') as f:
+            f.write(b'\xAB' * 20)
+        result = ctx.read('ROST')
+        assert result == b'\xAB' * 20
+        assert 'ROST' in ctx._cache
+        assert ctx._file_types['ROST'] == (0x06, 0x9500)
+
+    def test_read_case_insensitive(self, tmp_path):
+        """read() matches filenames case-insensitively."""
+        from ult3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        ctx._tmpdir = str(tmp_path)
+        fpath = os.path.join(str(tmp_path), 'rost#060000')
+        with open(fpath, 'wb') as f:
+            f.write(b'\xCD' * 5)
+        result = ctx.read('ROST')
+        assert result == b'\xCD' * 5
+
+
+class TestDiskContextExit:
+    """Test DiskContext.__exit__ writeback and cleanup behavior."""
+
+    def test_exit_cleans_tmpdir(self, tmp_path):
+        """__exit__ removes the tmpdir."""
+        from ult3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        tmpdir = os.path.join(str(tmp_path), 'ult3edit_test')
+        os.makedirs(tmpdir)
+        ctx._tmpdir = tmpdir
+        ctx.__exit__(None, None, None)
+        assert not os.path.exists(tmpdir)
+
+    def test_exit_returns_false(self):
+        """__exit__ returns False (does not suppress exceptions)."""
+        from ult3edit.disk import DiskContext
+        ctx = DiskContext('fake.po')
+        ctx._tmpdir = None
+        result = ctx.__exit__(None, None, None)
+        assert result is False
+
+
+class TestDiskAuditLogic:
+    """Test cmd_audit logic with mocked disk_info/disk_list."""
+
+    def test_audit_text_output(self, monkeypatch, capsys):
+        from ult3edit import disk
+        monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
+            'blocks': '280',
+            'volume': 'TEST',
+        })
+        monkeypatch.setattr(disk, 'disk_list', lambda image, **kw: [
+            {'name': 'ROST', 'type': 'BIN', 'size': '1280'},
+            {'name': 'MAPA', 'type': 'BIN', 'size': '4096'},
+        ])
+        args = argparse.Namespace(
+            image='test.po', json=False, output=None, detail=False)
+        disk.cmd_audit(args)
+        out = capsys.readouterr().out
+        assert 'Disk Audit' in out
+        assert '280' in out  # total blocks shown
+
+    def test_audit_json_output(self, monkeypatch, capsys):
+        from ult3edit import disk
+        monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
+            'blocks': '280',
+        })
+        monkeypatch.setattr(disk, 'disk_list', lambda image, **kw: [
+            {'name': 'ROST', 'type': 'BIN', 'size': '1280'},
+        ])
+        args = argparse.Namespace(
+            image='test.po', json=True, output=None, detail=False)
+        disk.cmd_audit(args)
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert data['total_blocks'] == 280
+        assert data['used_blocks'] == 3  # ceil(1280/512) = 3
+        assert data['free_blocks'] == 277
+        assert 'capacity_estimates' in data
+
+    def test_audit_detail_flag(self, monkeypatch, capsys):
+        from ult3edit import disk
+        monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
+            'blocks': '100',
+        })
+        monkeypatch.setattr(disk, 'disk_list', lambda image, **kw: [
+            {'name': 'TEST', 'type': 'BIN', 'size': '256'},
+        ])
+        args = argparse.Namespace(
+            image='test.po', json=False, output=None, detail=True)
+        disk.cmd_audit(args)
+        out = capsys.readouterr().out
+        assert 'TEST' in out
+        assert 'BIN' in out
+
+    def test_audit_error(self, monkeypatch, capsys):
+        from ult3edit import disk
+        monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
+            'error': 'bad image',
+        })
+        monkeypatch.setattr(disk, 'disk_list', lambda image, **kw: [])
+        args = argparse.Namespace(
+            image='test.po', json=False, output=None, detail=False)
+        with pytest.raises(SystemExit):
+            disk.cmd_audit(args)
+
+
+class TestDiskCmdHandlers:
+    """Test disk CLI handler functions."""
+
+    def test_cmd_info_error(self, monkeypatch, capsys):
+        from ult3edit import disk
+        monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
+            'error': 'not found',
+        })
+        args = argparse.Namespace(image='bad.po', json=False, output=None)
+        with pytest.raises(SystemExit):
+            disk.cmd_info(args)
+
+    def test_cmd_info_text(self, monkeypatch, capsys):
+        from ult3edit import disk
+        monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
+            'volume': 'GAME',
+            'format': 'ProDOS',
+        })
+        args = argparse.Namespace(image='game.po', json=False, output=None)
+        disk.cmd_info(args)
+        out = capsys.readouterr().out
+        assert 'GAME' in out
+        assert 'ProDOS' in out
+
+    def test_cmd_info_json(self, monkeypatch, capsys):
+        from ult3edit import disk
+        monkeypatch.setattr(disk, 'disk_info', lambda image, **kw: {
+            'volume': 'GAME',
+        })
+        args = argparse.Namespace(image='game.po', json=True, output=None)
+        disk.cmd_info(args)
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert data['volume'] == 'GAME'
+
+    def test_cmd_list_empty(self, monkeypatch, capsys):
+        from ult3edit import disk
+        monkeypatch.setattr(disk, 'disk_list', lambda image, path, **kw: [])
+        args = argparse.Namespace(image='empty.po', path='/', json=False, output=None)
+        with pytest.raises(SystemExit):
+            disk.cmd_list(args)
+
+    def test_cmd_list_text(self, monkeypatch, capsys):
+        from ult3edit import disk
+        monkeypatch.setattr(disk, 'disk_list', lambda image, path, **kw: [
+            {'name': 'ROST', 'type': 'BIN', 'size': '1280'},
+        ])
+        args = argparse.Namespace(image='game.po', path='/', json=False, output=None)
+        disk.cmd_list(args)
+        out = capsys.readouterr().out
+        assert 'ROST' in out
+        assert '1 files' in out
+
+    def test_cmd_list_json(self, monkeypatch, capsys):
+        from ult3edit import disk
+        monkeypatch.setattr(disk, 'disk_list', lambda image, path, **kw: [
+            {'name': 'ROST', 'type': 'BIN', 'size': '1280'},
+        ])
+        args = argparse.Namespace(image='game.po', path='/', json=True, output=None)
+        disk.cmd_list(args)
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert len(data) == 1
+        assert data[0]['name'] == 'ROST'
+
+    def test_cmd_extract_success(self, monkeypatch, capsys, tmp_path):
+        from ult3edit import disk
+        monkeypatch.setattr(disk, 'disk_extract_all', lambda *a, **kw: True)
+        args = argparse.Namespace(image='game.po', output=str(tmp_path))
+        disk.cmd_extract(args)
+        out = capsys.readouterr().out
+        assert 'Extracted' in out
+
+    def test_cmd_extract_failure(self, monkeypatch, capsys):
+        from ult3edit import disk
+        monkeypatch.setattr(disk, 'disk_extract_all', lambda *a, **kw: False)
+        args = argparse.Namespace(image='bad.po', output=None)
+        with pytest.raises(SystemExit):
+            disk.cmd_extract(args)
+
+
+class TestDiskDispatchFallback:
+    """disk dispatch with unknown command prints usage."""
+
+    def test_dispatch_unknown(self, capsys):
+        from ult3edit.disk import dispatch
+        args = argparse.Namespace(disk_command='unknown')
+        dispatch(args)
+        err = capsys.readouterr().err
+        assert 'Usage' in err
+
+
+# =============================================================================
+# Batch 14: Grade-A upgrade tests
+# =============================================================================
+
