@@ -8,11 +8,20 @@ FormEditorTab: scrollable list of records with field-level editing.
 class FormField:
     """A single editable field in a form."""
 
-    def __init__(self, label, getter, setter, fmt='str'):
+    def __init__(self, label, getter, setter, validator=None, fmt='str'):
         self.label = label
         self.getter = getter   # callable() -> display value
         self.setter = setter   # callable(new_value_str) -> None
+        self.validator = validator # callable(value_str) -> bool
         self.fmt = fmt         # 'str', 'int'
+
+    def is_valid(self):
+        if self.validator:
+            try:
+                return self.validator(str(self.getter()))
+            except Exception: # pragma: no cover
+                return False # pragma: no cover
+        return True
 
 
 class FormEditorTab:
@@ -55,6 +64,10 @@ class FormEditorTab:
         self.editing_fields = False  # False = record list, True = field list
         self.dirty = False
         self._current_fields = []
+        self.undo_stack = []
+        self.redo_stack = []
+        self._revision = 0
+        self._saved_revision = 0
 
     @property
     def name(self):
@@ -67,13 +80,27 @@ class FormEditorTab:
     def save(self):
         if self.save_callback and self.get_save_data:
             self.save_callback(self.get_save_data())
+            self._saved_revision = self._revision
             self.dirty = False
+
+    def _sync_dirty(self):
+        self.dirty = self._revision != self._saved_revision
+
+    @staticmethod
+    def _validate_input(field: FormField, value: str) -> bool:
+        """Validate candidate user input before applying a setter."""
+        if not field.validator:
+            return True
+        try:
+            return bool(field.validator(value))
+        except Exception:
+            return False
 
     def build_ui(self):  # pragma: no cover
         from prompt_toolkit.layout import HSplit, Window, FormattedTextControl
         from prompt_toolkit.layout.controls import UIControl, UIContent
         from prompt_toolkit.key_binding import KeyBindings
-        from prompt_toolkit.shortcuts import input_dialog
+        from prompt_toolkit.shortcuts import input_dialog, message_dialog
 
         tab = self
 
@@ -100,12 +127,17 @@ class FormEditorTab:
                                    ' ' + '─' * (width - 2) + ' ')])
                     for i, field in enumerate(tab._current_fields):
                         val = field.getter()
+                        valid = field.is_valid()
                         label = f' {field.label:<16s}: {val}'
                         if i == tab.selected_field:
                             style = 'class:palette-selected'
+                            if not valid:
+                                style = 'bg:ansired ansiwhite bold'
                             marker = ' <'
                         else:
                             style = 'class:palette-normal'
+                            if not valid:
+                                style = 'ansired'
                             marker = ''
                         lines.append([(style,
                                        f'{label}{marker}'.ljust(width))])
@@ -138,10 +170,14 @@ class FormEditorTab:
                     ('class:help-key', ' Up/Down'), ('class:help-text', '=navigate '),
                     ('class:help-key', 'Enter'), ('class:help-text', '=edit field '),
                     ('class:help-key', 'Escape'), ('class:help-text', '=back '),
+                    ('class:help-key', 'Ctrl+Z'), ('class:help-text', '=undo '),
+                    ('class:help-key', 'Ctrl+Y'), ('class:help-text', '=redo '),
                 ]
             return [
                 ('class:help-key', ' Up/Down'), ('class:help-text', '=navigate '),
                 ('class:help-key', 'Enter'), ('class:help-text', '=edit '),
+                ('class:help-key', 'Ctrl+Z'), ('class:help-text', '=undo '),
+                ('class:help-key', 'Ctrl+Y'), ('class:help-text', '=redo '),
             ]
 
         root = HSplit([
@@ -196,16 +232,60 @@ class FormEditorTab:
                     default=current_val,
                 ).run()
                 if result is not None and result != current_val:
+                    if not tab._validate_input(field, result):
+                        message_dialog(
+                            title='Invalid Value',
+                            text=f"'{result}' is not valid for field {field.label}.",
+                        ).run()
+                        return
                     try:
                         field.setter(result)
-                        tab.dirty = True
+                        new_val = str(field.getter())
+                        if new_val != current_val:
+                            tab._revision += 1
+                            tab._sync_dirty()
+                            tab.undo_stack.append(
+                                (tab.selected_record, tab.selected_field, current_val, new_val),
+                            )
+                            tab.redo_stack.clear()
                     except (ValueError, TypeError):
-                        pass  # Invalid input, ignore
+                        message_dialog(
+                            title='Invalid Value',
+                            text=f"'{result}' could not be applied to {field.label}.",
+                        ).run()
 
         @kb.add('escape')
         def _back(event):
             if tab.editing_fields:
                 tab.editing_fields = False
                 tab._current_fields = []
+
+        @kb.add('c-z')
+        def _undo(event):
+            if tab.undo_stack:
+                rec_idx, f_idx, old_val, new_val = tab.undo_stack.pop()
+                rec = tab.records[rec_idx]
+                fields = tab.field_factory(rec)
+                try:
+                    fields[f_idx].setter(old_val)
+                except (ValueError, TypeError):
+                    return
+                tab.redo_stack.append((rec_idx, f_idx, old_val, new_val))
+                tab._revision = max(0, tab._revision - 1)
+                tab._sync_dirty()
+
+        @kb.add('c-y')
+        def _redo(event):
+            if tab.redo_stack:
+                rec_idx, f_idx, old_val, new_val = tab.redo_stack.pop()
+                rec = tab.records[rec_idx]
+                fields = tab.field_factory(rec)
+                try:
+                    fields[f_idx].setter(new_val)
+                except (ValueError, TypeError):
+                    return
+                tab.undo_stack.append((rec_idx, f_idx, old_val, new_val))
+                tab._revision += 1
+                tab._sync_dirty()
 
         return root, kb

@@ -12,7 +12,8 @@ from ult3edit.bestiary import (
 from ult3edit.constants import (
     MON_FILE_SIZE, MON_MONSTERS_PER_FILE,
     MON_FLAG1_UNDEAD, MON_FLAG1_RANGED, MON_FLAG1_MAGIC_USER, MON_FLAG1_BOSS,
-    MON_ABIL1_POISON, MON_ABIL1_TELEPORT, MON_ABIL2_RESISTANT,
+    MON_ABIL1_POISON, MON_ABIL1_SLEEP, MON_ABIL1_NEGATE, MON_ABIL1_TELEPORT,
+    MON_ABIL1_DIVIDE, MON_ABIL2_RESISTANT,
 )
 
 
@@ -553,10 +554,6 @@ class TestBestiaryDictImport:
         }))
         import argparse
         from ult3edit.bestiary import cmd_import as bestiary_import
-        from ult3edit.constants import (
-            MON_FLAG1_BOSS, MON_ABIL1_POISON,
-            MON_ABIL1_NEGATE, MON_ABIL2_RESISTANT,
-        )
         args = argparse.Namespace(
             file=str(mon_file), json_file=str(json_file),
             backup=False, dry_run=False, output=None)
@@ -625,10 +622,7 @@ class TestBestiaryShortcutRawConflict:
 
     def test_shortcut_ors_into_existing_flags(self, tmp_path):
         """Multiple shortcuts all accumulate."""
-        from ult3edit.bestiary import (
-            load_mon_file, cmd_import,
-            MON_FLAG1_BOSS, MON_ABIL1_POISON, MON_ABIL1_NEGATE
-        )
+        from ult3edit.bestiary import load_mon_file, cmd_import
         mon_data = bytearray(256)
         mon_path = str(tmp_path / 'MONA')
         with open(mon_path, 'wb') as f:
@@ -1258,7 +1252,6 @@ class TestMonsterAbilityDesc:
         assert 'Sleep' in m.ability_desc
 
     def test_ability_negate(self):
-        from ult3edit.constants import MON_ABIL1_NEGATE
         attrs = [0x48, 0x48, 0, 0, 50, 30, 20, 10, MON_ABIL1_NEGATE, 0]
         m = Monster(attrs, 0)
         assert 'Negate' in m.ability_desc
@@ -1401,7 +1394,6 @@ class TestCmdEditNamedFlags:
         args = _edit_args(file=sample_mon_file, monster=0, output=out, negate=True)
         cmd_edit(args)
         monsters = load_mon_file(out)
-        from ult3edit.constants import MON_ABIL1_NEGATE
         assert monsters[0].ability1 & MON_ABIL1_NEGATE
 
     def test_edit_clear_negate(self, sample_mon_file, tmp_dir):
@@ -1411,7 +1403,6 @@ class TestCmdEditNamedFlags:
         args2 = _edit_args(file=out, monster=0, output=out, no_negate=True)
         cmd_edit(args2)
         monsters = load_mon_file(out)
-        from ult3edit.constants import MON_ABIL1_NEGATE
         assert not (monsters[0].ability1 & MON_ABIL1_NEGATE)
 
     def test_edit_divide(self, sample_mon_file, tmp_dir):
@@ -1545,8 +1536,6 @@ class TestCmdImportFlagShortcuts:
             output=out, backup=False, dry_run=False)
         cmd_import(args)
         monsters = load_mon_file(out)
-        from ult3edit.constants import (MON_ABIL1_SLEEP, MON_ABIL1_NEGATE,
-                                         MON_ABIL1_DIVIDE)
         assert monsters[0].ability1 & MON_ABIL1_POISON
         assert monsters[0].ability1 & MON_ABIL1_SLEEP
         assert monsters[0].ability1 & MON_ABIL1_NEGATE
@@ -1601,12 +1590,17 @@ class TestCmdImportFlagShortcuts:
         json_path = os.path.join(tmp_dir, 'monsters.json')
         with open(json_path, 'w') as f:
             json.dump([{'index': 0, 'hp': 99}], f)
+        with open(sample_mon_file, 'rb') as f:
+            before = f.read()
         args = argparse.Namespace(
             file=sample_mon_file, json_file=json_path,
             output=None, backup=False, dry_run=True)
         cmd_import(args)
         out = capsys.readouterr().out
         assert 'Dry run' in out
+        with open(sample_mon_file, 'rb') as f:
+            after = f.read()
+        assert after == before
 
 
 class TestBestiaryDispatch:
@@ -1692,5 +1686,169 @@ class TestBestiaryMain:
         monkeypatch.setattr('sys.argv', ['ult3-bestiary'])
         main()
         captured = capsys.readouterr()
-        assert 'Usage' in captured.err or captured.out == '' or True
+        assert 'Usage' in captured.err
 
+
+class TestImportClearsFlagsOnFalse:
+    """cmd_import clears flag/ability bits when JSON value is false."""
+
+    def _make_mon_with_flags(self, tmp_path, flags1=0, ability1=0, ability2=0):
+        """Create a MON file with monster 0 having specified flags."""
+        mon = bytearray(MON_FILE_SIZE)
+        # Columnar layout: attribute_row * 16 + monster_index
+        # Row 2 = flags1, Row 8 = ability1, Row 9 = ability2
+        mon[2 * 16 + 0] = flags1
+        mon[8 * 16 + 0] = ability1
+        mon[9 * 16 + 0] = ability2
+        path = str(tmp_path / 'MON')
+        with open(path, 'wb') as f:
+            f.write(mon)
+        return path
+
+    def test_clear_poison(self, tmp_path):
+        """poison: false clears the poison bit."""
+        path = self._make_mon_with_flags(tmp_path, ability1=MON_ABIL1_POISON)
+        json_path = str(tmp_path / 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({"monsters": {"0": {"poison": False}}}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            output=None, backup=False, dry_run=False)
+        cmd_import(args)
+        monsters = load_mon_file(path)
+        assert monsters[0].ability1 & MON_ABIL1_POISON == 0
+
+    def test_clear_boss(self, tmp_path):
+        """boss: false clears the boss bit."""
+        path = self._make_mon_with_flags(tmp_path, flags1=MON_FLAG1_BOSS)
+        json_path = str(tmp_path / 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({"monsters": {"0": {"boss": False}}}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            output=None, backup=False, dry_run=False)
+        cmd_import(args)
+        monsters = load_mon_file(path)
+        assert monsters[0].flags1 & MON_FLAG1_BOSS == 0
+
+    def test_clear_undead(self, tmp_path):
+        """undead: false clears the undead bits."""
+        path = self._make_mon_with_flags(tmp_path, flags1=MON_FLAG1_UNDEAD)
+        json_path = str(tmp_path / 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({"monsters": {"0": {"undead": False}}}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            output=None, backup=False, dry_run=False)
+        cmd_import(args)
+        monsters = load_mon_file(path)
+        assert monsters[0].flags1 & MON_FLAG1_UNDEAD == 0
+
+    def test_clear_sleep(self, tmp_path):
+        """sleep: false clears the sleep bit."""
+        path = self._make_mon_with_flags(tmp_path, ability1=MON_ABIL1_SLEEP)
+        json_path = str(tmp_path / 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({"monsters": {"0": {"sleep": False}}}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            output=None, backup=False, dry_run=False)
+        cmd_import(args)
+        monsters = load_mon_file(path)
+        assert monsters[0].ability1 & MON_ABIL1_SLEEP == 0
+
+    def test_clear_ranged(self, tmp_path):
+        """ranged: false clears the ranged bits."""
+        path = self._make_mon_with_flags(tmp_path, flags1=MON_FLAG1_RANGED)
+        json_path = str(tmp_path / 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({"monsters": {"0": {"ranged": False}}}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            output=None, backup=False, dry_run=False)
+        cmd_import(args)
+        monsters = load_mon_file(path)
+        assert monsters[0].flags1 & MON_FLAG1_RANGED == 0
+
+    def test_clear_magic_user(self, tmp_path):
+        """magic_user: false clears the magic_user bits."""
+        path = self._make_mon_with_flags(tmp_path, flags1=MON_FLAG1_MAGIC_USER)
+        json_path = str(tmp_path / 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({"monsters": {"0": {"magic_user": False}}}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            output=None, backup=False, dry_run=False)
+        cmd_import(args)
+        monsters = load_mon_file(path)
+        assert monsters[0].flags1 & MON_FLAG1_MAGIC_USER == 0
+
+    def test_clear_negate(self, tmp_path):
+        """negate: false clears the negate bit."""
+        path = self._make_mon_with_flags(tmp_path, ability1=MON_ABIL1_NEGATE)
+        json_path = str(tmp_path / 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({"monsters": {"0": {"negate": False}}}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            output=None, backup=False, dry_run=False)
+        cmd_import(args)
+        monsters = load_mon_file(path)
+        assert monsters[0].ability1 & MON_ABIL1_NEGATE == 0
+
+    def test_clear_resistant(self, tmp_path):
+        """resistant: false clears the resistant bit."""
+        path = self._make_mon_with_flags(tmp_path, ability2=MON_ABIL2_RESISTANT)
+        json_path = str(tmp_path / 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({"monsters": {"0": {"resistant": False}}}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            output=None, backup=False, dry_run=False)
+        cmd_import(args)
+        monsters = load_mon_file(path)
+        assert monsters[0].ability2 & MON_ABIL2_RESISTANT == 0
+
+    def test_clear_all_flags(self, tmp_path):
+        """All flags/abilities cleared when set to false."""
+        path = self._make_mon_with_flags(
+            tmp_path,
+            flags1=MON_FLAG1_BOSS | MON_FLAG1_UNDEAD,
+            ability1=MON_ABIL1_POISON | MON_ABIL1_TELEPORT | MON_ABIL1_DIVIDE,
+            ability2=MON_ABIL2_RESISTANT,
+        )
+        json_path = str(tmp_path / 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({"monsters": {"0": {
+                "boss": False, "undead": False,
+                "poison": False, "teleport": False, "divide": False,
+                "resistant": False,
+            }}}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            output=None, backup=False, dry_run=False)
+        cmd_import(args)
+        monsters = load_mon_file(path)
+        assert monsters[0].flags1 == 0
+        assert monsters[0].ability1 == 0
+        assert monsters[0].ability2 == 0
+
+    def test_absent_key_preserves_flag(self, tmp_path):
+        """Flags not mentioned in JSON are preserved (not cleared)."""
+        path = self._make_mon_with_flags(
+            tmp_path,
+            flags1=MON_FLAG1_BOSS,
+            ability1=MON_ABIL1_POISON,
+        )
+        json_path = str(tmp_path / 'import.json')
+        with open(json_path, 'w') as f:
+            # Only set sleep: true, don't mention boss or poison
+            json.dump({"monsters": {"0": {"sleep": True}}}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            output=None, backup=False, dry_run=False)
+        cmd_import(args)
+        monsters = load_mon_file(path)
+        assert monsters[0].flags1 & MON_FLAG1_BOSS  # preserved
+        assert monsters[0].ability1 & MON_ABIL1_POISON  # preserved
+        assert monsters[0].ability1 & MON_ABIL1_SLEEP  # newly set

@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-02-24
+
+### Fixed
+- CombatEditor `_place_at_cursor()` now increments revision counter for monster/PC placement (was only setting dirty flag)
+- MapEditor `switch_level()` now resets revision counters and dirty state when switching dungeon levels
+- Bestiary `cmd_import` now clears flag/ability bits when JSON value is `false` (was only OR-ing on `true`)
+- Roster `cmd_import` now warns on stderr when skipping out-of-range slot indices (was silent)
+- Standardized dry-run messages to `"Dry run - ..."` across all 12 modules (was mixing hyphens and em-dashes)
+- text.py `--text` help now documents that input is uppercased to match engine behavior
+
+### Changed
+- Extracted `EXOTIC_WEAPON_INDEX` and `EXOTIC_ARMOR_INDEX` constants from hardcoded values in `check_progress()`
+- Added explanatory comment to TLK `is_text_record()` 70% heuristic threshold
+- Version bump to 1.21.0
+- 84 new tests (2512 → 2596) maintaining 100% code coverage
+
 ## [1.20.0] - 2026-02-24
 
 ### Added

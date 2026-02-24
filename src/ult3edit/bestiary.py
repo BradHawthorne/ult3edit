@@ -170,13 +170,9 @@ def validate_monster(monster: Monster) -> list[str]:
     return warnings
 
 
-def load_mon_file(path: str, file_letter: str = '') -> list[Monster]:
-    """Load a MON file and extract 16 monsters from columnar format."""
-    with open(path, 'rb') as f:
-        data = f.read()
-
+def load_monsters(data: bytes, file_letter: str = '') -> list[Monster]:
+    """Extract 16 monsters from raw columnar MON data."""
     if len(data) < MON_ATTR_COUNT * MON_MONSTERS_PER_FILE:
-        print(f"Warning: MON file too small ({len(data)} bytes)", file=sys.stderr)
         return []
 
     monsters = []
@@ -187,6 +183,13 @@ def load_mon_file(path: str, file_letter: str = '') -> list[Monster]:
             attrs.append(data[offset] if offset < len(data) else 0)
         monsters.append(Monster(attrs, i, file_letter))
     return monsters
+
+
+def load_mon_file(path: str, file_letter: str = '') -> list[Monster]:
+    """Load a MON file and extract 16 monsters from columnar format."""
+    with open(path, 'rb') as f:
+        data = f.read()
+    return load_monsters(data, file_letter)
 
 
 def save_mon_file(path: str, monsters: list[Monster],
@@ -460,27 +463,57 @@ def cmd_import(args) -> None:
                 if clamped != raw:
                     print(f"  Warning: monster {idx} {attr}={raw} clamped to {clamped}")
                 setattr(m, attr, clamped)
-        # Apply flag/ability shortcuts (OR into current values)
-        if entry.get('boss'):
-            m.flags1 |= MON_FLAG1_BOSS
-        if entry.get('undead'):
-            m.flags1 = (m.flags1 & ~0x0C) | MON_FLAG1_UNDEAD
-        if entry.get('ranged'):
-            m.flags1 = (m.flags1 & ~0x0C) | MON_FLAG1_RANGED
-        if entry.get('magic_user'):
-            m.flags1 = (m.flags1 & ~0x0C) | MON_FLAG1_MAGIC_USER
-        if entry.get('poison'):
-            m.ability1 |= MON_ABIL1_POISON
-        if entry.get('sleep'):
-            m.ability1 |= MON_ABIL1_SLEEP
-        if entry.get('negate'):
-            m.ability1 |= MON_ABIL1_NEGATE
-        if entry.get('teleport'):
-            m.ability1 |= MON_ABIL1_TELEPORT
-        if entry.get('divide'):
-            m.ability1 |= MON_ABIL1_DIVIDE
-        if entry.get('resistant'):
-            m.ability2 |= MON_ABIL2_RESISTANT
+        # Apply flag/ability shortcuts (set on true, clear on false)
+        if 'boss' in entry:
+            if entry['boss']:
+                m.flags1 |= MON_FLAG1_BOSS
+            else:
+                m.flags1 &= ~MON_FLAG1_BOSS
+        if 'undead' in entry:
+            if entry['undead']:
+                m.flags1 = (m.flags1 & ~0x0C) | MON_FLAG1_UNDEAD
+            else:
+                m.flags1 &= ~MON_FLAG1_UNDEAD
+        if 'ranged' in entry:
+            if entry['ranged']:
+                m.flags1 = (m.flags1 & ~0x0C) | MON_FLAG1_RANGED
+            else:
+                m.flags1 &= ~MON_FLAG1_RANGED
+        if 'magic_user' in entry:
+            if entry['magic_user']:
+                m.flags1 = (m.flags1 & ~0x0C) | MON_FLAG1_MAGIC_USER
+            else:
+                m.flags1 &= ~MON_FLAG1_MAGIC_USER
+        if 'poison' in entry:
+            if entry['poison']:
+                m.ability1 |= MON_ABIL1_POISON
+            else:
+                m.ability1 &= ~MON_ABIL1_POISON
+        if 'sleep' in entry:
+            if entry['sleep']:
+                m.ability1 |= MON_ABIL1_SLEEP
+            else:
+                m.ability1 &= ~MON_ABIL1_SLEEP
+        if 'negate' in entry:
+            if entry['negate']:
+                m.ability1 |= MON_ABIL1_NEGATE
+            else:
+                m.ability1 &= ~MON_ABIL1_NEGATE
+        if 'teleport' in entry:
+            if entry['teleport']:
+                m.ability1 |= MON_ABIL1_TELEPORT
+            else:
+                m.ability1 &= ~MON_ABIL1_TELEPORT
+        if 'divide' in entry:
+            if entry['divide']:
+                m.ability1 |= MON_ABIL1_DIVIDE
+            else:
+                m.ability1 &= ~MON_ABIL1_DIVIDE
+        if 'resistant' in entry:
+            if entry['resistant']:
+                m.ability2 |= MON_ABIL2_RESISTANT
+            else:
+                m.ability2 &= ~MON_ABIL2_RESISTANT
         count += 1
 
     print(f"Import: {count} monster(s) to update")

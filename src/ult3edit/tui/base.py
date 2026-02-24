@@ -26,8 +26,13 @@ class EditorState:
     is_dungeon: bool = False
     dirty: bool = False
     mode: str = 'paint'
+    picker_mode: bool = False
     palette: list = field(default_factory=list)
     palette_index: int = 0
+    undo_stack: list = field(default_factory=list)
+    redo_stack: list = field(default_factory=list)
+    revision: int = 0
+    saved_revision: int = 0
 
     def __post_init__(self):
         if not self.palette:
@@ -41,10 +46,41 @@ class EditorState:
             return self.data[y * self.width + x]
         return 0
 
-    def set_tile(self, x: int, y: int, value: int) -> None:
+    def set_tile(self, x: int, y: int, value: int, track_undo: bool = True) -> None:
         if 0 <= x < self.width and 0 <= y < self.height:
-            self.data[y * self.width + x] = value
-            self.dirty = True
+            offset = y * self.width + x
+            old_value = self.data[offset]
+            if old_value != value:
+                if track_undo:
+                    self.undo_stack.append((offset, old_value, value))
+                    self.redo_stack.clear()
+                self.data[offset] = value
+                self.revision += 1
+                self._sync_dirty()
+
+    def undo(self) -> None:
+        if self.undo_stack:
+            offset, old_value, new_value = self.undo_stack.pop()
+            self.data[offset] = old_value
+            self.redo_stack.append((offset, old_value, new_value))
+            self.revision = max(0, self.revision - 1)
+            self._sync_dirty()
+
+    def redo(self) -> None:
+        if self.redo_stack:
+            offset, old_value, new_value = self.redo_stack.pop()
+            self.data[offset] = new_value
+            self.undo_stack.append((offset, old_value, new_value))
+            self.revision += 1
+            self._sync_dirty()
+
+    def mark_saved(self) -> None:
+        """Mark current state as persisted to disk."""
+        self.saved_revision = self.revision
+        self.dirty = False
+
+    def _sync_dirty(self) -> None:
+        self.dirty = self.revision != self.saved_revision
 
     def move_cursor(self, dx: int, dy: int) -> None:
         self.cursor_x = max(0, min(self.width - 1, self.cursor_x + dx))
@@ -122,7 +158,7 @@ class BaseTileEditor:
         else:
             with open(self.file_path, 'wb') as f:
                 f.write(bytes(self.state.data))
-        self.state.dirty = False
+        self.state.mark_saved()
 
     def _extra_status(self) -> str:
         """Extra status text for subclass-specific info. Override as needed."""
@@ -158,6 +194,9 @@ class BaseTileEditor:
         # --- Grid Control ---
         class GridControl(UIControl):
             def create_content(self, width: int, height: int):
+                if state.picker_mode:
+                    return self._create_picker_content(width, height)
+
                 usable_w = max(1, width - 5)
                 usable_h = max(1, height)
                 state.viewport_w = min(usable_w, state.width)
@@ -177,6 +216,44 @@ class BaseTileEditor:
                             style = 'class:cursor'
                         fragments.append((style, ch))
                     lines.append(fragments)
+                return UIContent(
+                    get_line=lambda i: lines[i] if i < len(lines) else [],
+                    line_count=len(lines),
+                )
+
+            def _create_picker_content(self, width, height):
+                lines = []
+                lines.append([('class:palette-header', ' TILE PICKER (Select tile and press Enter/Space) '.center(width))])
+                lines.append([('class:palette-header', ('═' * (width - 2)).center(width))])
+
+                # Show 256 tiles in a grid
+                # Use 16 columns
+                cols = 16
+                for row in range(16):
+                    fragments = []
+                    fragments.append(('', '  '))
+                    for col in range(cols):
+                        tile_id = row * cols + col
+                        from ..constants import tile_char as tc
+                        from .theme import tile_style as ts
+                        ch = tc(tile_id, state.is_dungeon)
+                        style = ts(tile_id, state.is_dungeon)
+
+                        # Highlight if it matches selected_tile
+                        if tile_id == state.selected_tile:
+                            style = 'class:palette-selected'
+                            ch = f'[{ch}]'
+                        else:
+                            ch = f' {ch} '
+
+                        fragments.append((style, ch))
+                        fragments.append(('', ' '))
+                    lines.append(fragments)
+
+                lines.append([])
+                sel_name = tile_name(state.selected_tile, state.is_dungeon)
+                lines.append([('', f' Selected: ${state.selected_tile:02X} {sel_name}'.center(width))])
+
                 return UIContent(
                     get_line=lambda i: lines[i] if i < len(lines) else [],
                     line_count=len(lines),
@@ -206,14 +283,17 @@ class BaseTileEditor:
         def get_status():
             t = state.tile_at(state.cursor_x, state.cursor_y)
             tname = tile_name(t, state.is_dungeon)
+            thard = f'${t:02X} ({t})'
             dirty = ' [MODIFIED]' if state.dirty else ''
             extra = editor._extra_status()
             sel_name = tile_name(state.selected_tile, state.is_dungeon)
+            sel_hard = f'${state.selected_tile:02X}'
             return [
                 ('class:status', f' {editor.title}: {editor.file_path} '),
                 ('class:status-dirty' if state.dirty else 'class:status', dirty),
-                ('class:status', f' | ({state.cursor_x},{state.cursor_y}) {tname}'),
-                ('class:status', f' | Brush: {tile_char(state.selected_tile, state.is_dungeon)} {sel_name}'),
+                ('class:status', f' | Cursor: ({state.cursor_x:2d},{state.cursor_y:2d}) '),
+                ('class:status-mode', f' {tname:<12s} '),
+                ('class:status', f' {thard} | Brush: {tile_char(state.selected_tile, state.is_dungeon)} {sel_name} ({sel_hard})'),
                 ('class:status', f' {extra}'),
             ]
 
@@ -223,8 +303,11 @@ class BaseTileEditor:
                     ('class:help-key', ' Arrows'), ('class:help-text', '=move '),
                     ('class:help-key', 'Space'), ('class:help-text', '=paint '),
                     ('class:help-key', '[ ]'), ('class:help-text', '=tile '),
+                    ('class:help-key', 'P'), ('class:help-text', '=picker '),
                     ('class:help-key', 'Ctrl-S'), ('class:help-text', '=save '),
                     ('class:help-key', 'Ctrl-Q'), ('class:help-text', '=quit '),
+                    ('class:help-key', 'Ctrl-Z'), ('class:help-text', '=undo '),
+                    ('class:help-key', 'Ctrl-Y'), ('class:help-text', '=redo '),
                     ('class:help-key', '?'), ('class:help-text', '=help'),
                 ]
             return [
@@ -250,27 +333,49 @@ class BaseTileEditor:
 
         @kb.add('up')
         def _up(event):
-            state.move_cursor(0, -1)
+            if state.picker_mode:
+                state.selected_tile = (state.selected_tile - 16) % 256
+            else:
+                state.move_cursor(0, -1)
 
         @kb.add('down')
         def _down(event):
-            state.move_cursor(0, 1)
+            if state.picker_mode:
+                state.selected_tile = (state.selected_tile + 16) % 256
+            else:
+                state.move_cursor(0, 1)
 
         @kb.add('left')
         def _left(event):
-            state.move_cursor(-1, 0)
+            if state.picker_mode:
+                state.selected_tile = (state.selected_tile - 1) % 256
+            else:
+                state.move_cursor(-1, 0)
 
         @kb.add('right')
         def _right(event):
-            state.move_cursor(1, 0)
+            if state.picker_mode:
+                state.selected_tile = (state.selected_tile + 1) % 256
+            else:
+                state.move_cursor(1, 0)
+
+        @kb.add('p')
+        def _toggle_picker(event):
+            state.picker_mode = not state.picker_mode
 
         @kb.add(' ')
         def _paint_space(event):
-            state.paint()
+            if state.picker_mode:
+                state.picker_mode = False
+            else:
+                state.paint()
 
         @kb.add('enter')
         def _paint_enter(event):
-            state.paint()
+            if state.picker_mode:
+                state.picker_mode = False
+            else:
+                state.paint()
 
         @kb.add(']')
         def _next_tile(event):
@@ -283,6 +388,21 @@ class BaseTileEditor:
         @kb.add('?')
         def _toggle_help(event):
             editor.show_help = not editor.show_help
+
+        @kb.add('c-z')
+        def _undo(event):
+            state.undo()
+
+        @kb.add('c-y')
+        def _redo(event):
+            state.redo()
+
+        @kb.add('escape')
+        def _escape_picker(event):
+            if state.picker_mode:
+                state.picker_mode = False
+            elif not embedded:
+                event.app.exit(result=False)
 
         if not embedded:
             @kb.add('c-s')

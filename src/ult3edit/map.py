@@ -382,8 +382,43 @@ def cmd_import(args) -> None:
     name_reverse = DUNGEON_TILE_NAMES_REVERSE if is_dungeon else TILE_NAMES_REVERSE
     default_tile = 0 if is_dungeon else 0x04
 
-    def resolve_tile(name):
-        """Resolve a tile name or display char to a byte value."""
+    def resolve_tile(value):
+        """Resolve JSON tile input (name/char/index) to a tile byte."""
+        if isinstance(value, bool):
+            return int(value)
+        if isinstance(value, int):
+            if 0 <= value <= 0xFF:
+                return value
+            print(f"  Warning: tile value {value} out of range; using default",
+                  file=sys.stderr)
+            return default_tile
+        if not isinstance(value, str):
+            value = str(value)
+
+        name = value.strip()
+        if not name:
+            return default_tile
+
+        if name.startswith(('0x', '0X')):
+            try:
+                num = int(name, 16)
+            except ValueError:
+                num = None
+            if num is not None:
+                if 0 <= num <= 0xFF:
+                    return num
+                print(f"  Warning: tile value {name} out of range; using default",
+                      file=sys.stderr)
+                return default_tile
+
+        if name.isdigit():
+            num = int(name, 10)
+            if 0 <= num <= 0xFF:
+                return num
+            print(f"  Warning: tile value {name} out of range; using default",
+                  file=sys.stderr)
+            return default_tile
+
         if len(name) == 1:
             return char_reverse.get(name, default_tile)
         return name_reverse.get(name.lower(), default_tile)
@@ -411,8 +446,26 @@ def cmd_import(args) -> None:
         if len(data) % width != 0:
             print(f"  Warning: file size {len(data)} not divisible by "
                   f"width {width}", file=sys.stderr)
-        for y, row in enumerate(tiles):
-            for x, name in enumerate(row):
+        height = len(data) // width if width > 0 else 0
+        if len(tiles) > height:
+            print(f"  Warning: {len(tiles) - height} extra row(s) ignored",
+                  file=sys.stderr)
+        elif len(tiles) < height:
+            print(f"  Warning: only {len(tiles)} row(s) provided for {height}-row map; "
+                  "unprovided rows left unchanged", file=sys.stderr)
+
+        for y, row in enumerate(tiles[:height]):
+            if not isinstance(row, list):
+                print(f"  Warning: row {y} is not a list; skipping",
+                      file=sys.stderr)
+                continue
+            if len(row) > width:
+                print(f"  Warning: row {y} has {len(row)} column(s), truncating to {width}",
+                      file=sys.stderr)
+            elif len(row) < width:
+                print(f"  Warning: row {y} has only {len(row)} column(s); "
+                      "remaining columns left unchanged", file=sys.stderr)
+            for x, name in enumerate(row[:width]):
                 offset = y * width + x
                 if offset < len(data):
                     data[offset] = resolve_tile(name)

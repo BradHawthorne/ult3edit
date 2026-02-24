@@ -128,6 +128,7 @@ class TestCombatEditorPureLogic:
         assert editor.monster_x[2] == 7
         assert editor.monster_y[2] == 8
         assert editor.state.dirty
+        assert editor.state.revision == 1
         assert editor.placement_slot == 3  # auto-advance
 
     def test_place_at_cursor_pc(self):
@@ -140,6 +141,7 @@ class TestCombatEditorPureLogic:
         assert editor.pc_x[1] == 9
         assert editor.pc_y[1] == 10
         assert editor.state.dirty
+        assert editor.state.revision == 1
 
     def test_place_at_cursor_paint(self):
         editor, _ = self._make_editor()
@@ -188,9 +190,17 @@ class TestMapEditorPureLogic:
         data[256] = 0xBB  # Level 1, first tile
         editor = MapEditor('test.map', bytes(data), is_dungeon=True)
         assert editor.state.data[0] == 0xAA
+        # Edit level 0 to make it dirty
+        editor.state.set_tile(0, 0, 0x04)
+        assert editor.state.revision == 1
+        assert editor.state.dirty
+        # Switch to level 1
         editor.switch_level(1)
         assert editor.current_level == 1
         assert editor.state.data[0] == 0xBB
+        assert editor.state.revision == 0
+        assert editor.state.saved_revision == 0
+        assert not editor.state.dirty
 
     def test_switch_level_out_of_range(self):
         data = bytearray(2048)
@@ -274,6 +284,14 @@ class TestDialogEditorPureLogic:
         editor._save()
         assert (tmp_path / 'TLKA').exists()
 
+    def test_sync_dirty_uses_revision_counters(self):
+        data = self._make_tlk_data()
+        editor = DialogEditor('test.tlk', data)
+        editor._revision = 2
+        editor._saved_revision = 1
+        editor._sync_dirty()
+        assert editor.dirty
+
 
 # ---- TextEditor pure logic ----
 
@@ -324,6 +342,14 @@ class TestTextEditorPureLogic:
         editor = TextEditor(fpath, data)
         editor._save()
         assert (tmp_path / 'TEXT').exists()
+
+    def test_text_editor_sync_dirty_uses_revision_counters(self):
+        data = self._make_text_data()
+        editor = TextEditor('test.txt', data)
+        editor._revision = 3
+        editor._saved_revision = 2
+        editor._sync_dirty()
+        assert editor.dirty
 
 
 # ---- ExodEditor pure logic ----
@@ -545,6 +571,13 @@ class TestBestiaryEditorLabel:
         assert _byte_clamp('-1') == 0
         assert _byte_clamp('100') == 100
 
+    def test_monster_field_validator(self):
+        from ult3edit.bestiary import Monster
+        from ult3edit.tui.bestiary_editor import _monster_fields
+        mon = Monster([0x60, 0x60, 0, 0, 10, 5, 3, 2, 0, 0], 0, 'A')
+        fields = _monster_fields(mon)
+        assert fields[0].validator('0x10')
+
 
 # ---- UnifiedApp factory methods ----
 
@@ -588,6 +621,21 @@ class TestUnifiedAppFactories:
         data = encode_high_ascii('HI', 2) + bytes([TLK_RECORD_END])
         tab = app._make_dialog_editor('TLKA', data, lambda d: None)
         assert isinstance(tab, DialogEditorTab)
+
+    def test_make_text_editor(self):
+        from ult3edit.tui.app import UnifiedApp
+        from ult3edit.fileutil import encode_high_ascii
+
+        app = UnifiedApp.__new__(UnifiedApp)
+        data = encode_high_ascii('TEST', 4) + b'\x00'
+        tab = app._make_text_editor('TEXT', data, lambda d: None)
+        assert isinstance(tab, TextEditorTab)
+
+    def test_make_party_editor(self):
+        from ult3edit.tui.app import UnifiedApp
+        app = UnifiedApp.__new__(UnifiedApp)
+        tab = app._make_party_editor('PRTY', bytearray(16), lambda d: None)
+        assert isinstance(tab, FormEditorTab)
 
     def test_make_bestiary_editor(self):
         from ult3edit.tui.app import UnifiedApp
@@ -666,6 +714,72 @@ class TestUnifiedAppFactories:
         app.session = MockSession()
         tab = app._make_exod_editor('EXOD:unknown', bytearray(26208), lambda d: None)
         assert tab is None
+
+    def test_make_exod_editor_without_prefix(self):
+        """fname without EXOD: prefix still routes by sub-editor name."""
+        from ult3edit.tui.app import UnifiedApp
+
+        class MockSession:
+            def read(self, name):
+                return bytearray(26208)
+
+            def make_save_callback(self, name):
+                return lambda d: None
+
+        app = UnifiedApp.__new__(UnifiedApp)
+        app.session = MockSession()
+        tab = app._make_exod_editor('crawl', bytearray(26208), lambda d: None)
+        assert isinstance(tab, ExodCrawlEditor)
+
+    def test_make_shapes_viewer(self):
+        from ult3edit.tui.app import UnifiedApp
+        from ult3edit.tui.shapes_editor import ShapesViewer
+        app = UnifiedApp.__new__(UnifiedApp)
+        tab = app._make_shapes_viewer('SHPS', bytearray(2048), lambda d: None)
+        assert isinstance(tab, ShapesViewer)
+
+    def test_tab_matches_category_exod(self):
+        from ult3edit.tui.app import UnifiedApp
+
+        class Tab:
+            name = 'EXOD'
+
+        assert UnifiedApp._tab_matches_category(Tab(), 'exod')
+        assert not UnifiedApp._tab_matches_category(Tab(), 'maps')
+
+    def test_set_record_selection_helper(self):
+        from ult3edit.tui.app import UnifiedApp
+
+        class A:
+            selected_record = 0
+
+        class B:
+            selected_index = 0
+
+        a = A()
+        b = B()
+        assert UnifiedApp._set_record_selection(a, 3)
+        assert a.selected_record == 3
+        assert UnifiedApp._set_record_selection(b, 4)
+        assert b.selected_index == 4
+        assert not UnifiedApp._set_record_selection(None, 1)
+        assert not UnifiedApp._set_record_selection(object(), 1)
+
+    def test_save_tabs_collects_failures(self):
+        from ult3edit.tui.app import UnifiedApp
+
+        class GoodTab:
+            name = 'Good'
+            def save(self):
+                return None
+
+        class BadTab:
+            name = 'Bad'
+            def save(self):
+                raise RuntimeError('boom')
+
+        failed = UnifiedApp._save_tabs([GoodTab(), BadTab()])
+        assert failed == ['Bad']
 
     def test_build_tabs(self):
         from ult3edit.tui.app import UnifiedApp
@@ -845,7 +959,7 @@ class TestUnifiedAppBuildTabsMulti:
 
         app = UnifiedApp(MockSession())
         app._build_tabs()
-        assert len(app.tabs) == 0
+        assert len(app.tabs) == 1 # Just SearchTab
 
     def test_build_tabs_party_none_data(self):
         """Party category where read returns None should not add tab."""
@@ -864,7 +978,7 @@ class TestUnifiedAppBuildTabsMulti:
 
         app = UnifiedApp(MockSession())
         app._build_tabs()
-        assert len(app.tabs) == 0
+        assert len(app.tabs) == 1 # Just SearchTab
 
 
 class TestDrillDownTabOpenEditorNoneData:
@@ -882,3 +996,643 @@ class TestDrillDownTabOpenEditorNoneData:
                            lambda f, d, s: None, MockSession())
         tab._open_editor()
         assert tab.active_editor is None
+
+
+class TestEditorStateUndoRedo:
+    def test_undo_redo(self):
+        from ult3edit.tui.base import EditorState
+        state = EditorState(data=bytearray(64), width=8, height=8)
+        state.set_tile(0, 0, 0x10)
+        assert state.tile_at(0, 0) == 0x10
+        assert len(state.undo_stack) == 1
+        assert state.dirty
+
+        state.undo()
+        assert state.tile_at(0, 0) == 0x00
+        assert len(state.undo_stack) == 0
+        assert len(state.redo_stack) == 1
+        assert not state.dirty
+
+        state.redo()
+        assert state.tile_at(0, 0) == 0x10
+        assert len(state.redo_stack) == 0
+        assert state.dirty
+
+        # Test no-op undo/redo
+        state.redo()
+        state.undo()
+        state.undo()
+
+    def test_set_tile_no_track(self):
+        from ult3edit.tui.base import EditorState
+        state = EditorState(data=bytearray(64), width=8, height=8)
+        state.set_tile(0, 0, 0x10, track_undo=False)
+        assert len(state.undo_stack) == 0
+        assert state.tile_at(0, 0) == 0x10
+
+    def test_tile_at_out_of_bounds(self):
+        from ult3edit.tui.base import EditorState
+        state = EditorState(data=bytearray(64), width=8, height=8)
+        assert state.tile_at(99, 99) == 0
+
+    def test_move_cursor_and_scroll(self):
+        from ult3edit.tui.base import EditorState
+        state = EditorState(data=bytearray(4096), width=64, height=64, viewport_w=10, viewport_h=10)
+        state.move_cursor(20, 20)
+        assert state.cursor_x == 20
+        assert state.cursor_y == 20
+        assert state.viewport_x > 0
+        assert state.viewport_y > 0
+
+        state.move_cursor(-20, -20)
+        assert state.cursor_x == 0
+        assert state.cursor_y == 0
+        assert state.viewport_x == 0
+        assert state.viewport_y == 0
+
+        # Clamp to max
+        state.move_cursor(100, 100)
+        assert state.cursor_x == 63
+        assert state.cursor_y == 63
+
+
+class TestFormField:
+    def test_form_field(self):
+        from ult3edit.tui.form_editor import FormField
+        f = FormField('Label', lambda: 'val', lambda x: None, fmt='int')
+        assert f.label == 'Label'
+        assert f.getter() == 'val'
+        assert f.fmt == 'int'
+
+
+class TestActivePartyTabBuilding:
+    def test_build_tabs_active_party(self):
+        from ult3edit.tui.app import UnifiedApp
+        class MockSession:
+            image_path = 'test.po'
+            def has_category(self, cat): return cat == 'active_party'
+            def files_in(self, cat): return [('PLRS', 'Active Characters')] if cat == 'active_party' else []
+            def read(self, name): return bytearray(256)
+            def make_save_callback(self, name): return lambda d: None
+        app = UnifiedApp(MockSession())
+        app._build_tabs()
+        assert any(t.name == 'Active Party' for t in app.tabs)
+
+    def test_build_tabs_active_party_none(self):
+        from ult3edit.tui.app import UnifiedApp
+        class MockSession:
+            image_path = 'test.po'
+            def has_category(self, cat): return cat == 'active_party'
+            def files_in(self, cat): return [('PLRS', 'Active Characters')] if cat == 'active_party' else []
+            def read(self, name): return None
+            def make_save_callback(self, name): return lambda d: None
+        app = UnifiedApp(MockSession())
+        app._build_tabs()
+        assert not any(t.name == 'Active Party' for t in app.tabs)
+
+
+class TestSearchJumpFlow:
+    def test_prepare_drilldown_jump_clean_editor_returns_true(self):
+        from prompt_toolkit.key_binding import KeyBindings
+        from prompt_toolkit.layout import Window
+        from ult3edit.tui.app import UnifiedApp
+        from ult3edit.tui.editor_tab import DrillDownTab
+
+        class MockEditor:
+            def __init__(self):
+                self._dirty = False
+
+            @property
+            def is_dirty(self):
+                return self._dirty
+
+            def build_ui(self):
+                return Window(), KeyBindings()
+
+            def save(self):
+                self._dirty = False
+
+        class MockSession:
+            def read(self, name):
+                return bytes(256)
+
+            def make_save_callback(self, name):
+                return lambda data: None
+
+        tab = DrillDownTab(
+            'Maps',
+            [('MAPA', 'Overworld')],
+            lambda fname, data, save_cb: MockEditor(),
+            MockSession(),
+        )
+        tab._open_editor()
+
+        app = UnifiedApp.__new__(UnifiedApp)
+        assert app._prepare_drilldown_jump(tab)
+
+    def test_jump_to_file_saves_dirty_drilldown_editor(self):
+        from prompt_toolkit.key_binding import KeyBindings
+        from prompt_toolkit.layout import Window
+        from ult3edit.tui.app import UnifiedApp
+        from ult3edit.tui.editor_tab import DrillDownTab
+
+        class MockEditor:
+            def __init__(self):
+                self._dirty = False
+                self.saved = False
+                self.selected_record = 0
+
+            @property
+            def is_dirty(self):
+                return self._dirty
+
+            def build_ui(self):
+                return Window(), KeyBindings()
+
+            def save(self):
+                self.saved = True
+                self._dirty = False
+
+        class MockSession:
+            def read(self, name):
+                return bytes(256)
+
+            def make_save_callback(self, name):
+                return lambda data: None
+
+        editors = []
+
+        def factory(fname, data, save_cb):
+            ed = MockEditor()
+            editors.append(ed)
+            return ed
+
+        tab = DrillDownTab(
+            'Maps',
+            [('MAPA', 'Overworld'), ('MAPB', 'Town')],
+            factory,
+            MockSession(),
+        )
+        tab._open_editor()
+        first_editor = tab.active_editor
+        first_editor._dirty = True
+
+        app = UnifiedApp.__new__(UnifiedApp)
+        app.tabs = [tab]
+        app.active_tab_index = 0
+        app._prompt_unsaved_jump = lambda _tab_name: 'save'
+        app._show_error_dialog = lambda **kwargs: None
+
+        app._jump_to_file(('maps', 'MAPB', 7))
+
+        assert first_editor.saved
+        assert tab.selected_index == 1
+        assert tab.active_editor is not None
+        assert tab.active_editor is not first_editor
+        assert tab.active_editor.selected_record == 7
+
+    def test_jump_to_file_discard_switches_without_save(self):
+        from prompt_toolkit.key_binding import KeyBindings
+        from prompt_toolkit.layout import Window
+        from ult3edit.tui.app import UnifiedApp
+        from ult3edit.tui.editor_tab import DrillDownTab
+
+        class MockEditor:
+            def __init__(self):
+                self._dirty = False
+                self.saved = False
+                self.selected_record = 0
+
+            @property
+            def is_dirty(self):
+                return self._dirty
+
+            def build_ui(self):
+                return Window(), KeyBindings()
+
+            def save(self):
+                self.saved = True
+                self._dirty = False
+
+        class MockSession:
+            def read(self, name):
+                return bytes(256)
+
+            def make_save_callback(self, name):
+                return lambda data: None
+
+        tab = DrillDownTab(
+            'Maps',
+            [('MAPA', 'Overworld'), ('MAPB', 'Town')],
+            lambda fname, data, save_cb: MockEditor(),
+            MockSession(),
+        )
+        tab._open_editor()
+        first_editor = tab.active_editor
+        first_editor._dirty = True
+
+        app = UnifiedApp.__new__(UnifiedApp)
+        app.tabs = [tab]
+        app.active_tab_index = 0
+        app._prompt_unsaved_jump = lambda _tab_name: 'discard'
+        app._show_error_dialog = lambda **kwargs: None
+
+        app._jump_to_file(('maps', 'MAPB', 4))
+
+        assert not first_editor.saved
+        assert tab.selected_index == 1
+        assert tab.active_editor is not first_editor
+        assert tab.active_editor.selected_record == 4
+
+    def test_jump_to_file_cancel_keeps_editor_open(self):
+        from prompt_toolkit.key_binding import KeyBindings
+        from prompt_toolkit.layout import Window
+        from ult3edit.tui.app import UnifiedApp
+        from ult3edit.tui.editor_tab import DrillDownTab
+
+        class MockEditor:
+            def __init__(self):
+                self._dirty = False
+                self.saved = False
+
+            @property
+            def is_dirty(self):
+                return self._dirty
+
+            def build_ui(self):
+                return Window(), KeyBindings()
+
+            def save(self):
+                self.saved = True
+                self._dirty = False
+
+        class MockSession:
+            def read(self, name):
+                return bytes(256)
+
+            def make_save_callback(self, name):
+                return lambda data: None
+
+        tab = DrillDownTab(
+            'Maps',
+            [('MAPA', 'Overworld'), ('MAPB', 'Town')],
+            lambda fname, data, save_cb: MockEditor(),
+            MockSession(),
+        )
+        tab._open_editor()
+        first_editor = tab.active_editor
+        first_editor._dirty = True
+
+        app = UnifiedApp.__new__(UnifiedApp)
+        app.tabs = [tab]
+        app.active_tab_index = 0
+        app._prompt_unsaved_jump = lambda _tab_name: 'cancel'
+        app._show_error_dialog = lambda **kwargs: None
+
+        app._jump_to_file(('maps', 'MAPB', 1))
+
+        assert tab.selected_index == 0
+        assert tab.active_editor is first_editor
+        assert not first_editor.saved
+
+    def test_jump_to_file_save_failure_shows_error_and_stays(self):
+        from prompt_toolkit.key_binding import KeyBindings
+        from prompt_toolkit.layout import Window
+        from ult3edit.tui.app import UnifiedApp
+        from ult3edit.tui.editor_tab import DrillDownTab
+
+        class MockEditor:
+            def __init__(self):
+                self._dirty = False
+
+            @property
+            def is_dirty(self):
+                return self._dirty
+
+            def build_ui(self):
+                return Window(), KeyBindings()
+
+            def save(self):
+                raise OSError('read-only')
+
+        class MockSession:
+            def read(self, name):
+                return bytes(256)
+
+            def make_save_callback(self, name):
+                return lambda data: None
+
+        tab = DrillDownTab(
+            'Maps',
+            [('MAPA', 'Overworld'), ('MAPB', 'Town')],
+            lambda fname, data, save_cb: MockEditor(),
+            MockSession(),
+        )
+        tab._open_editor()
+        first_editor = tab.active_editor
+        first_editor._dirty = True
+
+        errors = []
+        app = UnifiedApp.__new__(UnifiedApp)
+        app.tabs = [tab]
+        app.active_tab_index = 0
+        app._prompt_unsaved_jump = lambda _tab_name: 'save'
+        app._show_error_dialog = lambda **kwargs: errors.append(kwargs)
+
+        app._jump_to_file(('maps', 'MAPB', 1))
+
+        assert tab.selected_index == 0
+        assert tab.active_editor is first_editor
+        assert errors
+
+    def test_jump_to_file_sets_selected_index_for_text_editor(self):
+        from ult3edit.fileutil import encode_high_ascii
+        from ult3edit.tui.app import UnifiedApp
+        from ult3edit.tui.editor_tab import TextEditorTab
+        from ult3edit.tui.text_editor import TextEditor
+
+        data = encode_high_ascii('A', 1) + b'\x00' + encode_high_ascii('B', 1) + b'\x00'
+        text_tab = TextEditorTab(TextEditor('TEXT', data))
+
+        app = UnifiedApp.__new__(UnifiedApp)
+        app.tabs = [text_tab]
+        app.active_tab_index = 0
+
+        app._jump_to_file(('text', 'TEXT', 1))
+        assert text_tab._editor.selected_index == 1
+
+    def test_jump_to_file_sets_selected_index_for_dialog_editor(self):
+        from ult3edit.fileutil import encode_high_ascii
+        from ult3edit.constants import TLK_RECORD_END
+        from ult3edit.tui.app import UnifiedApp
+        from ult3edit.tui.editor_tab import DialogEditorTab
+        from ult3edit.tui.dialog_editor import DialogEditor
+
+        tlk_data = (
+            encode_high_ascii('A', 1) + bytes([TLK_RECORD_END]) +
+            encode_high_ascii('B', 1) + bytes([TLK_RECORD_END])
+        )
+        dialog_tab = DialogEditorTab(DialogEditor('TLKA', tlk_data))
+
+        app = UnifiedApp.__new__(UnifiedApp)
+        app.tabs = [dialog_tab]
+        app.active_tab_index = 0
+
+        app._jump_to_file(('dialog', 'TLKA', 1))
+        assert dialog_tab._editor.selected_index == 1
+
+    def test_jump_to_file_sets_selected_record_for_form_tab(self):
+        from ult3edit.tui.app import UnifiedApp
+        from ult3edit.tui.form_editor import FormEditorTab
+
+        form_tab = FormEditorTab(
+            tab_name='Roster',
+            records=['A', 'B', 'C'],
+            record_label_fn=lambda r, i: str(i),
+            field_factory=lambda r: [],
+            save_callback=lambda d: None,
+            get_save_data=lambda: b'',
+        )
+
+        app = UnifiedApp.__new__(UnifiedApp)
+        app.tabs = [form_tab]
+        app.active_tab_index = 0
+
+        app._jump_to_file(('roster', 'ROST', 2))
+        assert form_tab.selected_record == 2
+
+
+class TestSearchTabLogic:
+    def test_search_empty(self):
+        from ult3edit.tui.search_tab import SearchTab
+        tab = SearchTab(None)
+        tab.query = ""
+        tab._perform_search()
+        assert tab.results == []
+
+    def test_search_roster(self, tmp_dir):
+        from ult3edit.tui.search_tab import SearchTab
+        from ult3edit.constants import CHAR_RECORD_SIZE
+
+        # Setup mock session with roster data
+        roster_data = bytearray(CHAR_RECORD_SIZE * 20)
+        # Set name 'HERO' in slot 0
+        from ult3edit.fileutil import encode_high_ascii
+        roster_data[0:4] = encode_high_ascii('HERO', 4)
+
+        class MockSession:
+            def has_category(self, cat): return cat == 'roster'
+            def files_in(self, cat): return [('ROST', 'Roster')] if cat == 'roster' else []
+            def read(self, name): return roster_data if name == 'ROST' else None
+
+        session = MockSession()
+        tab = SearchTab(session)
+        tab.query = 'HERO'
+        tab._perform_search()
+        assert len(tab.results) == 1
+        assert tab.results[0]['type'] == 'Roster'
+        assert 'HERO' in tab.results[0]['label']
+
+    def test_search_active_party(self):
+        from ult3edit.constants import CHAR_RECORD_SIZE
+        from ult3edit.fileutil import encode_high_ascii
+        from ult3edit.tui.search_tab import SearchTab
+
+        plrs_data = bytearray(CHAR_RECORD_SIZE * 4)
+        plrs_data[0:4] = encode_high_ascii('HERO', 4)
+
+        class MockSession:
+            def has_category(self, cat): return cat == 'active_party'
+            def files_in(self, cat): return [('PLRS', 'Active Characters')]
+            def read(self, name): return plrs_data
+
+        tab = SearchTab(MockSession())
+        tab.query = 'hero'
+        tab._perform_search()
+        assert len(tab.results) == 1
+        assert tab.results[0]['type'] == 'Party'
+        assert tab.results[0]['jump'][0] == 'active_party'
+
+    def test_search_bestiary(self, monkeypatch):
+        from ult3edit.tui.search_tab import SearchTab
+
+        class MockMonster:
+            def __init__(self, name):
+                self.name = name
+                self.is_empty = False
+
+        monkeypatch.setattr('ult3edit.bestiary.load_monsters',
+                            lambda data, letter: [MockMonster('DRAGON')])
+
+        class MockSession:
+            def has_category(self, cat): return cat == 'bestiary'
+            def files_in(self, cat): return [('MONA', 'Monsters A')]
+            def read(self, name): return bytes(256)
+
+        tab = SearchTab(MockSession())
+        tab.query = 'drag'
+        tab._perform_search()
+        assert len(tab.results) == 1
+        assert tab.results[0]['type'] == 'Monster'
+
+    def test_search_dialog(self):
+        from ult3edit.tui.search_tab import SearchTab
+        from ult3edit.fileutil import encode_high_ascii
+        tlk_data = encode_high_ascii('SECRET MESSAGE', 20)
+
+        class MockSession:
+            def has_category(self, cat): return cat == 'dialog'
+            def files_in(self, cat): return [('TLKA', 'Dialog A')]
+            def read(self, name): return tlk_data
+
+        session = MockSession()
+        tab = SearchTab(session)
+        tab.query = 'SECRET'
+        tab._perform_search()
+        assert len(tab.results) == 1
+        assert tab.results[0]['type'] == 'Dialog'
+
+    def test_selection_normalizes_and_never_goes_negative(self):
+        from ult3edit.tui.search_tab import SearchTab
+
+        tab = SearchTab(None)
+        tab.results = [{'jump': ('maps', 'MAPA', 0)}]
+        tab.selected_index = 99
+        tab._normalize_selection()
+        assert tab.selected_index == 0
+
+        tab.results = []
+        tab.selected_index = 5
+        tab.move_selection(1)
+        assert tab.selected_index == 0
+        assert tab.selected_result() is None
+
+        tab.results = [
+            {'jump': ('maps', 'MAPA', 0)},
+            {'jump': ('maps', 'MAPB', 0)},
+        ]
+        tab.move_selection(1)
+        assert tab.selected_index == 1
+        assert tab.selected_result()['jump'][1] == 'MAPB'
+
+    def test_search_maps(self):
+        from ult3edit.tui.search_tab import SearchTab
+        class MockSession:
+            def has_category(self, cat): return cat == 'maps'
+            def files_in(self, cat): return [('MAPA', 'Sosaria')]
+            def read(self, name): return None
+
+        session = MockSession()
+        tab = SearchTab(session)
+        tab.query = 'Sosaria'
+        tab._perform_search()
+        assert len(tab.results) == 1
+        assert tab.results[0]['type'] == 'Map'
+        assert not tab.is_dirty
+        tab.save() # no-op
+
+    def test_search_special(self):
+        from ult3edit.tui.search_tab import SearchTab
+
+        class MockSession:
+            def has_category(self, cat): return cat == 'special'
+            def files_in(self, cat): return [('BRND', 'Branding Area')]
+            def read(self, name): return None
+
+        tab = SearchTab(MockSession())
+        tab.query = 'brand'
+        tab._perform_search()
+        assert len(tab.results) == 1
+        assert tab.results[0]['type'] == 'Special'
+        assert tab.results[0]['jump'][0] == 'special'
+
+class TestFormFieldValidation:
+    def test_is_valid_none(self):
+        from ult3edit.tui.form_editor import FormField
+        f = FormField('HP', lambda: 100, lambda x: None)
+        assert f.is_valid()
+
+    def test_is_valid(self):
+        from ult3edit.tui.form_editor import FormField
+        f = FormField('HP', lambda: 100, lambda x: None, validator=lambda x: int(x) < 200)
+        assert f.is_valid()
+        f = FormField('HP', lambda: 300, lambda x: None, validator=lambda x: int(x) < 200)
+        assert not f.is_valid()
+
+    def test_is_valid_exception(self):
+        from ult3edit.tui.form_editor import FormField
+        f = FormField('Err', lambda: 'val', lambda x: None, validator=lambda x: 1/0)
+        assert not f.is_valid()
+
+    def test_validate_input_uses_user_value(self):
+        from ult3edit.tui.form_editor import FormField, FormEditorTab
+        tab = FormEditorTab(
+            tab_name='Test',
+            records=[],
+            record_label_fn=lambda r, i: '',
+            field_factory=lambda r: [],
+            save_callback=lambda d: None,
+            get_save_data=lambda: b'',
+        )
+        f = FormField('Race', lambda: 'H', lambda x: None,
+                      validator=lambda v: v.upper() in ('H', 'E', 'D', 'B', 'F'))
+        assert tab._validate_input(f, 'E')
+        assert not tab._validate_input(f, 'INVALID')
+
+    def test_validate_input_no_validator_and_exception_path(self):
+        from ult3edit.tui.form_editor import FormField, FormEditorTab
+        tab = FormEditorTab(
+            tab_name='Test',
+            records=[],
+            record_label_fn=lambda r, i: '',
+            field_factory=lambda r: [],
+            save_callback=lambda d: None,
+            get_save_data=lambda: b'',
+        )
+        no_validator = FormField('Any', lambda: 'x', lambda x: None)
+        assert tab._validate_input(no_validator, 'whatever')
+        bad_validator = FormField('Bad', lambda: 'x', lambda x: None,
+                                  validator=lambda v: 1 / 0)
+        assert not tab._validate_input(bad_validator, 'x')
+
+    def test_sync_dirty_uses_revision_counters(self):
+        from ult3edit.tui.form_editor import FormEditorTab
+        tab = FormEditorTab(
+            tab_name='Test',
+            records=[],
+            record_label_fn=lambda r, i: '',
+            field_factory=lambda r: [],
+            save_callback=lambda d: None,
+            get_save_data=lambda: b'',
+        )
+        tab._revision = 2
+        tab._saved_revision = 1
+        tab._sync_dirty()
+        assert tab.dirty
+
+
+class TestSearchTextAndShapes:
+    def test_search_text(self):
+        from ult3edit.tui.search_tab import SearchTab
+        from ult3edit.fileutil import encode_high_ascii
+        text_data = encode_high_ascii('TITLE STRING', 20) + b'\\x00'
+
+        class MockSession:
+            def has_category(self, cat): return cat == 'text'
+            def files_in(self, cat): return [('TEXT', 'Game Text')]
+            def read(self, name): return text_data
+
+        session = MockSession()
+        tab = SearchTab(session)
+        tab.query = 'TITLE'
+        tab._perform_search()
+        assert len(tab.results) == 1
+        assert tab.results[0]['type'] == 'Text'
+
+    def test_shapes_viewer_logic(self):
+        from ult3edit.tui.shapes_editor import ShapesViewer
+        data = bytearray(2048)
+        viewer = ShapesViewer(data)
+        assert viewer.name == 'Shapes'
+        assert viewer.selected_glyph == 0
+        assert not viewer.is_dirty

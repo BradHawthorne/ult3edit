@@ -638,7 +638,7 @@ pytest -v
 pytest --cov=ult3edit --cov-report=term-missing
 ```
 
-2512 tests with 100% code coverage. All tests use synthesized game data (no real game files needed).
+2596 tests with 100% code coverage. All tests use synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 

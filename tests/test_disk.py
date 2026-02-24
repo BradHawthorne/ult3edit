@@ -523,6 +523,72 @@ class TestDiskContextExit:
         result = ctx.__exit__(None, None, None)
         assert result is False
 
+    def test_exit_keeps_journal_on_write_failure(self, tmp_path, monkeypatch):
+        """Journal file is retained if any write-back fails."""
+        from ult3edit.disk import DiskContext
+
+        image_path = str(tmp_path / 'game.po')
+        ctx = DiskContext(image_path)
+        ctx._modified = {'ROST': b'\x00', 'MAPA': b'\x01'}
+        ctx._file_types = {'ROST': (0x06, 0x9500), 'MAPA': (0x06, 0x1000)}
+        tmpdir = tmp_path / 'cache'
+        tmpdir.mkdir()
+        ctx._tmpdir = str(tmpdir)
+
+        def fake_write(image, name, data, **kwargs):
+            return name != 'MAPA'
+
+        monkeypatch.setattr('ult3edit.disk.disk_write', fake_write)
+        ctx.__exit__(None, None, None)
+
+        journal_path = tmp_path / 'game.po.journal'
+        assert journal_path.exists()
+        journal_text = journal_path.read_text()
+        assert 'ROST' in journal_text
+        assert 'MAPA' in journal_text
+
+    def test_exit_removes_journal_when_all_writes_succeed(self, tmp_path, monkeypatch):
+        """Journal file is removed after successful write-back."""
+        from ult3edit.disk import DiskContext
+
+        image_path = str(tmp_path / 'game.po')
+        ctx = DiskContext(image_path)
+        ctx._modified = {'ROST': b'\x00'}
+        ctx._file_types = {'ROST': (0x06, 0x9500)}
+        tmpdir = tmp_path / 'cache'
+        tmpdir.mkdir()
+        ctx._tmpdir = str(tmpdir)
+
+        monkeypatch.setattr('ult3edit.disk.disk_write', lambda *a, **kw: True)
+        ctx.__exit__(None, None, None)
+
+        journal_path = tmp_path / 'game.po.journal'
+        assert not journal_path.exists()
+
+    def test_exit_reports_journal_write_error(self, tmp_path, monkeypatch, capsys):
+        """Journal creation failures are reported without crashing __exit__."""
+        from ult3edit.disk import DiskContext
+
+        image_path = str(tmp_path / 'game.po')
+        ctx = DiskContext(image_path)
+        ctx._modified = {'ROST': b'\x00'}
+        tmpdir = tmp_path / 'cache'
+        tmpdir.mkdir()
+        ctx._tmpdir = str(tmpdir)
+
+        import builtins
+        real_open = builtins.open
+
+        def fake_open(path, mode='r', *args, **kwargs):
+            if str(path).endswith('.journal') and 'w' in mode:
+                raise OSError('no write permission')
+            return real_open(path, mode, *args, **kwargs)
+
+        monkeypatch.setattr('builtins.open', fake_open)
+        ctx.__exit__(None, None, None)
+        err = capsys.readouterr().err
+        assert 'Critical: Journaling error' in err
+
 
 class TestDiskAuditLogic:
     """Test cmd_audit logic with mocked disk_info/disk_list."""
@@ -1333,4 +1399,3 @@ class TestDiskMain:
         assert len(called) == 1
         assert called[0].vol_name == 'VOIDBORN'
         assert called[0].boot_from == 'vanilla.po'
-

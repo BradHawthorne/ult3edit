@@ -20,6 +20,7 @@ from .constants import (
     CHAR_RECORD_SIZE, RACES, RACE_CODES, CLASSES, CLASS_CODES, GENDERS, STATUS_CODES,
     WEAPONS, ARMORS, MARKS_BITS, CARDS_BITS, RACE_MAX_STATS,
     CLASS_MAX_WEAPON, CLASS_MAX_ARMOR,
+    EXOTIC_WEAPON_INDEX, EXOTIC_ARMOR_INDEX,
     CHAR_NAME_OFFSET, CHAR_NAME_MAX, CHAR_NAME_FIELD,
     CHAR_MARKS_CARDS, CHAR_TORCHES,
     CHAR_IN_PARTY, CHAR_STATUS, CHAR_STR, CHAR_DEX, CHAR_INT, CHAR_WIS,
@@ -292,6 +293,17 @@ class Character:
         self.raw[CHAR_FOOD_HI], self.raw[CHAR_FOOD_LO] = int_to_bcd16(val)
 
     @property
+    def food_float(self) -> float:
+        """Get food + sub-morsels as a float (e.g., 100.50)."""
+        return self.food + (self.sub_morsels / 100.0)
+
+    @food_float.setter
+    def food_float(self, val: float) -> None:
+        """Set food and sub-morsels from a float."""
+        self.food = int(val)
+        self.sub_morsels = int(round((val - int(val)) * 100))
+
+    @property
     def gold(self) -> int:
         return bcd16_to_int(self.raw[CHAR_GOLD_HI], self.raw[CHAR_GOLD_LO])
 
@@ -343,8 +355,8 @@ class Character:
         try:
             self.raw[CHAR_WORN_ARMOR] = max(0, min(255, int(name, 0)))
             return
-        except ValueError:
-            pass
+        except ValueError: # pragma: no cover
+            pass # pragma: no cover
         raise ValueError(f'Unknown armor: {val}')
 
     @property
@@ -768,6 +780,8 @@ def cmd_import(args) -> None:
     for entry in data:
         slot = entry.get('slot')
         if slot is None or not (0 <= slot < len(chars)):
+            if slot is not None:
+                print(f"  Warning: skipping out-of-range slot {slot}", file=sys.stderr)
             continue
         char = chars[slot]
         if char.is_empty:
@@ -888,9 +902,9 @@ def check_progress(chars: list[Character]) -> dict:
             continue
         marks_found.update(char.marks)
         cards_found.update(char.cards)
-        if char.raw[CHAR_READIED_WEAPON] == 15:  # Exotic weapon index
+        if char.raw[CHAR_READIED_WEAPON] == EXOTIC_WEAPON_INDEX:
             has_exotic_weapon = True
-        if char.raw[CHAR_WORN_ARMOR] == 7:  # Exotic armor index
+        if char.raw[CHAR_WORN_ARMOR] == EXOTIC_ARMOR_INDEX:
             has_exotic_armor = True
 
     marks_missing = all_marks - marks_found

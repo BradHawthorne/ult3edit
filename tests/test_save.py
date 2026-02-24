@@ -2009,6 +2009,52 @@ class TestCmdImportPartyFields:
         assert (tmp_path / 'PRTY.bak').exists()
 
 
+class TestSaveImportOutputConflict:
+    """Protect cmd_import from dual-file --output clobbering."""
+
+    def test_import_dual_file_output_rejected(self, tmp_path, sample_character_bytes):
+        """Importing party + active_characters with --output must fail."""
+        from ult3edit.save import cmd_import as save_import
+
+        # Create source files.
+        prty = bytearray(PRTY_FILE_SIZE)
+        prty[PRTY_OFF_SENTINEL] = 0xFF
+        prty_path = tmp_path / 'PRTY'
+        prty_path.write_bytes(bytes(prty))
+
+        plrs = bytearray(PLRS_FILE_SIZE)
+        plrs[:CHAR_RECORD_SIZE] = sample_character_bytes
+        plrs_path = tmp_path / 'PLRS'
+        plrs_path.write_bytes(bytes(plrs))
+
+        original_prty = prty_path.read_bytes()
+        original_plrs = plrs_path.read_bytes()
+
+        jdata = {
+            'party': {'x': 10, 'y': 20},
+            'active_characters': [{'name': 'ALPHA'}],
+        }
+        json_path = tmp_path / 'save.json'
+        json_path.write_text(json.dumps(jdata))
+
+        out_path = tmp_path / 'conflict.bin'
+        args = argparse.Namespace(
+            game_dir=str(tmp_path),
+            json_file=str(json_path),
+            output=str(out_path),
+            backup=False,
+            dry_run=False,
+        )
+
+        with pytest.raises(SystemExit):
+            save_import(args)
+
+        # Neither source file should have been modified.
+        assert prty_path.read_bytes() == original_prty
+        assert plrs_path.read_bytes() == original_plrs
+        assert not out_path.exists()
+
+
 class TestSaveDispatch:
     """Cover dispatch() lines 648-652."""
 
@@ -2021,7 +2067,8 @@ class TestSaveDispatch:
             save_command='view', game_dir=str(tmp_path),
             json=False, output=None, validate=False, brief=True)
         dispatch(args)
-        assert 'Party' in capsys.readouterr().out or 'Save State' in capsys.readouterr().out or True
+        out = capsys.readouterr().out
+        assert 'Save State' in out
 
     def test_dispatch_edit(self, tmp_path, capsys):
         from ult3edit.save import dispatch
@@ -2062,6 +2109,4 @@ class TestSaveMain:
         monkeypatch.setattr('sys.argv', ['ult3-save'])
         main()
         captured = capsys.readouterr()
-        # No subcommand should print usage
-        assert 'Usage' in captured.err or captured.out == '' or True
-
+        assert 'Usage' in captured.err

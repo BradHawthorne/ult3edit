@@ -1,8 +1,24 @@
 """Tests for EditorTab, DrillDownTab state management."""
 
 
-from ult3edit.tui.editor_tab import TileEditorTab, DrillDownTab
+import pytest
+
+from ult3edit.tui.editor_tab import EditorTab, TileEditorTab, DrillDownTab
 from ult3edit.tui.base import EditorState, BaseTileEditor
+
+
+class TestEditorTabDefaults:
+    def test_default_is_dirty_and_save(self):
+        tab = EditorTab()
+        assert not tab.is_dirty
+        assert tab.save() is None
+
+    def test_name_and_build_ui_raise(self):
+        tab = EditorTab()
+        with pytest.raises(NotImplementedError):
+            _ = tab.name
+        with pytest.raises(NotImplementedError):
+            tab.build_ui()
 
 
 class TestTileEditorTab:
@@ -35,9 +51,10 @@ class TestTileEditorTab:
 class MockEditor:
     """Mock editor for DrillDownTab tests."""
 
-    def __init__(self):
+    def __init__(self, fail_on_save=False):
         self._dirty = False
         self._saved = False
+        self._fail_on_save = fail_on_save
 
     @property
     def is_dirty(self):
@@ -49,6 +66,8 @@ class MockEditor:
         return Window(), KeyBindings()
 
     def save(self):
+        if self._fail_on_save:
+            raise OSError('disk full')
         self._saved = True
         self._dirty = False
 
@@ -127,3 +146,118 @@ class TestDrillDownTab:
         """is_dirty should be False when no editor is open."""
         tab = self._make_tab()
         assert not tab.is_dirty
+
+    def test_switch_to_file_saves_dirty_editor(self):
+        tab = self._make_tab()
+        tab._open_editor()
+        first = tab.active_editor
+        first._dirty = True
+        assert tab.switch_to_file(1)
+        assert first._saved
+        assert tab.selected_index == 1
+        assert tab.active_editor is not first
+
+    def test_switch_to_file_invalid_index(self):
+        tab = self._make_tab()
+        assert not tab.switch_to_file(99)
+
+    def test_close_active_editor_no_editor_returns_true(self):
+        tab = self._make_tab()
+        assert tab._close_active_editor()
+
+    def test_close_active_editor_refuses_dirty_without_save_or_discard(self):
+        tab = self._make_tab()
+        tab._open_editor()
+        tab.active_editor._dirty = True
+        assert not tab._close_active_editor(save_if_dirty=False, discard_if_dirty=False)
+        assert tab.active_editor is not None
+
+    def test_switch_to_file_refuses_when_dirty_and_save_disabled(self):
+        tab = self._make_tab()
+        tab._open_editor()
+        tab.active_editor._dirty = True
+        assert not tab.switch_to_file(1, save_if_dirty=False)
+        assert tab.selected_index == 0
+
+    def test_open_editor_closes_existing_editor_first(self):
+        tab = self._make_tab()
+        tab._open_editor()
+        first = tab.active_editor
+        first._dirty = True
+        tab.selected_index = 1
+        tab._open_editor()
+        assert first._saved
+        assert tab.active_editor is not first
+
+    def test_close_active_editor_save_failure_returns_false(self):
+        class MockSession:
+            def read(self, name):
+                return bytes(256)
+
+            def make_save_callback(self, name):
+                return lambda data: None
+
+        tab = DrillDownTab(
+            'Maps',
+            [('MAPA', 'Overworld')],
+            lambda fname, data, save_cb: MockEditor(fail_on_save=True),
+            MockSession(),
+        )
+        tab._open_editor()
+        tab.active_editor._dirty = True
+        assert not tab._close_active_editor(save_if_dirty=True)
+        assert tab.active_editor is not None
+        assert isinstance(tab.last_close_error, OSError)
+
+    def test_open_editor_does_not_replace_when_save_fails(self):
+        class MockSession:
+            def read(self, name):
+                return bytes(256)
+
+            def make_save_callback(self, name):
+                return lambda data: None
+
+        def factory(fname, data, save_cb):
+            if fname == 'MAPA':
+                return MockEditor(fail_on_save=True)
+            return MockEditor()
+
+        tab = DrillDownTab(
+            'Maps',
+            [('MAPA', 'Overworld'), ('MAPB', 'Town')],
+            factory,
+            MockSession(),
+        )
+        tab._open_editor()
+        first = tab.active_editor
+        first._dirty = True
+
+        tab.selected_index = 1
+        tab._open_editor()
+
+        assert tab.active_editor is first
+
+    def test_switch_to_file_returns_false_when_save_fails(self):
+        class MockSession:
+            def read(self, name):
+                return bytes(256)
+
+            def make_save_callback(self, name):
+                return lambda data: None
+
+        def factory(fname, data, save_cb):
+            if fname == 'MAPA':
+                return MockEditor(fail_on_save=True)
+            return MockEditor()
+
+        tab = DrillDownTab(
+            'Maps',
+            [('MAPA', 'Overworld'), ('MAPB', 'Town')],
+            factory,
+            MockSession(),
+        )
+        tab._open_editor()
+        tab.active_editor._dirty = True
+
+        assert not tab.switch_to_file(1, save_if_dirty=True)
+        assert tab.selected_index == 0

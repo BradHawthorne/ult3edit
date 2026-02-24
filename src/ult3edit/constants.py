@@ -180,6 +180,9 @@ ARMORS = [
 # Armor evasion percentage (index matches ARMORS)
 ARMOR_EVASION = [50.0, 51.2, 53.1, 56.2, 59.4, 60.9, 63.3, 65.2]
 
+EXOTIC_WEAPON_INDEX = len(WEAPONS) - 1   # 15 = 'Exotic'
+EXOTIC_ARMOR_INDEX = len(ARMORS) - 1     # 7 = 'Exotic'
+
 # Class maximum weapon/armor tier (index into WEAPONS/ARMORS)
 CLASS_MAX_WEAPON = {
     'Fighter': 15, 'Cleric': 2, 'Wizard': 1, 'Thief': 6,

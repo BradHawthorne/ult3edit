@@ -36,6 +36,9 @@ def is_text_record(data: bytes) -> bool:
             high_ascii_printable += 1
     if content_bytes == 0:
         return False
+    # 70% threshold: real TLK text is nearly all high-ASCII; binary/code
+    # sections typically have <50% high-ASCII bytes.  70% cleanly separates
+    # the two in all known game files (vanilla + total conversions).
     return high_ascii_printable / content_bytes > 0.7
 
 
@@ -71,15 +74,8 @@ def encode_record(lines: list[str]) -> bytes:
     return bytes(out)
 
 
-def load_tlk_records(path: str, skip_binary: bool = True) -> list[list[str]]:
-    """Load a TLK file and return list of decoded records.
-
-    If skip_binary is True, records that appear to be binary data (code)
-    rather than text are excluded from the result.
-    """
-    with open(path, 'rb') as f:
-        data = f.read()
-
+def parse_tlk_data(data: bytes, skip_binary: bool = True) -> list[list[str]]:
+    """Parse raw TLK data and return list of decoded records."""
     records = []
     parts = data.split(bytes([TLK_RECORD_END]))
     for part in parts:
@@ -89,6 +85,13 @@ def load_tlk_records(path: str, skip_binary: bool = True) -> list[list[str]]:
             continue
         records.append(decode_record(part + bytes([TLK_RECORD_END])))
     return records
+
+
+def load_tlk_records(path: str, skip_binary: bool = True) -> list[list[str]]:
+    """Load a TLK file and return list of decoded records."""
+    with open(path, 'rb') as f:
+        data = f.read()
+    return parse_tlk_data(data, skip_binary)
 
 
 def cmd_view(args) -> None:

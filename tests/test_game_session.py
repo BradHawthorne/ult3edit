@@ -262,3 +262,45 @@ class TestGameSessionExodCatalog:
         cb = session.make_save_callback('EXOD:crawl')
         cb(b'\x00' * 26208)
         assert 'EXOD' in session.ctx._modified
+
+
+class TestGameSessionShapesCatalog:
+    def test_shapes_detected(self, tmp_dir):
+        session = _make_session(tmp_dir, files={
+            'SHPS#060800': 2048,
+        })
+        assert session.has_category('shapes')
+        assert session.files_in('shapes') == [('SHPS', 'Tile Shapes')]
+
+
+class TestActivePartyScanning:
+    def test_active_party_detected(self, tmp_dir):
+        from ult3edit.tui.game_session import GameSession
+        import os
+        plrs_path = os.path.join(tmp_dir, 'PLRS')
+        with open(plrs_path, 'wb') as f:
+            f.write(bytearray(256))
+
+        session = GameSession.__new__(GameSession)
+        session.image_path = 'fake.po'
+        session.catalog = {}
+
+        class MockCtx:
+            _tmpdir = tmp_dir
+        session.ctx = MockCtx()
+
+        session._scan_catalog()
+        assert session.has_category('active_party')
+        assert session.files_in('active_party') == [('PLRS', 'Active Characters')]
+
+
+class TestGameSessionNoCtx:
+    def test_read_no_ctx(self):
+        from ult3edit.tui.game_session import GameSession
+        session = GameSession('fake.po')
+        assert session.read('MAPA') is None
+
+    def test_write_no_ctx(self):
+        from ult3edit.tui.game_session import GameSession
+        session = GameSession('fake.po')
+        session.write('MAPA', b'0') # Should not raise

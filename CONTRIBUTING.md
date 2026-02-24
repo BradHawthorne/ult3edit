@@ -17,7 +17,7 @@ Python 3.10 is the minimum supported version. Do not use `match` statements, `St
 ## Running Tests
 
 ```bash
-pytest -v                        # Run all 2512 tests
+pytest -v                        # Run all 2596 tests
 pytest tests/test_roster.py      # Run one module
 pytest -v tests/test_bcd.py::TestBcdToInt::test_zero   # Run a single test
 

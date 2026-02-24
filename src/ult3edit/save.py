@@ -429,6 +429,15 @@ def cmd_import(args) -> None:
         jdata = json.load(f)
 
     party_data = jdata.get('party', {})
+    chars_data = jdata.get('active_characters', [])
+
+    if party_data and chars_data and args.output:
+        print("Error: --output cannot be used when importing both party state "
+              "and PLRS characters (they are separate files). Remove --output "
+              "to write each file in place, or import them in separate commands.",
+              file=sys.stderr)
+        sys.exit(1)
+
     if party_data:
         prty_path = resolve_single_file(game_dir, 'PRTY')
         if not prty_path:
@@ -469,7 +478,6 @@ def cmd_import(args) -> None:
             print(f"Imported party state to {output}")
 
     # PLRS character import
-    chars_data = jdata.get('active_characters', [])
     if chars_data:
         plrs_path = resolve_single_file(game_dir, 'PLRS')
         if not plrs_path:

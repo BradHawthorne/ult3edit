@@ -1361,7 +1361,7 @@ def cmd_import(args) -> None:
         print(f"  Imported {frame_name}: {width}x{height}{dither_label}")
 
     if getattr(args, 'dry_run', False):
-        print("  (dry run — no file written)")
+        print("Dry run - no changes written.")
         return
 
     # Write back
@@ -1467,7 +1467,7 @@ def cmd_crawl_import(args) -> None:
     print(f"  Importing {len(coords)} points ({len(crawl_bytes)} bytes)")
 
     if getattr(args, 'dry_run', False):
-        print("  (dry run — no file written)")
+        print("Dry run - no changes written.")
         return
 
     from .fileutil import backup_file
@@ -1725,7 +1725,7 @@ def cmd_glyph_import(args) -> None:
           f"{width}x{height}{dither_label}")
 
     if getattr(args, 'dry_run', False):
-        print("  (dry run — no file written)")
+        print("Dry run - no changes written.")
         return
 
     from .fileutil import backup_file

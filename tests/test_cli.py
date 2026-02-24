@@ -512,7 +512,7 @@ class TestValidateOnEditArgs:
                                   '--tile', '0', '0', '32', '--validate'])
         assert args.validate is True
 
-    def test_bestiary_edit_validate_runs(self, tmp_dir, sample_mon_bytes):
+    def test_bestiary_edit_validate_runs(self, tmp_dir, sample_mon_bytes, capsys):
         """bestiary edit with --validate should show warnings."""
         from ult3edit.bestiary import cmd_edit
         mon_file = os.path.join(tmp_dir, 'MONA#069900')
@@ -522,8 +522,9 @@ class TestValidateOnEditArgs:
             'file': mon_file, 'monster': 0, 'all': False,
             'output': None, 'backup': False, 'dry_run': True,
             'validate': True,
-            'name': None, 'tile1': None, 'tile2': None,
+            'name': None, 'tile1': None,
             'hp': 50, 'attack': None, 'defense': None, 'speed': None,
+            'tile2': 0x01,  # Force tile mismatch warning.
             'flags1': None, 'flags2': None, 'ability1': None, 'ability2': None,
             'type': None,
             'boss': None, 'no_boss': None, 'undead': None, 'ranged': None,
@@ -533,10 +534,11 @@ class TestValidateOnEditArgs:
             'divide': None, 'no_divide': None,
             'resistant': None, 'no_resistant': None,
         })()
-        # Should not raise
         cmd_edit(args)
+        err = capsys.readouterr().err
+        assert 'WARNING' in err
 
-    def test_combat_edit_validate_runs(self, tmp_dir, sample_con_bytes):
+    def test_combat_edit_validate_runs(self, tmp_dir, sample_con_bytes, capsys):
         """combat edit with --validate should show warnings."""
         from ult3edit.combat import cmd_edit
         con_file = os.path.join(tmp_dir, 'CONA#069900')
@@ -546,11 +548,12 @@ class TestValidateOnEditArgs:
             'file': con_file,
             'output': None, 'backup': False, 'dry_run': True,
             'validate': True,
-            'tile': [5, 5, 0x20],
+            'tile': [5, 5, 0x21],  # Misaligned tile value triggers validator warning.
             'monster_pos': None, 'pc_pos': None,
         })()
-        # Should not raise
         cmd_edit(args)
+        err = capsys.readouterr().err
+        assert 'WARNING' in err
 
 
 class TestHexIntArgParsing:

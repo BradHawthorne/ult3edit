@@ -114,6 +114,10 @@ class GameSession:
         if party:
             self.catalog['party'] = party
 
+        # Active Party (PLRS)
+        if 'PLRS' in available:
+            self.catalog['active_party'] = [('PLRS', 'Active Characters')]
+
         # EXOD (title screen / boot loader)
         if 'EXOD' in available:
             self.catalog['exod'] = [
@@ -121,6 +125,10 @@ class GameSession:
                 ('EXOD:glyphs', 'Glyph Table'),
                 ('EXOD:frames', 'HGR Frames'),
             ]
+
+        # Shapes (character set)
+        if 'SHPS' in available:
+            self.catalog['shapes'] = [('SHPS', 'Tile Shapes')]
 
     def read(self, name: str) -> bytes | None:
         """Read a file from the disk image (cached).

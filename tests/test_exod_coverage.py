@@ -579,7 +579,7 @@ class TestCmdImport:
         cmd_import(args)
         out = capsys.readouterr().out
         assert 'Imported exodus' in out
-        assert 'dry run' in out
+        assert 'Dry run' in out
 
     def test_import_frame_write(self, tmp_path, capsys):
         """Import a PNG frame with actual write."""
@@ -808,7 +808,7 @@ class TestCmdCrawlImport:
         cmd_crawl_import(args)
         out = capsys.readouterr().out
         assert 'Importing 2 points' in out
-        assert 'dry run' in out
+        assert 'Dry run' in out
 
     def test_import_write(self, tmp_path, capsys):
         """Import crawl data with actual write."""
@@ -1107,7 +1107,7 @@ class TestCmdGlyphImport:
         cmd_glyph_import(args)
         out = capsys.readouterr().out
         assert 'Imported glyph 0 variant 0' in out
-        assert 'dry run' in out
+        assert 'Dry run' in out
 
     def test_import_write(self, tmp_path, capsys):
         """Import glyph with actual write."""
@@ -1320,7 +1320,7 @@ class TestDispatchCrawl:
                                   backup=False)
         _dispatch_crawl(args)
         out = capsys.readouterr().out
-        assert 'dry run' in out
+        assert 'Dry run' in out
 
     def test_crawl_render_route(self, tmp_path, capsys):
         """_dispatch_crawl routes 'render'."""
@@ -1387,7 +1387,7 @@ class TestDispatchGlyph:
                                   dither=False, dry_run=True, backup=False)
         _dispatch_glyph(args)
         out = capsys.readouterr().out
-        assert 'dry run' in out
+        assert 'Dry run' in out
 
 
 # ============================================================================
@@ -1458,7 +1458,7 @@ class TestMain:
                              '--frame', 'exodus', '--dry-run'])
         main()
         out = capsys.readouterr().out
-        assert 'dry run' in out
+        assert 'Dry run' in out
 
     def test_main_crawl_compose(self, tmp_path, monkeypatch, capsys):
         """main() crawl compose generates coordinates."""

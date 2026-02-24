@@ -78,12 +78,14 @@ class CombatEditor(BaseTileEditor):
             self.monster_x[self.placement_slot] = x
             self.monster_y[self.placement_slot] = y
             self.state.dirty = True
+            self.state.revision += 1
             # Auto-advance to next slot
             self.placement_slot = (self.placement_slot + 1) % CON_MONSTER_COUNT
         elif self.state.mode == 'pc':
             self.pc_x[self.placement_slot] = x
             self.pc_y[self.placement_slot] = y
             self.state.dirty = True
+            self.state.revision += 1
             self.placement_slot = (self.placement_slot + 1) % CON_PC_COUNT
         else:
             self.state.paint()
@@ -144,4 +146,4 @@ class CombatEditor(BaseTileEditor):
         else:
             with open(self.file_path, 'wb') as f:
                 f.write(bytes(out))
-        self.state.dirty = False
+        self.state.mark_saved()

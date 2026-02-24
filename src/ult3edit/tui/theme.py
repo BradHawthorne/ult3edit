@@ -2,7 +2,17 @@
 
 from prompt_toolkit.styles import Style
 
-U3_STYLE = Style.from_dict({
+# --- Themes ---
+
+U3_STYLE_CLASSIC = {
+    'cursor':           'bg:ansigreen ansiblack bold',
+    'status':           'bg:ansigreen ansiblack',
+    'status-dirty':     'bg:ansired ansiwhite bold',
+    'help-key':         'ansigreen bold',
+    'tab-active':       'bg:ansigreen ansiblack bold',
+}
+
+U3_STYLE_MODERN = {
     # Cursor and selection
     'cursor':           'bg:ansiyellow ansiblack bold',
     'highlight':        'bg:#333333',
@@ -51,7 +61,25 @@ U3_STYLE = Style.from_dict({
     'tab-inactive':     'bg:#333333 ansigray',
     'tab-dirty':        'ansired bold',
     'tab-bar':          'bg:#222222',
-})
+}
+
+U3_STYLE_AMBER = {
+    **U3_STYLE_CLASSIC,
+    'cursor':           'bg:ansiyellow ansiblack bold',
+    'status':           'bg:ansiyellow ansiblack',
+    'tab-active':       'bg:ansiyellow ansiblack bold',
+}
+
+THEMES = {
+    'Modern': U3_STYLE_MODERN,
+    'Classic Green': U3_STYLE_CLASSIC,
+    'Classic Amber': U3_STYLE_AMBER,
+}
+
+U3_STYLE = Style.from_dict(U3_STYLE_MODERN)
+
+def get_style(theme_name): # pragma: no cover
+    return Style.from_dict(THEMES.get(theme_name, U3_STYLE_MODERN))
 
 # Map canonical tile IDs to style classes
 _TILE_STYLES = {

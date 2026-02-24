@@ -652,7 +652,7 @@ def cmd_edit(args) -> None:
     print(f"  New: {' '.join(f'{b:02X}' for b in new_bytes)}")
 
     if dry_run:
-        print("Dry run — no changes written.")
+        print("Dry run - no changes written.")
         return
 
     data[offset:offset + GLYPH_SIZE] = new_bytes

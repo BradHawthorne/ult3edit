@@ -15,6 +15,10 @@ class DialogEditor:
         self.original_data = bytes(data)
         self.save_callback = save_callback
         self.dirty = False
+        self.undo_stack = []
+        self.redo_stack = []
+        self._revision = 0
+        self._saved_revision = 0
 
         # Parse records from raw data, preserving binary parts
         self._raw_parts = data.split(bytes([TLK_RECORD_END]))
@@ -30,6 +34,9 @@ class DialogEditor:
             self.records.append(decode_record(part + bytes([TLK_RECORD_END])))
 
         self.selected_index = 0
+
+    def _sync_dirty(self):
+        self.dirty = self._revision != self._saved_revision
 
     @property
     def is_dirty(self):
@@ -54,6 +61,7 @@ class DialogEditor:
         else:
             with open(self.file_path, 'wb') as f:
                 f.write(data)
+        self._saved_revision = self._revision
         self.dirty = False
 
     def build_ui(self):  # pragma: no cover
@@ -102,6 +110,8 @@ class DialogEditor:
             return [
                 ('class:help-key', ' Up/Down'), ('class:help-text', '=navigate '),
                 ('class:help-key', 'Enter'), ('class:help-text', '=edit '),
+                ('class:help-key', 'Ctrl+Z'), ('class:help-text', '=undo '),
+                ('class:help-key', 'Ctrl+Y'), ('class:help-text', '=redo '),
                 ('class:help-key', 'Escape'), ('class:help-text', '=back '),
             ]
 
@@ -136,8 +146,33 @@ class DialogEditor:
                 default=current,
             ).run()
             if result is not None and result != current:
-                editor.records[editor.selected_index] = result.split('\\n')
+                old_value = list(editor.records[editor.selected_index])
+                new_value = result.split('\\n')
+                editor.records[editor.selected_index] = new_value
                 editor._modified_records.add(editor.selected_index)
-                editor.dirty = True
+                editor.undo_stack.append((editor.selected_index, old_value, new_value))
+                editor.redo_stack.clear()
+                editor._revision += 1
+                editor._sync_dirty()
+
+        @kb.add('c-z')
+        def _undo(event):
+            if editor.undo_stack:
+                idx, old_value, new_value = editor.undo_stack.pop()
+                editor.records[idx] = list(old_value)
+                editor._modified_records.add(idx)
+                editor.redo_stack.append((idx, old_value, new_value))
+                editor._revision = max(0, editor._revision - 1)
+                editor._sync_dirty()
+
+        @kb.add('c-y')
+        def _redo(event):
+            if editor.redo_stack:
+                idx, old_value, new_value = editor.redo_stack.pop()
+                editor.records[idx] = list(new_value)
+                editor._modified_records.add(idx)
+                editor.undo_stack.append((idx, old_value, new_value))
+                editor._revision += 1
+                editor._sync_dirty()
 
         return root, kb

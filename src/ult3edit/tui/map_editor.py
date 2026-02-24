@@ -46,6 +46,11 @@ class MapEditor(BaseTileEditor):
         self.current_level = level
         offset = level * 256
         self.state.data = bytearray(self.full_data[offset:offset + 256])
+        self.state.undo_stack.clear()
+        self.state.redo_stack.clear()
+        self.state.revision = 0
+        self.state.saved_revision = 0
+        self.state.dirty = False
         self.state.cursor_x = min(self.state.cursor_x, 15)
         self.state.cursor_y = min(self.state.cursor_y, 15)
 
@@ -75,4 +80,4 @@ class MapEditor(BaseTileEditor):
         else:
             with open(self.file_path, 'wb') as f:
                 f.write(out)
-        self.state.dirty = False
+        self.state.mark_saved()

@@ -30,4 +30,4 @@ class SpecialEditor(BaseTileEditor):
         else:
             with open(self.file_path, 'wb') as f:
                 f.write(bytes(out))
-        self.state.dirty = False
+        self.state.mark_saved()

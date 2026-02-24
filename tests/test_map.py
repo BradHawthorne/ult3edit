@@ -1502,6 +1502,136 @@ class TestMapImportGaps:
         captured = capsys.readouterr()
         assert 'not divisible' in captured.err
 
+    def test_import_row_too_wide_warns_and_truncates(self, tmp_path, capsys):
+        """Rows wider than map width are truncated with warning."""
+        from ult3edit.map import cmd_import
+        data = bytearray([0x04] * MAP_OVERWORLD_SIZE)
+        path = os.path.join(str(tmp_path), 'MAPA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({'width': 64, 'tiles': [['water'] * 65]}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        captured = capsys.readouterr()
+        assert 'truncating' in captured.err
+
+        result = open(path, 'rb').read()
+        assert all(v == 0x00 for v in result[:64])
+        assert result[64] == 0x04
+
+    def test_import_extra_rows_warns_and_ignores_overflow(self, tmp_path, capsys):
+        """Rows beyond map height are ignored with warning."""
+        from ult3edit.map import cmd_import
+        data = bytearray([0x04] * MAP_OVERWORLD_SIZE)
+        path = os.path.join(str(tmp_path), 'MAPA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'import.json')
+        rows = [['water'] * 64 for _ in range(65)]
+        with open(json_path, 'w') as f:
+            json.dump({'width': 64, 'tiles': rows}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        captured = capsys.readouterr()
+        assert 'extra row' in captured.err
+
+        result = open(path, 'rb').read()
+        assert result[0] == 0x00
+        assert result[(64 * 63)] == 0x00
+
+    def test_import_non_list_row_is_skipped(self, tmp_path, capsys):
+        """Non-list rows warn and are skipped."""
+        from ult3edit.map import cmd_import
+        data = bytearray([0x04] * MAP_OVERWORLD_SIZE)
+        path = os.path.join(str(tmp_path), 'MAPA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({'width': 64, 'tiles': ['NOT_A_ROW']}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        captured = capsys.readouterr()
+        assert 'is not a list' in captured.err
+
+    def test_import_short_row_warns_and_leaves_tail(self, tmp_path, capsys):
+        """Rows shorter than map width warn and preserve untouched columns."""
+        from ult3edit.map import cmd_import
+        data = bytearray([0x04] * MAP_OVERWORLD_SIZE)
+        path = os.path.join(str(tmp_path), 'MAPA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({'width': 64, 'tiles': [['water'] * 2]}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            dry_run=False, backup=False, output=None)
+        cmd_import(args)
+        captured = capsys.readouterr()
+        assert 'has only 2 column' in captured.err
+
+        result = open(path, 'rb').read()
+        assert result[0] == 0x00
+        assert result[1] == 0x00
+        assert result[2] == 0x04
+
+    def test_import_numeric_tile_values(self, tmp_path):
+        """Numeric tile values in JSON are treated as direct byte IDs."""
+        from ult3edit.map import cmd_import
+        data = bytearray([0x04] * MAP_OVERWORLD_SIZE)
+        path = os.path.join(str(tmp_path), 'MAPA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({'width': 64, 'tiles': [[16, '0x11', '18']]}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            dry_run=False, backup=False, output=None)
+        cmd_import(args)
+
+        result = open(path, 'rb').read()
+        assert result[0] == 16
+        assert result[1] == 17
+        assert result[2] == 18
+
+    def test_import_mixed_non_string_tiles_fall_back_safely(self, tmp_path, capsys):
+        """Importer handles bool/non-string/invalid numeric inputs without crashing."""
+        from ult3edit.map import cmd_import
+        data = bytearray([0x04] * MAP_OVERWORLD_SIZE)
+        path = os.path.join(str(tmp_path), 'MAPA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        json_path = os.path.join(str(tmp_path), 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({
+                'width': 64,
+                'tiles': [[True, 999, {'k': 1}, '   ', '0xGG', '300', '0x1FF']],
+            }, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            dry_run=False, backup=False, output=None)
+        cmd_import(args)
+
+        result = open(path, 'rb').read()
+        assert result[0] == 1
+        assert result[1] == 0x04
+        assert result[2] == 0x04
+        assert result[3] == 0x04
+        assert result[4] == 0x04
+        assert result[5] == 0x04
+        assert result[6] == 0x04
+        assert 'out of range' in capsys.readouterr().err
+
 
 class TestMapCmdViewGaps:
     """Test map cmd_view and cmd_overview directory errors."""
@@ -2097,4 +2227,3 @@ class TestMapCompileRowTruncation:
         with open(out, 'rb') as f:
             data = f.read()
         assert len(data) == MAP_OVERWORLD_SIZE
-

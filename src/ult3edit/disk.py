@@ -169,15 +169,40 @@ class DiskContext:
     def __exit__(self, exc_type, exc_val, exc_tb):
         # Always write back modified files, even on exception, to avoid data loss
         if self._modified:
-            for name, data in self._modified.items():
-                try:
-                    ft, at = self._file_types.get(name.upper(), (0x06, 0x0000))
-                    disk_write(self.image_path, name, data,
-                               file_type=ft, aux_type=at,
-                               diskiigs_path=self.diskiigs_path)
-                except Exception as e:
-                    print(f'Warning: failed to write {name}: {e}',
-                          file=sys.stderr)
+            # Create a simple journal of what we are about to write
+            journal_path = self.image_path + '.journal'
+            try:
+                with open(journal_path, 'w') as f:
+                    for name in self._modified:
+                        f.write(f'{name}\n')
+
+                all_writes_ok = True
+                for name, data in self._modified.items():
+                    try:
+                        ft, at = self._file_types.get(name.upper(), (0x06, 0x0000))
+                        ok = disk_write(
+                            self.image_path, name, data,
+                            file_type=ft, aux_type=at,
+                            diskiigs_path=self.diskiigs_path,
+                        )
+                        if not ok:
+                            all_writes_ok = False
+                            print(f'Warning: failed to write {name} to disk image',
+                                  file=sys.stderr) # pragma: no cover
+                    except Exception as e:
+                        all_writes_ok = False
+                        print(f'Warning: failed to write {name}: {e}',
+                              file=sys.stderr) # pragma: no cover
+
+                # Remove journal only after every file writes successfully.
+                if all_writes_ok and os.path.exists(journal_path):
+                    os.remove(journal_path)
+                elif not all_writes_ok:
+                    print(f'Warning: one or more writes failed; journal kept at '
+                          f'{journal_path}', file=sys.stderr) # pragma: no cover
+            except Exception as e:
+                print(f'Critical: Journaling error: {e}', file=sys.stderr) # pragma: no cover
+
         if self._tmpdir:
             shutil.rmtree(self._tmpdir, ignore_errors=True)
         return False

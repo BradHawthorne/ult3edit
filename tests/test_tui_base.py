@@ -27,6 +27,25 @@ class TestTileAccess:
         state.set_tile(10, 10, 0x00)
         assert state.dirty is False
 
+    def test_dirty_clears_when_undo_returns_to_saved_state(self):
+        data = bytearray([0x04] * 16)
+        state = EditorState(data=data, width=4, height=4)
+        state.set_tile(0, 0, 0x00)
+        assert state.dirty
+        state.undo()
+        assert not state.dirty
+
+    def test_dirty_tracks_saved_revision_across_redo(self):
+        data = bytearray([0x04] * 16)
+        state = EditorState(data=data, width=4, height=4)
+        state.set_tile(0, 0, 0x00)
+        state.mark_saved()
+        assert not state.dirty
+        state.undo()
+        assert state.dirty
+        state.redo()
+        assert not state.dirty
+
 
 class TestCursorMovement:
     def test_move_right(self):

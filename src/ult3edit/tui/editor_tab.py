@@ -14,7 +14,25 @@ from prompt_toolkit.key_binding import KeyBindings, merge_key_bindings, \
 from prompt_toolkit.filters import Condition
 
 
-class TileEditorTab:
+class EditorTab:
+    """Interface for all top-level editor tabs."""
+
+    @property
+    def name(self) -> str:
+        raise NotImplementedError # pragma: no cover
+
+    @property
+    def is_dirty(self) -> bool:
+        return False
+
+    def build_ui(self):
+        raise NotImplementedError # pragma: no cover
+
+    def save(self):
+        pass
+
+
+class TileEditorTab(EditorTab):
     """Wraps a BaseTileEditor subclass as a tab."""
 
     def __init__(self, editor):
@@ -93,6 +111,7 @@ class DrillDownTab:
         self.selected_index = 0
         self.active_editor = None  # None = selector mode
         self._editor_version = 0
+        self._last_close_error = None
 
     @property
     def name(self):
@@ -107,6 +126,50 @@ class DrillDownTab:
     def save(self):
         if self.active_editor:
             self.active_editor.save()
+
+    @property
+    def last_close_error(self):
+        return self._last_close_error
+
+    def _close_active_editor(
+        self,
+        save_if_dirty: bool = True,
+        discard_if_dirty: bool = False,
+    ) -> bool:
+        """Close current sub-editor; optionally save first if dirty.
+
+        Returns True when the editor is closed, False if close was refused.
+        """
+        if not self.active_editor:
+            self._last_close_error = None
+            return True
+
+        self._last_close_error = None
+        if self.active_editor.is_dirty:
+            if save_if_dirty:
+                try:
+                    self.active_editor.save()
+                except Exception as exc:
+                    self._last_close_error = exc
+                    return False
+            elif not discard_if_dirty:
+                return False
+
+        self.active_editor = None
+        self._editor_container = None
+        self._editor_kb = None
+        self._editor_version += 1
+        return True
+
+    def switch_to_file(self, file_index: int, save_if_dirty: bool = True) -> bool:
+        """Switch to a file index, closing/saving active sub-editor first."""
+        if file_index < 0 or file_index >= len(self.file_list):
+            return False
+        if not self._close_active_editor(save_if_dirty=save_if_dirty):
+            return False
+        self.selected_index = file_index
+        self._open_editor()
+        return self.active_editor is not None
 
     def build_ui(self):  # pragma: no cover
         """Build a dynamic container that switches between selector and editor."""
@@ -192,6 +255,13 @@ class DrillDownTab:
         @nav_kb.add('escape')
         def _back(event):
             if tab.active_editor:
+                # If sub-editor has a palette picker open, close that first
+                if (hasattr(tab.active_editor, 'state')
+                        and hasattr(tab.active_editor.state, 'picker_mode')
+                        and tab.active_editor.state.picker_mode):
+                    tab.active_editor.state.picker_mode = False
+                    return
+
                 # If sub-editor has field-editing mode, exit that first
                 if (hasattr(tab.active_editor, 'editing_fields')
                         and tab.active_editor.editing_fields):
@@ -199,10 +269,34 @@ class DrillDownTab:
                     tab.active_editor._current_fields = []
                     return
                 if tab.active_editor.is_dirty:
-                    tab.active_editor.save()
-                tab.active_editor = None
-                tab._editor_container = None
-                tab._editor_kb = None
+                    from prompt_toolkit.shortcuts import button_dialog
+                    choice = button_dialog(
+                        title='Unsaved Changes',
+                        text=f"Save changes before closing {tab.tab_name} editor?",
+                        buttons=[
+                            ('Save', 'save'),
+                            ('Discard', 'discard'),
+                            ('Cancel', 'cancel'),
+                        ],
+                    ).run()
+                    if choice == 'cancel' or choice is None:
+                        return
+                    if choice == 'save':
+                        closed = tab._close_active_editor(save_if_dirty=True)
+                        if not closed:
+                            from prompt_toolkit.shortcuts import message_dialog
+                            err = tab.last_close_error
+                            message_dialog(
+                                title='Save Failed',
+                                text=f"Failed to save {tab.tab_name}: {err}",
+                            ).run()
+                    else:
+                        tab._close_active_editor(
+                            save_if_dirty=False,
+                            discard_if_dirty=True,
+                        )
+                    return
+                tab._close_active_editor(save_if_dirty=False, discard_if_dirty=True)
 
         # Sub-editor keybindings: dynamically forwarded via _DynamicEditorBindings
         class _DynamicEditorBindings:
@@ -235,6 +329,10 @@ class DrillDownTab:
         """Open the editor for the currently selected file."""
         if not self.file_list:
             return
+        # Prevent dirty sub-editor from being silently overwritten.
+        if self.active_editor:
+            if not self._close_active_editor(save_if_dirty=True):
+                return
         fname, display = self.file_list[self.selected_index]
         data = self.session.read(fname)
         if data is None:

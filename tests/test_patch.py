@@ -128,17 +128,23 @@ class TestPatch:
             encode_text_region(strings, 10)
 
     def test_patch_dry_run(self, tmp_path):
-        data = bytearray(17408)
+        data = bytearray(self._make_ult3())
         path = str(tmp_path / 'ULT3')
         with open(path, 'wb') as f:
             f.write(data)
+        json_path = str(tmp_path / 'patch.json')
+        with open(json_path, 'w') as f:
+            json.dump({'regions': {'food-rate': {'data': [2]}}}, f)
 
-        # Read and verify original
         with open(path, 'rb') as f:
             original = f.read()
-
-        # Simulate edit + dry run: data should not change
-        assert original[0x397A] == 0
+        args = argparse.Namespace(
+            file=path, json_file=json_path, region='food-rate',
+            output=None, backup=False, dry_run=True)
+        patch_cmd_import(args)
+        with open(path, 'rb') as f:
+            after = f.read()
+        assert after == original
 
     def test_all_regions_within_file_bounds(self):
         """Verify all patchable region offsets fit within their binaries."""
@@ -3561,16 +3567,22 @@ class TestPatchDispatch:
             patch_command='view', file=path,
             region=None, json=False, output=None)
         dispatch(args)
+        captured = capsys.readouterr()
+        assert 'food-rate' in captured.out
 
     def test_dispatch_edit(self, tmp_path, capsys):
         """dispatch() routes 'edit' to cmd_edit."""
         from ult3edit.patch import dispatch
         path = self._make_ult3_file(tmp_path)
+        before = open(path, 'rb').read()
         args = argparse.Namespace(
             patch_command='edit', file=path,
             region='food-rate', data='02',
             output=None, backup=False, dry_run=True)
         dispatch(args)
+        captured = capsys.readouterr()
+        assert 'Dry run' in captured.out
+        assert open(path, 'rb').read() == before
 
     def test_dispatch_dump(self, tmp_path, capsys):
         """dispatch() routes 'dump' to cmd_dump."""

@@ -160,7 +160,7 @@ def register_parser(subparsers) -> None:
     p_edit = sub.add_parser('edit', help='Edit game text')
     p_edit.add_argument('file', help='TEXT file path')
     p_edit.add_argument('--record', type=int, help='Record index (with --text)')
-    p_edit.add_argument('--text', help='New text (with --record)')
+    p_edit.add_argument('--text', help='New text (with --record; uppercased to match engine)')
     p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_edit.add_argument('--backup', action='store_true', help='Create .bak backup before overwrite')
     p_edit.add_argument('--dry-run', action='store_true', help='Show changes without writing')
@@ -198,7 +198,7 @@ def main() -> None:
     p_edit = sub.add_parser('edit', help='Edit game text')
     p_edit.add_argument('file', help='TEXT file path')
     p_edit.add_argument('--record', type=int, help='Record index (with --text)')
-    p_edit.add_argument('--text', help='New text (with --record)')
+    p_edit.add_argument('--text', help='New text (with --record; uppercased to match engine)')
     p_edit.add_argument('--output', '-o', help='Output file (default: overwrite)')
     p_edit.add_argument('--backup', action='store_true',
                         help='Create .bak backup before overwrite')

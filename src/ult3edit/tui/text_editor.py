@@ -65,6 +65,13 @@ class TextEditor:
         self.selected_index = 0
         self.dirty = False
         self.save_callback = save_callback
+        self.undo_stack = []
+        self.redo_stack = []
+        self._revision = 0
+        self._saved_revision = 0
+
+    def _sync_dirty(self):
+        self.dirty = self._revision != self._saved_revision
 
     def _build_ui(self, embedded: bool = False):  # pragma: no cover
         """Build the UI container and keybindings.
@@ -117,6 +124,8 @@ class TextEditor:
             return [
                 ('class:help-key', ' Up/Down'), ('class:help-text', '=navigate '),
                 ('class:help-key', 'Enter'), ('class:help-text', '=edit '),
+                ('class:help-key', 'Ctrl+Z'), ('class:help-text', '=undo '),
+                ('class:help-key', 'Ctrl+Y'), ('class:help-text', '=redo '),
                 ('class:help-key', 'Ctrl-S'), ('class:help-text', '=save '),
                 ('class:help-key', 'Ctrl-Q'), ('class:help-text', '=quit '),
             ]
@@ -152,8 +161,30 @@ class TextEditor:
             if result is not None:
                 new_text = result[:rec.max_len].upper()
                 if new_text != rec.text:
+                    old_text = rec.text
                     rec.text = new_text
-                    editor.dirty = True
+                    editor.undo_stack.append((editor.selected_index, old_text, new_text))
+                    editor.redo_stack.clear()
+                    editor._revision += 1
+                    editor._sync_dirty()
+
+        @kb.add('c-z')
+        def _undo(event):
+            if editor.undo_stack:
+                idx, old_text, new_text = editor.undo_stack.pop()
+                editor.records[idx].text = old_text
+                editor.redo_stack.append((idx, old_text, new_text))
+                editor._revision = max(0, editor._revision - 1)
+                editor._sync_dirty()
+
+        @kb.add('c-y')
+        def _redo(event):
+            if editor.redo_stack:
+                idx, old_text, new_text = editor.redo_stack.pop()
+                editor.records[idx].text = new_text
+                editor.undo_stack.append((idx, old_text, new_text))
+                editor._revision += 1
+                editor._sync_dirty()
 
         if not embedded:
             @kb.add('c-s')
@@ -195,4 +226,5 @@ class TextEditor:
         else:
             with open(self.file_path, 'wb') as f:
                 f.write(bytes(out))
+        self._saved_revision = self._revision
         self.dirty = False

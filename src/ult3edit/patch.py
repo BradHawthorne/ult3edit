@@ -311,7 +311,7 @@ def cmd_edit(args) -> None:
     print(f"  New: {' '.join(f'{b:02X}' for b in new_bytes)}")
 
     if dry_run:
-        print("Dry run — no changes written.")
+        print("Dry run - no changes written.")
         return
 
     output = args.output if args.output else args.file
@@ -443,7 +443,7 @@ def cmd_import(args) -> None:
         sys.exit(1)
 
     if dry_run:  # Buffer mutations above are discarded — no file written
-        print(f"Dry run — {patched} region(s) would be updated.")
+        print(f"Dry run - {patched} region(s) would be updated.")
         return
 
     output = args.output if args.output else args.file
@@ -602,7 +602,7 @@ def cmd_strings_edit(args) -> None:
         sys.exit(1)
 
     if getattr(args, 'dry_run', False):
-        print(f"\nDry run — {success_count} string(s) would be patched.")
+        print(f"\nDry run - {success_count} string(s) would be patched.")
         return
 
     output = getattr(args, 'output', None) or args.file
@@ -671,7 +671,7 @@ def cmd_strings_import(args) -> None:
         sys.exit(1)
 
     if getattr(args, 'dry_run', False):
-        print("Dry run — no changes written.")
+        print("Dry run - no changes written.")
         return
 
     output = getattr(args, 'output', None) or args.file

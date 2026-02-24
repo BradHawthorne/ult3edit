@@ -63,6 +63,12 @@ class TestCharacter:
         char = Character(bytearray(CHAR_RECORD_SIZE))
         assert char.is_empty
 
+    def test_food_float_setter_updates_food_and_sub_morsels(self):
+        char = Character(bytearray(CHAR_RECORD_SIZE))
+        char.food_float = 123.45
+        assert char.food == 123
+        assert char.sub_morsels == 45
+
 
 class TestMarksCards:
     """Test R-2 fix: marks are high nibble, cards are low nibble."""
@@ -2243,6 +2249,24 @@ class TestRosterCmdEditGaps:
         captured = capsys.readouterr()
         assert 'Warning' in captured.err or 'arning' in captured.err
 
+    def test_import_non_list_json_exits_without_writing(self, tmp_path, capsys):
+        """Import rejects non-list JSON payloads and leaves roster unchanged."""
+        data = bytearray(ROSTER_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'ROST')
+        with open(path, 'wb') as f:
+            f.write(data)
+        original = open(path, 'rb').read()
+        json_path = os.path.join(str(tmp_path), 'import.json')
+        with open(json_path, 'w') as f:
+            json.dump({'slot': 0, 'name': 'HERO'}, f)
+        args = argparse.Namespace(
+            file=path, json_file=json_path,
+            dry_run=False, backup=False, output=None)
+        with pytest.raises(SystemExit):
+            cmd_import(args)
+        assert "JSON must be a list of character objects" in capsys.readouterr().err
+        assert open(path, 'rb').read() == original
+
 
 class TestCharacterInitSize:
     """Test Character constructor rejects wrong-size data."""
@@ -2927,5 +2951,52 @@ class TestRosterMain:
         monkeypatch.setattr('sys.argv', ['ult3-roster'])
         main()
         captured = capsys.readouterr()
-        assert 'Usage' in captured.err or captured.out == '' or True
+        assert 'Usage' in captured.err
 
+
+class TestImportOutOfRangeSlotWarning:
+    """cmd_import warns when slot index is out of range."""
+
+    def test_import_warns_out_of_range_slot(self, tmp_path, capsys):
+        """Out-of-range slot produces warning on stderr."""
+        rost = tmp_path / "ROST"
+        rost.write_bytes(bytearray(ROSTER_FILE_SIZE))
+
+        json_file = tmp_path / "import.json"
+        json_file.write_text(json.dumps([{"slot": 999, "name": "Bad"}]))
+
+        args = argparse.Namespace(
+            file=str(rost), json_file=str(json_file),
+            dry_run=False, backup=False, output=None
+        )
+        cmd_import(args)
+        captured = capsys.readouterr()
+        assert "Warning: skipping out-of-range slot 999" in captured.err
+
+    def test_import_no_warning_for_missing_slot(self, tmp_path, capsys):
+        """Entry without slot key is silently skipped (no warning)."""
+        rost = tmp_path / "ROST"
+        rost.write_bytes(bytearray(ROSTER_FILE_SIZE))
+
+        json_file = tmp_path / "import.json"
+        json_file.write_text(json.dumps([{"name": "NoSlot"}]))
+
+        args = argparse.Namespace(
+            file=str(rost), json_file=str(json_file),
+            dry_run=False, backup=False, output=None
+        )
+        cmd_import(args)
+        captured = capsys.readouterr()
+        assert "Warning" not in captured.err
+
+
+class TestExoticConstants:
+    def test_exotic_weapon_index(self):
+        from ult3edit.constants import EXOTIC_WEAPON_INDEX, WEAPONS
+        assert EXOTIC_WEAPON_INDEX == 15
+        assert WEAPONS[EXOTIC_WEAPON_INDEX] == 'Exotic'
+
+    def test_exotic_armor_index(self):
+        from ult3edit.constants import EXOTIC_ARMOR_INDEX, ARMORS
+        assert EXOTIC_ARMOR_INDEX == 7
+        assert ARMORS[EXOTIC_ARMOR_INDEX] == 'Exotic'
