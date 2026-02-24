@@ -1125,3 +1125,119 @@ class TestFlagDescMagicUserPrecedence:
         m = Monster(attrs, 0)
         assert m.flag_desc == '-'
 
+
+# =============================================================================
+# TUI bestiary editor tests
+# =============================================================================
+
+
+class TestBestiaryEditorTUI:
+    """Test make_bestiary_tab() from ult3edit.tui.bestiary_editor."""
+
+    def test_construction(self, sample_mon_bytes):
+        """make_bestiary_tab creates a FormEditorTab with 16 records."""
+        from ult3edit.tui.bestiary_editor import make_bestiary_tab
+        tab = make_bestiary_tab(sample_mon_bytes, 'A', lambda d: None)
+        assert len(tab.records) == 16
+
+    def test_tab_name(self, sample_mon_bytes):
+        """Tab name is MON + file_letter."""
+        from ult3edit.tui.bestiary_editor import make_bestiary_tab
+        tab = make_bestiary_tab(sample_mon_bytes, 'A', lambda d: None)
+        assert tab.tab_name == 'MONA'
+
+    def test_record_count(self, sample_mon_bytes):
+        """Always produces exactly 16 monster records."""
+        from ult3edit.tui.bestiary_editor import make_bestiary_tab
+        tab = make_bestiary_tab(sample_mon_bytes, 'B', lambda d: None)
+        assert len(tab.records) == MON_MONSTERS_PER_FILE
+
+    def test_field_access_hp(self, sample_mon_bytes):
+        """Monster 0 HP matches sample data (50)."""
+        from ult3edit.tui.bestiary_editor import make_bestiary_tab
+        tab = make_bestiary_tab(sample_mon_bytes, 'A', lambda d: None)
+        assert tab.records[0].hp == 50
+
+    def test_field_access_attack(self, sample_mon_bytes):
+        """Monster 1 attack matches sample data (80)."""
+        from ult3edit.tui.bestiary_editor import make_bestiary_tab
+        tab = make_bestiary_tab(sample_mon_bytes, 'A', lambda d: None)
+        assert tab.records[1].attack == 80
+
+    def test_save_roundtrip_unmodified(self, sample_mon_bytes):
+        """get_save_data() on unmodified tab returns original bytes."""
+        from ult3edit.tui.bestiary_editor import make_bestiary_tab
+        tab = make_bestiary_tab(sample_mon_bytes, 'A', lambda d: None)
+        result = tab.get_save_data()
+        assert result == sample_mon_bytes
+
+    def test_modified_save(self, sample_mon_bytes):
+        """Modifying a monster field is reflected in get_save_data()."""
+        from ult3edit.tui.bestiary_editor import make_bestiary_tab
+        tab = make_bestiary_tab(sample_mon_bytes, 'A', lambda d: None)
+        tab.records[0].hp = 99
+        result = tab.get_save_data()
+        # HP is row 4, monster 0 -> offset 4*16+0 = 64
+        assert result[64] == 99
+        # Other fields unchanged
+        assert result[65] == sample_mon_bytes[65]  # monster 1 HP
+
+    def test_save_callback_receives_data(self, sample_mon_bytes):
+        """save_callback receives data when save() is triggered."""
+        from ult3edit.tui.bestiary_editor import make_bestiary_tab
+        received = []
+        tab = make_bestiary_tab(sample_mon_bytes, 'A', lambda d: received.append(d))
+        tab.dirty = True
+        tab.save()
+        assert len(received) == 1
+        assert received[0] == sample_mon_bytes
+
+
+# =============================================================================
+# CLI cmd_dump tests
+# =============================================================================
+
+
+class TestBestiaryDump:
+    """Test bestiary cmd_dump hex display output."""
+
+    def test_dump_produces_hex_output(self, tmp_path, capsys):
+        """cmd_dump produces output containing hex values."""
+        from ult3edit.bestiary import cmd_dump
+        data = bytearray(MON_FILE_SIZE)
+        data[0] = 0xBB  # tile1 for monster 0
+        data[4 * 16] = 42  # HP for monster 0
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(file=path)
+        cmd_dump(args)
+        captured = capsys.readouterr()
+        assert 'BB' in captured.out
+        assert '2A' in captured.out  # 42 == 0x2A
+
+    def test_dump_contains_attribute_names(self, tmp_path, capsys):
+        """cmd_dump output contains attribute row labels."""
+        from ult3edit.bestiary import cmd_dump
+        data = bytearray(MON_FILE_SIZE)
+        path = os.path.join(str(tmp_path), 'MONA')
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(file=path)
+        cmd_dump(args)
+        captured = capsys.readouterr()
+        assert 'HP' in captured.out
+        assert 'Tile 1' in captured.out
+        assert 'Attack' in captured.out
+
+    def test_dump_with_sample_mon(self, sample_mon_file, capsys):
+        """cmd_dump works on the sample_mon_file fixture."""
+        from ult3edit.bestiary import cmd_dump
+        args = argparse.Namespace(file=sample_mon_file)
+        cmd_dump(args)
+        captured = capsys.readouterr()
+        assert 'MON File Dump' in captured.out
+        assert 'Columnar' in captured.out
+        # Monster 0 tile 0x48 should appear in hex
+        assert '48' in captured.out
+

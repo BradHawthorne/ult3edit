@@ -10,6 +10,7 @@ import pytest
 from ult3edit.bcd import int_to_bcd
 from ult3edit.roster import Character
 from ult3edit.save import PartyState, cmd_edit, validate_party_state
+from ult3edit.tui.party_editor import make_party_tab
 from ult3edit.constants import (
     PRTY_FILE_SIZE, PRTY_OFF_TRANSPORT, PRTY_OFF_PARTY_SIZE,
     PRTY_OFF_LOCATION, PRTY_OFF_SENTINEL,
@@ -1494,4 +1495,59 @@ class TestSaveOutputConflict:
         # PLRS must NOT have been written before the conflict error
         with open(plrs_file, 'rb') as f:
             assert f.read() == original_plrs, "PLRS was modified before conflict check"
+
+
+# =============================================================================
+# Party editor TUI tests
+# =============================================================================
+
+
+class TestPartyEditorTUI:
+    """Tests for make_party_tab() from tui/party_editor.py."""
+
+    def test_construction_no_error(self, sample_prty_bytes):
+        """make_party_tab creates a FormEditorTab without raising."""
+        saved = []
+        tab = make_party_tab(bytearray(sample_prty_bytes), lambda d: saved.append(d))
+        assert tab is not None
+
+    def test_tab_name(self, sample_prty_bytes):
+        """Tab name should be 'Party'."""
+        tab = make_party_tab(bytearray(sample_prty_bytes), lambda d: None)
+        assert tab.tab_name == 'Party'
+
+    def test_single_record(self, sample_prty_bytes):
+        """Records list should contain exactly one PartyState."""
+        tab = make_party_tab(bytearray(sample_prty_bytes), lambda d: None)
+        assert len(tab.records) == 1
+        assert isinstance(tab.records[0], PartyState)
+
+    def test_transport_readable(self, sample_prty_bytes):
+        """Transport field from sample data should be 'On Foot'."""
+        tab = make_party_tab(bytearray(sample_prty_bytes), lambda d: None)
+        party = tab.records[0]
+        assert party.transport == 'On Foot'
+
+    def test_party_size_readable(self, sample_prty_bytes):
+        """Party size from sample data should be 4."""
+        tab = make_party_tab(bytearray(sample_prty_bytes), lambda d: None)
+        party = tab.records[0]
+        assert party.party_size == 4
+
+    def test_save_roundtrip(self, sample_prty_bytes):
+        """get_save_data() should produce 16 bytes of PRTY data."""
+        saved = []
+        tab = make_party_tab(bytearray(sample_prty_bytes), lambda d: saved.append(d))
+        data = tab.get_save_data()
+        assert isinstance(data, bytes)
+        assert len(data) == PRTY_FILE_SIZE
+
+    def test_modified_field_in_save_data(self, sample_prty_bytes):
+        """Changing party X coordinate should be reflected in get_save_data()."""
+        saved = []
+        tab = make_party_tab(bytearray(sample_prty_bytes), lambda d: saved.append(d))
+        party = tab.records[0]
+        party.x = 50
+        data = tab.get_save_data()
+        assert data[PRTY_OFF_SAVED_X] == 50
 

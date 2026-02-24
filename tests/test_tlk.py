@@ -1011,3 +1011,125 @@ class TestDialogEditorEmptyRecord:
         reloaded = DialogEditor('test', saved_data[0])
         assert len(reloaded.records) == 3
 
+
+# =============================================================================
+# Dialog editor TUI tests
+# =============================================================================
+
+
+class TestDialogEditorTUI:
+    """Tests for DialogEditor from tui/dialog_editor.py."""
+
+    def test_record_count(self, sample_tlk_bytes):
+        """DialogEditor should parse 2 records from sample TLK data."""
+        editor = DialogEditor('test', sample_tlk_bytes)
+        assert len(editor.records) == 2
+
+    def test_record_0_contains_hello(self, sample_tlk_bytes):
+        """Record 0 text should contain 'HELLO'."""
+        editor = DialogEditor('test', sample_tlk_bytes)
+        text = ' '.join(editor.records[0])
+        assert 'HELLO' in text
+
+    def test_record_1_contains_welcome(self, sample_tlk_bytes):
+        """Record 1 text should contain 'WELCOME'."""
+        editor = DialogEditor('test', sample_tlk_bytes)
+        text = ' '.join(editor.records[1])
+        assert 'WELCOME' in text
+
+    def test_modify_and_save(self, sample_tlk_bytes):
+        """Modifying a record and saving produces valid data via callback."""
+        saved = []
+        editor = DialogEditor('test', sample_tlk_bytes,
+                              save_callback=lambda d: saved.append(d))
+        editor.records[0] = ['GOODBYE TRAVELER']
+        editor._modified_records.add(0)
+        editor.dirty = True
+        editor._save()
+        assert len(saved) == 1
+        # Re-parse and verify modification
+        editor2 = DialogEditor('test', saved[0])
+        assert editor2.records[0] == ['GOODBYE TRAVELER']
+        # Record 1 should be preserved
+        assert 'WELCOME' in editor2.records[1][0]
+
+    def test_selected_index_starts_at_zero(self, sample_tlk_bytes):
+        """selected_index should start at 0."""
+        editor = DialogEditor('test', sample_tlk_bytes)
+        assert editor.selected_index == 0
+
+
+# =============================================================================
+# TLK extract/build additional tests
+# =============================================================================
+
+
+class TestTlkExtractBuildAdditional:
+    """Additional tests for cmd_extract and cmd_build round-trip."""
+
+    def test_extract_produces_text_file(self, tmp_path, sample_tlk_bytes):
+        """cmd_extract should produce a text file from TLK binary."""
+        from ult3edit.tlk import cmd_extract
+        tlk_path = str(tmp_path / 'TLKA')
+        with open(tlk_path, 'wb') as f:
+            f.write(sample_tlk_bytes)
+        txt_path = str(tmp_path / 'tlk.txt')
+        args = type('Args', (), {'input': tlk_path, 'output': txt_path})()
+        cmd_extract(args)
+        assert os.path.exists(txt_path)
+        assert os.path.getsize(txt_path) > 0
+
+    def test_extracted_file_contains_text(self, tmp_path, sample_tlk_bytes):
+        """Extracted text file should contain record text."""
+        from ult3edit.tlk import cmd_extract
+        tlk_path = str(tmp_path / 'TLKA')
+        with open(tlk_path, 'wb') as f:
+            f.write(sample_tlk_bytes)
+        txt_path = str(tmp_path / 'tlk.txt')
+        args = type('Args', (), {'input': tlk_path, 'output': txt_path})()
+        cmd_extract(args)
+        with open(txt_path, 'r', encoding='utf-8') as f:
+            text = f.read()
+        assert 'HELLO' in text
+        assert 'WELCOME' in text
+
+    def test_build_produces_binary(self, tmp_path):
+        """cmd_build should produce a TLK binary from text file."""
+        from ult3edit.tlk import cmd_build
+        txt_path = str(tmp_path / 'tlk.txt')
+        with open(txt_path, 'w', encoding='utf-8') as f:
+            f.write('# Record 0\nHELLO WORLD\n---\n# Record 1\nGOODBYE\n')
+        out_path = str(tmp_path / 'TLK_OUT')
+        args = type('Args', (), {'input': txt_path, 'output': out_path})()
+        cmd_build(args)
+        assert os.path.exists(out_path)
+        with open(out_path, 'rb') as f:
+            data = f.read()
+        assert len(data) > 0
+        # Verify it contains valid TLK records
+        records = load_tlk_records(out_path)
+        assert len(records) == 2
+        assert records[0] == ['HELLO WORLD']
+        assert records[1] == ['GOODBYE']
+
+    def test_extract_build_roundtrip_preserves_content(self, tmp_path, sample_tlk_bytes):
+        """Extract then build should produce binary with same decoded content."""
+        from ult3edit.tlk import cmd_extract, cmd_build
+        tlk_path = str(tmp_path / 'TLKA')
+        with open(tlk_path, 'wb') as f:
+            f.write(sample_tlk_bytes)
+        # Extract
+        txt_path = str(tmp_path / 'tlk.txt')
+        args_extract = type('Args', (), {'input': tlk_path, 'output': txt_path})()
+        cmd_extract(args_extract)
+        # Build
+        rebuilt_path = str(tmp_path / 'TLKA_REBUILT')
+        args_build = type('Args', (), {'input': txt_path, 'output': rebuilt_path})()
+        cmd_build(args_build)
+        # Compare decoded content
+        original_records = load_tlk_records(tlk_path)
+        rebuilt_records = load_tlk_records(rebuilt_path)
+        assert len(rebuilt_records) == len(original_records)
+        for orig, rebuilt in zip(original_records, rebuilt_records):
+            assert orig == rebuilt
+

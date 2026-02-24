@@ -9,7 +9,7 @@ from unittest.mock import patch, MagicMock
 from ult3edit.disk import (
     find_diskiigs, disk_info, disk_list, DiskContext,
     build_prodos_image, collect_build_files, _parse_hash_filename,
-    PRODOS_ENTRY_LENGTH,
+    cmd_build, PRODOS_BLOCK_SIZE, PRODOS_ENTRY_LENGTH,
 )
 
 
@@ -684,4 +684,78 @@ class TestDiskDispatchFallback:
 # =============================================================================
 # Batch 14: Grade-A upgrade tests
 # =============================================================================
+
+
+# =============================================================================
+# Disk native builder tests
+# =============================================================================
+
+
+class TestDiskBuildNative:
+    """Tests for the native Python ProDOS disk image builder (no diskiigs)."""
+
+    def test_collect_build_files_finds_hash_suffixes(self, tmp_dir):
+        """collect_build_files() finds files with #hash suffixes."""
+        for name in ['ROST#069500', 'MONA#069900', 'TLKA#060000']:
+            with open(os.path.join(tmp_dir, name), 'wb') as f:
+                f.write(b'\x00' * 64)
+        # Also create a plain file without hash — should be skipped
+        with open(os.path.join(tmp_dir, 'README'), 'wb') as f:
+            f.write(b'text')
+        files = collect_build_files(tmp_dir)
+        assert len(files) == 3
+        names = {f['name'] for f in files}
+        assert 'ROST' in names
+        assert 'MONA' in names
+        assert 'TLKA' in names
+        # Verify file types are parsed
+        rost = [f for f in files if f['name'] == 'ROST'][0]
+        assert rost['file_type'] == 0x06
+        assert rost['aux_type'] == 0x9500
+
+    def test_build_prodos_image_140k(self, tmp_dir):
+        """build_prodos_image() creates a valid 140K (280-block) disk image."""
+        out = os.path.join(tmp_dir, 'test.po')
+        files = [{'name': 'TEST', 'data': b'\xAA' * 100,
+                  'file_type': 0x06, 'aux_type': 0x0000, 'subdir': None}]
+        result = build_prodos_image(out, files, total_blocks=280)
+        assert os.path.isfile(out)
+        assert os.path.getsize(out) == 280 * PRODOS_BLOCK_SIZE  # 143360 bytes
+        assert result['total_blocks'] == 280
+        assert result['total_bytes'] == 143360
+        assert result['files'] == 1
+
+    def test_cmd_build_creates_output(self, tmp_dir):
+        """cmd_build with valid input directory creates output file."""
+        # Create input files with #hash suffixes
+        input_dir = os.path.join(tmp_dir, 'input')
+        os.makedirs(input_dir)
+        with open(os.path.join(input_dir, 'ROST#069500'), 'wb') as f:
+            f.write(b'\x00' * 100)
+        with open(os.path.join(input_dir, 'MONA#069900'), 'wb') as f:
+            f.write(b'\x00' * 256)
+        output_path = os.path.join(tmp_dir, 'game.po')
+        args = argparse.Namespace(
+            output=output_path, input_dir=input_dir,
+            vol_name='ULTIMA3', boot_from=None)
+        cmd_build(args)
+        assert os.path.isfile(output_path)
+        assert os.path.getsize(output_path) > 0
+
+    def test_built_image_has_volume_header(self, tmp_dir):
+        """Built image starts with expected ProDOS volume directory signature."""
+        out = os.path.join(tmp_dir, 'test.po')
+        files = [{'name': 'DATA', 'data': b'\x55' * 50,
+                  'file_type': 0x06, 'aux_type': 0x0000, 'subdir': None}]
+        build_prodos_image(out, files, vol_name='ULTIMA3')
+        with open(out, 'rb') as f:
+            # Volume directory is at block 2
+            f.seek(2 * PRODOS_BLOCK_SIZE + 4)  # skip prev/next pointers
+            hdr = f.read(PRODOS_ENTRY_LENGTH)
+        # Storage type should be 0x0F (volume header)
+        storage_type = hdr[0] >> 4
+        assert storage_type == 0x0F
+        # Volume name should be present
+        name_len = hdr[0] & 0x0F
+        assert hdr[1:1 + name_len] == b'ULTIMA3'
 

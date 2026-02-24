@@ -11,9 +11,11 @@ from ult3edit.roster import Character, load_roster, save_roster, cmd_edit, cmd_c
 from ult3edit.bcd import int_to_bcd, int_to_bcd16
 from ult3edit.constants import (
     CHAR_CLASS, CHAR_GENDER, CHAR_HP_HI, CHAR_HP_LO, CHAR_IN_PARTY,
-    CHAR_MARKS_CARDS, CHAR_NAME_OFFSET, CHAR_RACE, CHAR_READIED_WEAPON,
-    CHAR_RECORD_SIZE, CHAR_STATUS, CHAR_STR, CHAR_WORN_ARMOR, ROSTER_FILE_SIZE,
+    CHAR_MARKS_CARDS, CHAR_MAX_SLOTS, CHAR_NAME_OFFSET, CHAR_RACE,
+    CHAR_READIED_WEAPON, CHAR_RECORD_SIZE, CHAR_STATUS, CHAR_STR,
+    CHAR_WORN_ARMOR, ROSTER_FILE_SIZE,
 )
+from ult3edit.tui.roster_editor import make_roster_tab
 
 
 class TestCharacter:
@@ -1351,6 +1353,122 @@ class TestMarksCaseInsensitive:
         assert 'Kings' in char.marks
         assert 'Death' in char.cards
         assert 'Sol' in char.cards
+
+
+# =============================================================================
+# TUI roster editor tests
+# =============================================================================
+
+
+class TestRosterEditorTUI:
+    """Tests for make_roster_tab() from ult3edit.tui.roster_editor."""
+
+    def test_construction(self, sample_roster_bytes):
+        """make_roster_tab creates a FormEditorTab without error."""
+        tab = make_roster_tab(sample_roster_bytes, lambda data: None)
+        assert tab is not None
+
+    def test_tab_name(self, sample_roster_bytes):
+        """Tab name is 'Roster'."""
+        tab = make_roster_tab(sample_roster_bytes, lambda data: None)
+        assert tab.tab_name == 'Roster'
+
+    def test_first_character_name(self, sample_roster_bytes):
+        """First character name matches fixture (HERO)."""
+        tab = make_roster_tab(sample_roster_bytes, lambda data: None)
+        assert tab.records[0].name == 'HERO'
+
+    def test_first_character_strength(self, sample_roster_bytes):
+        """First character strength matches fixture (25)."""
+        tab = make_roster_tab(sample_roster_bytes, lambda data: None)
+        assert tab.records[0].strength == 25
+
+    def test_empty_slots(self, sample_roster_bytes):
+        """Slots 1-19 are all empty."""
+        tab = make_roster_tab(sample_roster_bytes, lambda data: None)
+        for i in range(1, CHAR_MAX_SLOTS):
+            assert tab.records[i].is_empty, f"Slot {i} should be empty"
+
+    def test_save_roundtrip_length(self, sample_roster_bytes):
+        """get_save_data() on unmodified tab returns 1280 bytes."""
+        tab = make_roster_tab(sample_roster_bytes, lambda data: None)
+        save_data = tab.get_save_data()
+        assert len(save_data) == ROSTER_FILE_SIZE
+
+    def test_modified_save_differs(self, sample_roster_bytes):
+        """Changing a field makes get_save_data() differ from original."""
+        tab = make_roster_tab(sample_roster_bytes, lambda data: None)
+        original_data = tab.get_save_data()
+        tab.records[0].gold = 9999
+        modified_data = tab.get_save_data()
+        assert modified_data != original_data
+
+    def test_save_callback_receives_data(self, sample_roster_bytes):
+        """save_callback receives the serialized data."""
+        received = []
+        tab = make_roster_tab(sample_roster_bytes, lambda data: received.append(data))
+        tab.save_callback(tab.get_save_data())
+        assert len(received) == 1
+        assert len(received[0]) == ROSTER_FILE_SIZE
+
+
+# =============================================================================
+# CLI cmd_create tests
+# =============================================================================
+
+
+def _create_args(**kwargs):
+    """Build an argparse.Namespace with all roster create args defaulting to None."""
+    defaults = dict(
+        file=None, slot=0, output=None, force=False,
+        dry_run=False, backup=False,
+        name=None, str=None, dex=None, int_=None, wis=None,
+        hp=None, max_hp=None, mp=None,
+        gold=None, exp=None, food=None,
+        gems=None, keys=None, powders=None, torches=None,
+        race=None, class_=None, status=None, gender=None,
+        weapon=None, armor=None,
+        give_weapon=None, give_armor=None,
+        marks=None, cards=None,
+        in_party=None, not_in_party=None, sub_morsels=None,
+    )
+    defaults.update(kwargs)
+    return argparse.Namespace(**defaults)
+
+
+class TestRosterCmdCreate:
+    """Tests for cmd_create() from ult3edit.roster."""
+
+    def test_creates_in_empty_slot(self, sample_roster_file, tmp_dir):
+        """Creates a character in empty slot 1; slot is no longer empty."""
+        out = os.path.join(tmp_dir, 'ROST_CREATE')
+        args = _create_args(file=sample_roster_file, slot=1, output=out)
+        cmd_create(args)
+        chars, _ = load_roster(out)
+        assert not chars[1].is_empty
+        assert chars[0].name == 'HERO'  # Slot 0 preserved
+
+    def test_default_name_is_hero(self, sample_roster_file, tmp_dir):
+        """Created character has default name HERO when no name specified."""
+        out = os.path.join(tmp_dir, 'ROST_CREATE')
+        args = _create_args(file=sample_roster_file, slot=1, output=out)
+        cmd_create(args)
+        chars, _ = load_roster(out)
+        assert chars[1].name == 'HERO'
+
+    def test_dry_run_no_write(self, sample_roster_file, tmp_dir):
+        """--dry-run does not create the output file."""
+        out = os.path.join(tmp_dir, 'ROST_CREATE_DRY')
+        args = _create_args(file=sample_roster_file, slot=1, output=out,
+                            dry_run=True)
+        cmd_create(args)
+        assert not os.path.exists(out)
+
+    def test_occupied_slot_without_force(self, sample_roster_file):
+        """Creating in an occupied slot without --force raises SystemExit."""
+        args = _create_args(file=sample_roster_file, slot=0)
+        with pytest.raises(SystemExit):
+            cmd_create(args)
 
 
 # =============================================================================

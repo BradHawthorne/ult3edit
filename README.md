@@ -154,6 +154,12 @@ ult3edit roster edit ROST#069500 --slot 0 --sub-morsels 50
 ```bash
 # Make monster #0 in MONA tougher
 ult3edit bestiary edit MONA#069900 --monster 0 --hp 200 --attack 80
+
+# Hex dump of monster data (columnar format)
+ult3edit bestiary dump MONA#069900
+
+# Bulk edit all monsters
+ult3edit bestiary edit MONA#069900 --all --speed 20
 ```
 
 ## Editing Maps
@@ -222,6 +228,18 @@ ult3edit tlk edit TLKA#060000 --find "exodus" --replace "DARKNESS" --ignore-case
 
 # Preview replacements without writing
 ult3edit tlk edit TLKA#060000 --find "EXODUS" --replace "DARKNESS" --dry-run
+```
+
+## Extracting and Building Dialog Files
+
+```bash
+# Extract TLK binary to editable text file
+ult3edit tlk extract TLKA#060000 dialog.txt
+
+# Edit dialog.txt with any text editor (records separated by ---)
+
+# Build TLK binary from text file
+ult3edit tlk build dialog.txt TLKA#060000
 ```
 
 ## Editing Game Text
@@ -617,7 +635,7 @@ pip install -e ".[dev]"
 pytest -v
 ```
 
-1813 tests covering all modules with synthesized game data (no real game files needed).
+1903 tests covering all modules with synthesized game data (no real game files needed).
 
 ## Bug Fixes from Prototype
 
