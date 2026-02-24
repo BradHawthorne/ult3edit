@@ -1,6 +1,5 @@
-"""Tests for Grok audit improvements: backup, dry-run, validate, search, import, etc."""
+"""Integration tests for conversion tools, cross-module dispatch, and multi-module workflows."""
 
-import argparse
 import json
 import os
 import sys
@@ -8,303 +7,16 @@ import sys
 import pytest
 
 from ult3edit.constants import (
-    CHAR_RECORD_SIZE, ROSTER_FILE_SIZE, MON_FILE_SIZE, MON_MONSTERS_PER_FILE,
-    MAP_OVERWORLD_SIZE, CON_FILE_SIZE, SPECIAL_FILE_SIZE,
-    PRTY_FILE_SIZE, PLRS_FILE_SIZE,
-    CHAR_STATUS, CHAR_READIED_WEAPON, CHAR_WORN_ARMOR,
-    CHAR_HP_HI, CHAR_MARKS_CARDS,
+    MON_MONSTERS_PER_FILE,
+    CON_FILE_SIZE, SPECIAL_FILE_SIZE,
     TILE_CHARS_REVERSE, DUNGEON_TILE_CHARS_REVERSE,
 )
-from ult3edit.roster import (
-    load_roster, cmd_import,
-)
-from ult3edit.bestiary import load_mon_file
-from ult3edit.map import cmd_set
-from ult3edit.tlk import encode_record
 from ult3edit.shapes import encode_overlay_string, extract_overlay_strings
 
 
 # =============================================================================
-# Backup utility
+# Verify tool tests
 # =============================================================================
-
-
-
-class TestDryRun:
-    def test_roster_dry_run(self, tmp_dir, sample_roster_file):
-        """Verify dry-run doesn't modify the file."""
-        with open(sample_roster_file, 'rb') as f:
-            before = f.read()
-
-        chars, original = load_roster(sample_roster_file)
-        chars[0].gold = 9999
-        # Don't save (simulating dry-run)
-
-        with open(sample_roster_file, 'rb') as f:
-            after = f.read()
-        assert before == after
-
-    def test_map_dry_run(self, tmp_dir, sample_overworld_bytes):
-        path = os.path.join(tmp_dir, 'MAPA')
-        with open(path, 'wb') as f:
-            f.write(sample_overworld_bytes)
-        with open(path, 'rb') as f:
-            before = f.read()
-
-        # Modify in memory but don't write (dry-run)
-        data = bytearray(before)
-        data[0] = 0xFF
-
-        with open(path, 'rb') as f:
-            after = f.read()
-        assert before == after
-
-
-# =============================================================================
-# TLK regex search
-# =============================================================================
-
-
-
-class TestSaveOutputConflict:
-    """Verify that --output is rejected when editing both party and PLRS."""
-
-    def test_dual_file_output_rejected(self, tmp_dir, sample_prty_bytes):
-        """Editing both PRTY and PLRS with --output should fail."""
-        from ult3edit.save import cmd_edit
-        # Create PRTY file in game dir
-        prty_file = os.path.join(tmp_dir, 'PRTY#069500')
-        with open(prty_file, 'wb') as f:
-            f.write(sample_prty_bytes)
-        # Create PLRS file in same dir
-        plrs_data = bytearray(PLRS_FILE_SIZE)
-        for i, ch in enumerate('HERO'):
-            plrs_data[i] = ord(ch) | 0x80
-        plrs_file = os.path.join(tmp_dir, 'PLRS#069500')
-        with open(plrs_file, 'wb') as f:
-            f.write(plrs_data)
-        # Try editing both party state and PLRS character with --output
-        args = type('Args', (), {
-            'game_dir': tmp_dir, 'output': '/tmp/out',
-            'backup': False, 'dry_run': False,
-            'transport': 'Horse', 'x': None, 'y': None,
-            'party_size': None, 'slot_ids': None,
-            'sentinel': None, 'location': None,
-            'plrs_slot': 0, 'name': 'TEST',
-            'str': None, 'dex': None, 'int_': None, 'wis': None,
-            'hp': None, 'max_hp': None, 'exp': None,
-            'mp': None, 'food': None, 'gold': None,
-            'gems': None, 'keys': None, 'powders': None,
-            'torches': None, 'status': None, 'race': None,
-            'class_': None, 'gender': None,
-            'weapon': None, 'armor': None,
-            'marks': None, 'cards': None, 'sub_morsels': None,
-        })()
-        original_plrs = bytes(plrs_data)
-        with pytest.raises(SystemExit):
-            cmd_edit(args)
-        # PLRS must NOT have been written before the conflict error
-        with open(plrs_file, 'rb') as f:
-            assert f.read() == original_plrs, "PLRS was modified before conflict check"
-
-
-# =============================================================================
-# Fix: --validate on bestiary and combat edit CLI args
-# =============================================================================
-
-
-
-class TestValidateOnEditArgs:
-    """Verify --validate is accepted by bestiary and combat edit subparsers."""
-
-    def test_bestiary_edit_accepts_validate(self):
-        """bestiary edit --validate should be a valid CLI arg."""
-        import argparse
-        from ult3edit.bestiary import register_parser
-        parser = argparse.ArgumentParser()
-        sub = parser.add_subparsers(dest='module')
-        register_parser(sub)
-        args = parser.parse_args(['bestiary', 'edit', 'test.mon', '--monster', '0',
-                                  '--hp', '50', '--validate'])
-        assert args.validate is True
-
-    def test_combat_edit_accepts_validate(self):
-        """combat edit --validate should be a valid CLI arg."""
-        import argparse
-        from ult3edit.combat import register_parser
-        parser = argparse.ArgumentParser()
-        sub = parser.add_subparsers(dest='module')
-        register_parser(sub)
-        args = parser.parse_args(['combat', 'edit', 'test.con',
-                                  '--tile', '0', '0', '32', '--validate'])
-        assert args.validate is True
-
-    def test_bestiary_edit_validate_runs(self, tmp_dir, sample_mon_bytes):
-        """bestiary edit with --validate should show warnings."""
-        from ult3edit.bestiary import cmd_edit
-        mon_file = os.path.join(tmp_dir, 'MONA#069900')
-        with open(mon_file, 'wb') as f:
-            f.write(sample_mon_bytes)
-        args = type('Args', (), {
-            'file': mon_file, 'monster': 0, 'all': False,
-            'output': None, 'backup': False, 'dry_run': True,
-            'validate': True,
-            'name': None, 'tile1': None, 'tile2': None,
-            'hp': 50, 'attack': None, 'defense': None, 'speed': None,
-            'flags1': None, 'flags2': None, 'ability1': None, 'ability2': None,
-            'type': None,
-            'boss': None, 'no_boss': None, 'undead': None, 'ranged': None,
-            'magic_user': None, 'poison': None, 'no_poison': None,
-            'sleep': None, 'no_sleep': None, 'negate': None, 'no_negate': None,
-            'teleport': None, 'no_teleport': None,
-            'divide': None, 'no_divide': None,
-            'resistant': None, 'no_resistant': None,
-        })()
-        # Should not raise
-        cmd_edit(args)
-
-    def test_combat_edit_validate_runs(self, tmp_dir, sample_con_bytes):
-        """combat edit with --validate should show warnings."""
-        from ult3edit.combat import cmd_edit
-        con_file = os.path.join(tmp_dir, 'CONA#069900')
-        with open(con_file, 'wb') as f:
-            f.write(sample_con_bytes)
-        args = type('Args', (), {
-            'file': con_file,
-            'output': None, 'backup': False, 'dry_run': True,
-            'validate': True,
-            'tile': [5, 5, 0x20],
-            'monster_pos': None, 'pc_pos': None,
-        })()
-        # Should not raise
-        cmd_edit(args)
-
-
-# =============================================================================
-# Fix: Dead code removal verification
-# =============================================================================
-
-
-
-class TestDeadCodeRemoved:
-    """Verify removed dead functions are no longer importable."""
-
-    def test_validate_file_size_removed(self):
-        """validate_file_size should no longer exist in fileutil."""
-        from ult3edit import fileutil
-        assert not hasattr(fileutil, 'validate_file_size')
-
-    def test_load_game_file_removed(self):
-        """load_game_file should no longer exist in fileutil."""
-        from ult3edit import fileutil
-        assert not hasattr(fileutil, 'load_game_file')
-
-
-
-class TestHexIntArgParsing:
-    """Verify that CLI args for tiles, offsets, and flags accept hex (0x) prefix."""
-
-    def test_hex_int_helper(self):
-        from ult3edit.fileutil import hex_int
-        assert hex_int('10') == 10
-        assert hex_int('0x0A') == 10
-        assert hex_int('0xFF') == 255
-        assert hex_int('0') == 0
-
-    def test_hex_int_rejects_garbage(self):
-        from ult3edit.fileutil import hex_int
-        with pytest.raises(ValueError):
-            hex_int('xyz')
-
-    def test_map_tile_accepts_hex(self, tmp_dir):
-        """map set --tile 0x01 should parse without error."""
-        import argparse
-        path = os.path.join(tmp_dir, 'MAP')
-        data = bytes(MAP_OVERWORLD_SIZE)
-        with open(path, 'wb') as f:
-            f.write(data)
-        args = argparse.Namespace(
-            file=path, x=0, y=0, tile=0x01,
-            output=None, backup=False, dry_run=True)
-        cmd_set(args)  # Should not raise
-
-    def test_combat_tile_accepts_hex(self, tmp_dir):
-        """combat edit --tile 0x08 should parse without error."""
-        from ult3edit.combat import cmd_edit as combat_cmd_edit
-        path = os.path.join(tmp_dir, 'CON')
-        data = bytearray(CON_FILE_SIZE)
-        with open(path, 'wb') as f:
-            f.write(data)
-        args = type('Args', (), {
-            'file': path, 'tile': [0, 0, 0x08],
-            'monster_pos': None, 'pc_pos': None,
-            'output': None, 'backup': False, 'dry_run': True,
-        })()
-        combat_cmd_edit(args)  # Should not raise
-
-    def test_bestiary_flags_accept_hex(self, tmp_dir):
-        """bestiary edit --flags1 0x80 should parse without error."""
-        from ult3edit.bestiary import cmd_edit as bestiary_cmd_edit
-        path = os.path.join(tmp_dir, 'MON')
-        data = bytearray(MON_FILE_SIZE)
-        with open(path, 'wb') as f:
-            f.write(data)
-        args = type('Args', (), {
-            'file': path, 'monster': 0,
-            'tile1': None, 'tile2': None,
-            'flags1': 0x80, 'flags2': None,
-            'hp': None, 'attack': None, 'defense': None, 'speed': None,
-            'ability1': None, 'ability2': None,
-            'output': None, 'backup': False, 'dry_run': True,
-        })()
-        bestiary_cmd_edit(args)  # Should not raise
-
-    def test_special_tile_accepts_hex(self, tmp_dir):
-        """special edit --tile 0x00 0x00 0x08 should parse without error."""
-        from ult3edit.special import cmd_edit as special_cmd_edit
-        path = os.path.join(tmp_dir, 'BRND')
-        data = bytearray(SPECIAL_FILE_SIZE)
-        with open(path, 'wb') as f:
-            f.write(data)
-        args = type('Args', (), {
-            'file': path, 'tile': [0, 0, 0x08],
-            'output': None, 'backup': False, 'dry_run': True,
-        })()
-        special_cmd_edit(args)  # Should not raise
-
-    def test_argparser_accepts_hex_string(self):
-        """Verify argparse actually parses '0x0A' string to 10 via hex_int type."""
-        import argparse
-        from ult3edit.fileutil import hex_int
-        parser = argparse.ArgumentParser()
-        parser.add_argument('--tile', type=hex_int)
-        args = parser.parse_args(['--tile', '0x0A'])
-        assert args.tile == 10
-
-    def test_argparser_accepts_decimal_string(self):
-        """hex_int still works with plain decimal strings."""
-        import argparse
-        from ult3edit.fileutil import hex_int
-        parser = argparse.ArgumentParser()
-        parser.add_argument('--offset', type=hex_int)
-        args = parser.parse_args(['--offset', '240'])
-        assert args.offset == 240
-
-
-# =============================================================================
-# Sound and DDRW import integration tests
-# =============================================================================
-
-
-# =============================================================================
-# Shapes cmd_edit and cmd_import integration tests
-# =============================================================================
-
-
-# =============================================================================
-# Fix: HP > MaxHP race condition when both --hp and --max-hp provided
-# =============================================================================
-
 
 
 class TestVerifyTool:
@@ -393,13 +105,12 @@ class TestVerifyTool:
 
 
 # =============================================================================
-# Phase 0: Import format compatibility
+# Round-trip integration tests (Voidborn sources)
 # =============================================================================
 
 
-
 class TestRoundTripIntegration:
-    """End-to-end: load Voidborn source → import into binary → verify."""
+    """End-to-end: load Voidborn source -> import into binary -> verify."""
 
     SOURCES_DIR = os.path.join(os.path.dirname(__file__),
                                 '..', 'conversions', 'voidborn', 'sources')
@@ -496,7 +207,6 @@ class TestRoundTripIntegration:
 # =============================================================================
 # gen_maps.py tests
 # =============================================================================
-
 
 
 class TestGenMaps:
@@ -597,7 +307,6 @@ class TestGenMaps:
 # =============================================================================
 # Shop apply tool tests
 # =============================================================================
-
 
 
 class TestShopApply:
@@ -755,19 +464,8 @@ class TestShopApply:
 
 
 # =============================================================================
-# Sound source file validation
-# =============================================================================
-
-
-# =============================================================================
-# DDRW source file validation
-# =============================================================================
-
-
-# =============================================================================
 # Shop strings JSON validation
 # =============================================================================
-
 
 
 class TestShopStringsSource:
@@ -796,14 +494,8 @@ class TestShopStringsSource:
 
 
 # =============================================================================
-# Name compiler edge cases
-# =============================================================================
-
-
-# =============================================================================
 # Map compiler edge cases
 # =============================================================================
-
 
 
 class TestMapCompilerEdgeCases:
@@ -827,7 +519,7 @@ class TestMapCompilerEdgeCases:
         rows[0] = 'Z' + '.' * 63  # 'Z' is not in TILE_CHARS_REVERSE
         text = '\n'.join(rows) + '\n'
         grid = mod.parse_map_file(text, is_dungeon=False)
-        assert grid[0][0] == 0  # Unknown char → tile 0
+        assert grid[0][0] == 0  # Unknown char -> tile 0
 
     def test_dungeon_short_input_pads_to_8_levels(self):
         """Dungeon with fewer than 8 levels pads to 8."""
@@ -853,7 +545,6 @@ class TestMapCompilerEdgeCases:
 # =============================================================================
 # Shop apply edge cases
 # =============================================================================
-
 
 
 class TestShopApplyEdgeCases:
@@ -960,79 +651,8 @@ class TestShopApplyEdgeCases:
 
 
 # =============================================================================
-# Tile compiler edge cases
+# Cross-module view commands
 # =============================================================================
-
-
-# =============================================================================
-# Bestiary import: shortcut + raw attribute conflict fix
-# =============================================================================
-
-
-
-class TestDictKeyValidation:
-    """Verify non-numeric dict keys are handled gracefully."""
-
-    def test_bestiary_import_skips_bad_keys(self, tmp_path):
-        """Bestiary import skips non-numeric keys without crashing."""
-        from ult3edit.bestiary import cmd_import
-        mon_data = bytearray(256)
-        mon_path = str(tmp_path / 'MONA')
-        with open(mon_path, 'wb') as f:
-            f.write(mon_data)
-
-        jdata = {
-            "monsters": {
-                "0": {"hp": 100},
-                "abc": {"hp": 200},  # non-numeric key
-                "1": {"hp": 150}
-            }
-        }
-        json_path = str(tmp_path / 'bestiary.json')
-        with open(json_path, 'w') as f:
-            json.dump(jdata, f)
-
-        args = type('Args', (), {
-            'file': mon_path, 'json_file': json_path,
-            'output': None, 'backup': False, 'dry_run': False
-        })()
-        cmd_import(args)  # Should not crash
-
-        monsters = load_mon_file(mon_path)
-        assert monsters[0].hp == 100
-        assert monsters[1].hp == 150
-
-    def test_combat_import_skips_bad_keys(self, tmp_path):
-        """Combat import skips non-numeric monster keys without crashing."""
-        from ult3edit.combat import cmd_import as combat_import
-        from ult3edit.constants import CON_FILE_SIZE
-        con_data = bytearray(CON_FILE_SIZE)
-        con_path = str(tmp_path / 'CONA')
-        with open(con_path, 'wb') as f:
-            f.write(con_data)
-
-        jdata = {
-            "tiles": [['.' for _ in range(11)] for _ in range(11)],
-            "monsters": {
-                "0": {"x": 3, "y": 4},
-                "bad": {"x": 5, "y": 6}  # non-numeric key
-            }
-        }
-        json_path = str(tmp_path / 'combat.json')
-        with open(json_path, 'w') as f:
-            json.dump(jdata, f)
-
-        args = type('Args', (), {
-            'file': con_path, 'json_file': json_path,
-            'output': None, 'backup': False, 'dry_run': False
-        })()
-        combat_import(args)  # Should not crash
-
-
-# =============================================================================
-# Map import width validation
-# =============================================================================
-
 
 
 class TestViewOnlyCommands:
@@ -1041,6 +661,7 @@ class TestViewOnlyCommands:
     def test_equip_view(self, capsys):
         """equip view produces equipment stats table."""
         from ult3edit.equip import cmd_view
+        import argparse
         args = argparse.Namespace(json=False, output=None)
         cmd_view(args)
         out = capsys.readouterr().out
@@ -1049,6 +670,7 @@ class TestViewOnlyCommands:
     def test_equip_view_json(self, tmp_path):
         """equip view --json produces valid JSON."""
         from ult3edit.equip import cmd_view
+        import argparse
         outfile = tmp_path / 'equip.json'
         args = argparse.Namespace(json=True, output=str(outfile))
         cmd_view(args)
@@ -1058,6 +680,7 @@ class TestViewOnlyCommands:
     def test_spell_view(self, capsys):
         """spell view produces spell reference table."""
         from ult3edit.spell import cmd_view
+        import argparse
         args = argparse.Namespace(
             json=False, output=None,
             cleric_only=False, wizard_only=False)
@@ -1068,6 +691,7 @@ class TestViewOnlyCommands:
     def test_spell_view_json(self, tmp_path):
         """spell view --json produces valid JSON."""
         from ult3edit.spell import cmd_view
+        import argparse
         outfile = tmp_path / 'spells.json'
         args = argparse.Namespace(
             json=True, output=str(outfile),
@@ -1080,6 +704,7 @@ class TestViewOnlyCommands:
         """shapes export creates PNG files from SHPS data."""
         from ult3edit.shapes import cmd_export
         from ult3edit.constants import SHPS_FILE_SIZE
+        import argparse
         shps = tmp_path / 'SHPS'
         shps.write_bytes(bytes(SHPS_FILE_SIZE))
         out_dir = tmp_path / 'pngs'
@@ -1095,6 +720,7 @@ class TestViewOnlyCommands:
         """shapes export --sheet creates sprite sheet PNG."""
         from ult3edit.shapes import cmd_export
         from ult3edit.constants import SHPS_FILE_SIZE
+        import argparse
         shps = tmp_path / 'SHPS'
         shps.write_bytes(bytes(SHPS_FILE_SIZE))
         out_dir = tmp_path / 'pngs'
@@ -1109,6 +735,7 @@ class TestViewOnlyCommands:
         """shapes info shows metadata."""
         from ult3edit.shapes import cmd_info
         from ult3edit.constants import SHPS_FILE_SIZE
+        import argparse
         shps = tmp_path / 'SHPS'
         shps.write_bytes(bytes(SHPS_FILE_SIZE))
         args = argparse.Namespace(
@@ -1121,6 +748,7 @@ class TestViewOnlyCommands:
         """shapes info --json produces valid JSON."""
         from ult3edit.shapes import cmd_info
         from ult3edit.constants import SHPS_FILE_SIZE
+        import argparse
         shps = tmp_path / 'SHPS'
         shps.write_bytes(bytes(SHPS_FILE_SIZE))
         outfile = tmp_path / 'info.json'
@@ -1134,6 +762,7 @@ class TestViewOnlyCommands:
         """roster view displays character roster."""
         from ult3edit.roster import cmd_view
         from ult3edit.constants import ROSTER_FILE_SIZE
+        import argparse
         rost = tmp_path / 'ROST'
         data = bytearray(ROSTER_FILE_SIZE)
         # Set a name in slot 0
@@ -1151,9 +780,9 @@ class TestViewOnlyCommands:
     def test_bestiary_view(self, tmp_path, capsys):
         """bestiary view displays monster data."""
         from ult3edit.bestiary import cmd_view
-        from ult3edit.constants import MON_FILE_SIZE
+        import argparse
         monfile = tmp_path / 'MONA'
-        monfile.write_bytes(bytes(MON_FILE_SIZE))
+        monfile.write_bytes(bytes(256))
         args = argparse.Namespace(
             game_dir=str(tmp_path), json=False, output=None,
             validate=False, file=None)
@@ -1165,6 +794,7 @@ class TestViewOnlyCommands:
         """save view displays party state."""
         from ult3edit.save import cmd_view
         from ult3edit.constants import PRTY_FILE_SIZE
+        import argparse
         prty = tmp_path / 'PRTY'
         data = bytearray(PRTY_FILE_SIZE)
         data[5] = 0xFF  # sentinel
@@ -1180,6 +810,7 @@ class TestViewOnlyCommands:
         """combat view displays battlefield data."""
         from ult3edit.combat import cmd_view
         from ult3edit.constants import CON_FILE_SIZE
+        import argparse
         con = tmp_path / 'CONA'
         con.write_bytes(bytes(CON_FILE_SIZE))
         args = argparse.Namespace(
@@ -1191,64 +822,8 @@ class TestViewOnlyCommands:
 
 
 # =============================================================================
-# Patch cmd_edit and cmd_dump tests
+# Cross-module dispatch routing
 # =============================================================================
-
-
-# =============================================================================
-# Map cmd_fill / cmd_replace / cmd_find CLI tests
-# =============================================================================
-
-
-
-class TestImportTypeErrorHandling:
-    """Tests for TypeError handling in weapon/armor import with bad count types."""
-
-    def test_roster_import_bad_weapon_count_warns(self, tmp_path, capsys):
-        """Non-integer weapon count in JSON warns instead of crashing."""
-        rost = tmp_path / 'ROST'
-        data = bytearray(ROSTER_FILE_SIZE)
-        for i, ch in enumerate('HERO'):
-            data[i] = ord(ch) | 0x80
-        data[0x0D] = 0x00
-        rost.write_bytes(bytes(data))
-        json_path = tmp_path / 'chars.json'
-        json_path.write_text(json.dumps([{
-            'slot': 0, 'name': 'HERO',
-            'weapons': {'Dagger': 'five'}  # bad type
-        }]))
-        args = argparse.Namespace(
-            file=str(rost), json_file=str(json_path),
-            dry_run=True, backup=False, output=None, all=False)
-        cmd_import(args)  # should not crash
-        err = capsys.readouterr().err
-        assert 'Warning' in err
-
-    def test_roster_import_bad_armor_count_warns(self, tmp_path, capsys):
-        """Non-integer armor count in JSON warns instead of crashing."""
-        rost = tmp_path / 'ROST'
-        data = bytearray(ROSTER_FILE_SIZE)
-        for i, ch in enumerate('HERO'):
-            data[i] = ord(ch) | 0x80
-        data[0x0D] = 0x00
-        rost.write_bytes(bytes(data))
-        json_path = tmp_path / 'chars.json'
-        json_path.write_text(json.dumps([{
-            'slot': 0, 'name': 'HERO',
-            'armors': {'Cloth': 'many'}  # bad type
-        }]))
-        args = argparse.Namespace(
-            file=str(rost), json_file=str(json_path),
-            dry_run=True, backup=False, output=None, all=False)
-        cmd_import(args)  # should not crash
-        err = capsys.readouterr().err
-        assert 'Warning' in err
-
-
-# =============================================================================
-# Map --crop error handling test
-# =============================================================================
-
 
 
 class TestDispatchIntegration:
@@ -1257,6 +832,7 @@ class TestDispatchIntegration:
     def test_equip_view_text(self, capsys):
         """equip view text mode shows weapon and armor tables."""
         from ult3edit.equip import cmd_view
+        import argparse
         args = argparse.Namespace(json=False, output=None)
         cmd_view(args)
         out = capsys.readouterr().out
@@ -1268,6 +844,7 @@ class TestDispatchIntegration:
     def test_equip_dispatch_view(self, capsys):
         """equip dispatch routes 'view' correctly."""
         from ult3edit.equip import dispatch
+        import argparse
         args = argparse.Namespace(equip_command='view', json=False, output=None)
         dispatch(args)
         out = capsys.readouterr().out
@@ -1276,6 +853,7 @@ class TestDispatchIntegration:
     def test_equip_dispatch_none(self, capsys):
         """equip dispatch with no subcommand shows usage."""
         from ult3edit.equip import dispatch
+        import argparse
         args = argparse.Namespace(equip_command=None)
         dispatch(args)
         err = capsys.readouterr().err
@@ -1284,6 +862,7 @@ class TestDispatchIntegration:
     def test_spell_wizard_only(self, capsys):
         """spell view --wizard-only shows only wizard spells."""
         from ult3edit.spell import cmd_view
+        import argparse
         args = argparse.Namespace(
             json=False, output=None,
             wizard_only=True, cleric_only=False)
@@ -1295,6 +874,7 @@ class TestDispatchIntegration:
     def test_spell_cleric_only(self, capsys):
         """spell view --cleric-only shows only cleric spells."""
         from ult3edit.spell import cmd_view
+        import argparse
         args = argparse.Namespace(
             json=False, output=None,
             wizard_only=False, cleric_only=True)
@@ -1306,6 +886,7 @@ class TestDispatchIntegration:
     def test_spell_dispatch_none(self, capsys):
         """spell dispatch with no subcommand shows usage."""
         from ult3edit.spell import dispatch
+        import argparse
         args = argparse.Namespace(spell_command=None)
         dispatch(args)
         err = capsys.readouterr().err
@@ -1314,6 +895,7 @@ class TestDispatchIntegration:
     def test_combat_dispatch_view(self, tmp_path, capsys):
         """combat dispatch routes 'view' correctly."""
         from ult3edit.combat import dispatch
+        import argparse
         con = tmp_path / 'CONA'
         con.write_bytes(bytes(CON_FILE_SIZE))
         args = argparse.Namespace(
@@ -1326,6 +908,7 @@ class TestDispatchIntegration:
     def test_special_dispatch_view(self, tmp_path, capsys):
         """special dispatch routes 'view' correctly."""
         from ult3edit.special import dispatch
+        import argparse
         brnd = tmp_path / 'BRND'
         brnd.write_bytes(bytes(SPECIAL_FILE_SIZE))
         args = argparse.Namespace(
@@ -1338,6 +921,8 @@ class TestDispatchIntegration:
     def test_save_dispatch_view(self, tmp_path, capsys):
         """save dispatch routes 'view' correctly."""
         from ult3edit.save import dispatch
+        from ult3edit.constants import PRTY_FILE_SIZE
+        import argparse
         prty = tmp_path / 'PRTY'
         data = bytearray(PRTY_FILE_SIZE)
         data[5] = 0xFF
@@ -1353,6 +938,7 @@ class TestDispatchIntegration:
         """ddrw dispatch routes 'view' correctly."""
         from ult3edit.ddrw import dispatch
         from ult3edit.constants import DDRW_FILE_SIZE
+        import argparse
         ddrw = tmp_path / 'DDRW'
         ddrw.write_bytes(bytes(DDRW_FILE_SIZE))
         args = argparse.Namespace(
@@ -1366,6 +952,7 @@ class TestDispatchIntegration:
         """sound dispatch routes 'view' correctly."""
         from ult3edit.sound import dispatch
         from ult3edit.constants import SOSA_FILE_SIZE
+        import argparse
         sosa = tmp_path / 'SOSA'
         sosa.write_bytes(bytes(SOSA_FILE_SIZE))
         args = argparse.Namespace(
@@ -1377,165 +964,8 @@ class TestDispatchIntegration:
 
 
 # =============================================================================
-# Bug fix tests: text phantom records, TLK case, TLK find/replace error
+# Cross-module import validation
 # =============================================================================
-
-
-
-class TestDialogEditorEmptyRecord:
-    """Tests for DialogEditor save with empty records."""
-
-    def test_encode_empty_lines_produces_nonzero(self):
-        """encode_record(['']) produces at least 1 byte before stripping."""
-        result = encode_record([''])
-        # Empty line should produce just TLK_RECORD_END (0x00)
-        assert len(result) >= 1
-        # After stripping (encoded[:-1]), should not be empty
-        # The dialog editor now guards against this
-        stripped = result[:-1] if len(result) > 1 else result
-        assert len(stripped) >= 1
-
-    def test_dialog_editor_save_preserves_records(self):
-        """DialogEditor save doesn't collapse null separators."""
-        from ult3edit.tui.dialog_editor import DialogEditor
-        from ult3edit.constants import TLK_RECORD_END
-        # Build a TLK-like blob with 3 records
-        records = [
-            encode_record(['HELLO'])[:-1],  # strip trailing null
-            encode_record(['WORLD'])[:-1],
-            encode_record(['END'])[:-1],
-        ]
-        data = bytes([TLK_RECORD_END]).join(records)
-        saved_data = []
-        editor = DialogEditor('test', data, save_callback=lambda d: saved_data.append(d))
-        assert len(editor.records) == 3
-        # Mark record 0 as modified and save
-        editor._modified_records.add(0)
-        editor.dirty = True
-        editor._save()
-        # Should still produce valid data with 3 records
-        assert len(saved_data) == 1
-        # Re-parse should yield 3 records
-        reloaded = DialogEditor('test', saved_data[0])
-        assert len(reloaded.records) == 3
-
-
-# =============================================================================
-# Error path tests: sys.exit(1) coverage
-# =============================================================================
-
-
-
-class TestResolveSingleFile:
-    """Tests for resolve_single_file with ProDOS suffixes."""
-
-    def test_find_plain_file(self, tmp_path):
-        """Finds a plain file by name."""
-        from ult3edit.fileutil import resolve_single_file
-        (tmp_path / 'PRTY').write_bytes(b'\x00' * 16)
-        result = resolve_single_file(str(tmp_path), 'PRTY')
-        assert result is not None
-        assert 'PRTY' in result
-
-    def test_find_prodos_hashed_file(self, tmp_path):
-        """Finds a file with ProDOS #hash suffix."""
-        from ult3edit.fileutil import resolve_single_file
-        (tmp_path / 'PRTY#069500').write_bytes(b'\x00' * 16)
-        result = resolve_single_file(str(tmp_path), 'PRTY')
-        assert result is not None
-        assert 'PRTY#069500' in result
-
-    def test_not_found_returns_none(self, tmp_path):
-        """Returns None when file doesn't exist."""
-        from ult3edit.fileutil import resolve_single_file
-        result = resolve_single_file(str(tmp_path), 'NOSUCHFILE')
-        assert result is None
-
-    def test_prefers_hashed_over_plain(self, tmp_path):
-        """When both plain and hashed exist, hashed is returned first."""
-        from ult3edit.fileutil import resolve_single_file
-        (tmp_path / 'ROST#069500').write_bytes(b'\x00' * 64)
-        (tmp_path / 'ROST').write_bytes(b'\x00' * 64)
-        result = resolve_single_file(str(tmp_path), 'ROST')
-        assert result is not None
-        assert '#' in result
-
-
-
-class TestResolveGameFile:
-    """Tests for resolve_game_file with prefix+letter pattern."""
-
-    def test_find_with_hash(self, tmp_path):
-        """Finds MAPA#061000 style files."""
-        from ult3edit.fileutil import resolve_game_file
-        (tmp_path / 'MAPA#061000').write_bytes(b'\x00' * 100)
-        result = resolve_game_file(str(tmp_path), 'MAP', 'A')
-        assert result is not None
-        assert 'MAPA#061000' in result
-
-    def test_find_plain(self, tmp_path):
-        """Falls back to plain name if no hash file exists."""
-        from ult3edit.fileutil import resolve_game_file
-        (tmp_path / 'CONA').write_bytes(b'\x00' * 192)
-        result = resolve_game_file(str(tmp_path), 'CON', 'A')
-        assert result is not None
-        assert 'CONA' in result
-
-    def test_not_found(self, tmp_path):
-        """Returns None if neither hashed nor plain exists."""
-        from ult3edit.fileutil import resolve_game_file
-        result = resolve_game_file(str(tmp_path), 'MAP', 'Z')
-        assert result is None
-
-    def test_excludes_dproj(self, tmp_path):
-        """Files ending in .dproj are excluded."""
-        from ult3edit.fileutil import resolve_game_file
-        (tmp_path / 'MAPA#061000.dproj').write_bytes(b'\x00')
-        result = resolve_game_file(str(tmp_path), 'MAP', 'A')
-        assert result is None
-
-
-
-class TestFindGameFiles:
-    """Tests for find_game_files across multiple letters."""
-
-    def test_finds_multiple(self, tmp_path):
-        """Finds all existing files across letter range."""
-        from ult3edit.fileutil import find_game_files
-        (tmp_path / 'CONA').write_bytes(b'\x00' * 192)
-        (tmp_path / 'CONC').write_bytes(b'\x00' * 192)
-        result = find_game_files(str(tmp_path), 'CON', 'ABCDE')
-        assert len(result) == 2
-        letters = [r[0] for r in result]
-        assert 'A' in letters
-        assert 'C' in letters
-
-    def test_empty_directory(self, tmp_path):
-        """Returns empty list for empty directory."""
-        from ult3edit.fileutil import find_game_files
-        result = find_game_files(str(tmp_path), 'CON', 'ABCDE')
-        assert result == []
-
-
-# =============================================================================
-# Patch inline string operations
-# =============================================================================
-
-
-# =============================================================================
-# Shapes pixel helper tests
-# =============================================================================
-
-
-# =============================================================================
-# DDRW parsing and editing tests
-# =============================================================================
-
-
-# =============================================================================
-# SpecialEditor save preserves trailing bytes
-# =============================================================================
-
 
 
 class TestImportTypeValidation:
@@ -1544,6 +974,7 @@ class TestImportTypeValidation:
     def test_sound_import_non_int_in_raw_exits(self, tmp_path):
         """sound cmd_import with non-integer in raw array exits gracefully."""
         from ult3edit.sound import cmd_import as sound_import
+        import argparse
         json_file = tmp_path / 'bad.json'
         json_file.write_text(json.dumps({'raw': ['hello', 123]}))
         snd_file = tmp_path / 'SOSA'
@@ -1557,6 +988,7 @@ class TestImportTypeValidation:
     def test_sound_import_non_list_raw_exits(self, tmp_path):
         """sound cmd_import with non-list raw exits gracefully."""
         from ult3edit.sound import cmd_import as sound_import
+        import argparse
         json_file = tmp_path / 'bad.json'
         json_file.write_text(json.dumps({'raw': 'not a list'}))
         snd_file = tmp_path / 'SOSA'
@@ -1570,6 +1002,7 @@ class TestImportTypeValidation:
     def test_ddrw_import_non_int_in_raw_exits(self, tmp_path):
         """ddrw cmd_import with non-integer in raw array exits gracefully."""
         from ult3edit.ddrw import cmd_import as ddrw_import
+        import argparse
         json_file = tmp_path / 'bad.json'
         json_file.write_text(json.dumps({'raw': [1, 2, 'bad', 4]}))
         ddrw_file = tmp_path / 'DDRW'
@@ -1583,6 +1016,7 @@ class TestImportTypeValidation:
     def test_ddrw_import_valid_raw_works(self, tmp_path):
         """ddrw cmd_import with valid raw array succeeds."""
         from ult3edit.ddrw import cmd_import as ddrw_import
+        import argparse
         json_file = tmp_path / 'good.json'
         json_file.write_text(json.dumps({'raw': [0] * 1792}))
         ddrw_file = tmp_path / 'DDRW'
@@ -1596,6 +1030,7 @@ class TestImportTypeValidation:
     def test_sound_import_valid_raw_works(self, tmp_path):
         """sound cmd_import with valid raw array succeeds."""
         from ult3edit.sound import cmd_import as sound_import
+        import argparse
         json_file = tmp_path / 'good.json'
         json_file.write_text(json.dumps({'raw': [0] * 256}))
         snd_file = tmp_path / 'SOSM'
@@ -1608,127 +1043,8 @@ class TestImportTypeValidation:
 
 
 # =============================================================================
-# Shapes check_shps_code_region
+# Verify tool size warnings
 # =============================================================================
-
-
-# =============================================================================
-# Save validate_party_state coordinate bounds
-# =============================================================================
-
-
-
-class TestRosterCmdCheckProgress:
-    """Test cmd_check_progress CLI command."""
-
-    def _make_roster_with_chars(self, tmp_path, count=4, marks=0xF,
-                                 cards=0xF, weapon=15, armor=7):
-        """Create a roster file with specified characters."""
-        data = bytearray(ROSTER_FILE_SIZE)
-        for i in range(count):
-            off = i * CHAR_RECORD_SIZE
-            name = f'HERO{i}'
-            for j, ch in enumerate(name):
-                data[off + j] = ord(ch) | 0x80
-            data[off + CHAR_STATUS] = ord('G')
-            data[off + CHAR_HP_HI] = 0x01
-            data[off + CHAR_MARKS_CARDS] = (marks << 4) | cards
-            data[off + CHAR_READIED_WEAPON] = weapon
-            data[off + CHAR_WORN_ARMOR] = armor
-        path = os.path.join(str(tmp_path), 'ROST')
-        with open(path, 'wb') as f:
-            f.write(data)
-        return path
-
-    def test_check_progress_text_ready(self, tmp_path, capsys):
-        """cmd_check_progress shows READY verdict for complete party."""
-        from ult3edit.roster import cmd_check_progress
-        path = self._make_roster_with_chars(tmp_path)
-        args = argparse.Namespace(
-            file=path, json=False, output=None)
-        cmd_check_progress(args)
-        captured = capsys.readouterr()
-        assert 'READY TO FACE EXODUS' in captured.out
-
-    def test_check_progress_text_not_ready(self, tmp_path, capsys):
-        """cmd_check_progress shows not-ready for incomplete party."""
-        from ult3edit.roster import cmd_check_progress
-        path = self._make_roster_with_chars(
-            tmp_path, count=2, marks=0, cards=0, weapon=0, armor=0)
-        args = argparse.Namespace(
-            file=path, json=False, output=None)
-        cmd_check_progress(args)
-        captured = capsys.readouterr()
-        assert 'Not yet ready' in captured.out
-        assert 'Need 4 alive characters' in captured.out
-
-    def test_check_progress_json(self, tmp_path):
-        """cmd_check_progress JSON mode produces valid output."""
-        from ult3edit.roster import cmd_check_progress
-        path = self._make_roster_with_chars(tmp_path)
-        out_path = os.path.join(str(tmp_path), 'progress.json')
-        args = argparse.Namespace(
-            file=path, json=True, output=out_path)
-        cmd_check_progress(args)
-        with open(out_path) as f:
-            data = json.load(f)
-        assert data['exodus_ready'] is True
-        assert data['marks_complete'] is True
-        assert data['cards_complete'] is True
-
-
-# =============================================================================
-# Diff file-level dispatch (diff_file)
-# =============================================================================
-
-
-
-class TestFileUtilEdgeCases:
-    """Test fileutil utility edge cases."""
-
-    def test_hex_int_parses_hex(self):
-        """hex_int parses 0x prefix."""
-        from ult3edit.fileutil import hex_int
-        assert hex_int('0xFF') == 255
-        assert hex_int('0x10') == 16
-
-    def test_hex_int_parses_decimal(self):
-        """hex_int parses decimal strings."""
-        from ult3edit.fileutil import hex_int
-        assert hex_int('42') == 42
-
-    def test_hex_int_parses_dollar_prefix(self):
-        """hex_int parses $ prefix (if supported)."""
-        from ult3edit.fileutil import hex_int
-        try:
-            result = hex_int('$FF')
-            assert result == 255
-        except ValueError:
-            pass  # $ prefix may not be supported
-
-    def test_resolve_single_file_not_found(self, tmp_path):
-        """resolve_single_file returns None for missing file."""
-        from ult3edit.fileutil import resolve_single_file
-        result = resolve_single_file(str(tmp_path), 'NONEXISTENT')
-        assert result is None
-
-    def test_resolve_single_file_found(self, tmp_path):
-        """resolve_single_file finds file by prefix."""
-        from ult3edit.fileutil import resolve_single_file
-        path = os.path.join(str(tmp_path), 'ROST')
-        with open(path, 'wb') as f:
-            f.write(b'\x00')
-        result = resolve_single_file(str(tmp_path), 'ROST')
-        assert result is not None
-
-    def test_decode_encode_high_ascii_roundtrip(self):
-        """decode/encode_high_ascii round-trips."""
-        from ult3edit.fileutil import decode_high_ascii, encode_high_ascii
-        text = "HELLO WORLD"
-        encoded = encode_high_ascii(text, len(text))
-        decoded = decode_high_ascii(encoded)
-        assert decoded == text
-
 
 
 class TestVerifySizeWarnings:
@@ -1756,4 +1072,3 @@ class TestVerifySizeWarnings:
         assert len(size_warns) == 1
         assert '100' in size_warns[0]
         assert '1280' in size_warns[0]
-

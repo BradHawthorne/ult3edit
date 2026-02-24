@@ -35,7 +35,7 @@ Each game data type lives in `src/ult3edit/{module}.py` (roster, bestiary, map, 
 - **`dispatch(args)`**: Routes to command handlers
 - **`main()`**: Standalone entry point (also registered as `ult3-{module}` console script). Must have full parity with `register_parser()` — same subcommands, args, and help text.
 
-Exceptions: `equip` and `spell` are view-only (no `cmd_edit`/`cmd_import`). `diff` has `cmd_diff` only. `disk` has `cmd_info`/`cmd_list`/`cmd_extract`/`cmd_audit`.
+Exceptions: `equip` and `spell` are view-only (no `cmd_edit`/`cmd_import`). `diff` has `cmd_diff` only. `disk` has `cmd_info`/`cmd_list`/`cmd_extract`/`cmd_audit`/`cmd_build`.
 
 ### CLI dispatcher (`cli.py`)
 

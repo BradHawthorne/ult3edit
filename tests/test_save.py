@@ -1451,3 +1451,47 @@ class TestSavePLRSOnlyDryRun:
         with open(plrs_path, 'rb') as f:
             assert f.read() == bytes(plrs_data)
 
+
+# ── Migrated from test_new_features.py ──
+
+class TestSaveOutputConflict:
+    """Verify that --output is rejected when editing both party and PLRS."""
+
+    def test_dual_file_output_rejected(self, tmp_dir, sample_prty_bytes):
+        """Editing both PRTY and PLRS with --output should fail."""
+        from ult3edit.save import cmd_edit
+        # Create PRTY file in game dir
+        prty_file = os.path.join(tmp_dir, 'PRTY#069500')
+        with open(prty_file, 'wb') as f:
+            f.write(sample_prty_bytes)
+        # Create PLRS file in same dir
+        plrs_data = bytearray(PLRS_FILE_SIZE)
+        for i, ch in enumerate('HERO'):
+            plrs_data[i] = ord(ch) | 0x80
+        plrs_file = os.path.join(tmp_dir, 'PLRS#069500')
+        with open(plrs_file, 'wb') as f:
+            f.write(plrs_data)
+        # Try editing both party state and PLRS character with --output
+        args = type('Args', (), {
+            'game_dir': tmp_dir, 'output': '/tmp/out',
+            'backup': False, 'dry_run': False,
+            'transport': 'Horse', 'x': None, 'y': None,
+            'party_size': None, 'slot_ids': None,
+            'sentinel': None, 'location': None,
+            'plrs_slot': 0, 'name': 'TEST',
+            'str': None, 'dex': None, 'int_': None, 'wis': None,
+            'hp': None, 'max_hp': None, 'exp': None,
+            'mp': None, 'food': None, 'gold': None,
+            'gems': None, 'keys': None, 'powders': None,
+            'torches': None, 'status': None, 'race': None,
+            'class_': None, 'gender': None,
+            'weapon': None, 'armor': None,
+            'marks': None, 'cards': None, 'sub_morsels': None,
+        })()
+        original_plrs = bytes(plrs_data)
+        with pytest.raises(SystemExit):
+            cmd_edit(args)
+        # PLRS must NOT have been written before the conflict error
+        with open(plrs_file, 'rb') as f:
+            assert f.read() == original_plrs, "PLRS was modified before conflict check"
+

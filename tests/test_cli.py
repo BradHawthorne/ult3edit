@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 
@@ -482,4 +483,226 @@ class TestConsoleScriptEntryPoints:
         )
         assert result.returncode == 0
         assert len(result.stdout) > 20  # Non-trivial help text
+
+
+# ── Migrated from test_new_features.py ──
+
+class TestValidateOnEditArgs:
+    """Verify --validate is accepted by bestiary and combat edit subparsers."""
+
+    def test_bestiary_edit_accepts_validate(self):
+        """bestiary edit --validate should be a valid CLI arg."""
+        import argparse
+        from ult3edit.bestiary import register_parser
+        parser = argparse.ArgumentParser()
+        sub = parser.add_subparsers(dest='module')
+        register_parser(sub)
+        args = parser.parse_args(['bestiary', 'edit', 'test.mon', '--monster', '0',
+                                  '--hp', '50', '--validate'])
+        assert args.validate is True
+
+    def test_combat_edit_accepts_validate(self):
+        """combat edit --validate should be a valid CLI arg."""
+        import argparse
+        from ult3edit.combat import register_parser
+        parser = argparse.ArgumentParser()
+        sub = parser.add_subparsers(dest='module')
+        register_parser(sub)
+        args = parser.parse_args(['combat', 'edit', 'test.con',
+                                  '--tile', '0', '0', '32', '--validate'])
+        assert args.validate is True
+
+    def test_bestiary_edit_validate_runs(self, tmp_dir, sample_mon_bytes):
+        """bestiary edit with --validate should show warnings."""
+        from ult3edit.bestiary import cmd_edit
+        mon_file = os.path.join(tmp_dir, 'MONA#069900')
+        with open(mon_file, 'wb') as f:
+            f.write(sample_mon_bytes)
+        args = type('Args', (), {
+            'file': mon_file, 'monster': 0, 'all': False,
+            'output': None, 'backup': False, 'dry_run': True,
+            'validate': True,
+            'name': None, 'tile1': None, 'tile2': None,
+            'hp': 50, 'attack': None, 'defense': None, 'speed': None,
+            'flags1': None, 'flags2': None, 'ability1': None, 'ability2': None,
+            'type': None,
+            'boss': None, 'no_boss': None, 'undead': None, 'ranged': None,
+            'magic_user': None, 'poison': None, 'no_poison': None,
+            'sleep': None, 'no_sleep': None, 'negate': None, 'no_negate': None,
+            'teleport': None, 'no_teleport': None,
+            'divide': None, 'no_divide': None,
+            'resistant': None, 'no_resistant': None,
+        })()
+        # Should not raise
+        cmd_edit(args)
+
+    def test_combat_edit_validate_runs(self, tmp_dir, sample_con_bytes):
+        """combat edit with --validate should show warnings."""
+        from ult3edit.combat import cmd_edit
+        con_file = os.path.join(tmp_dir, 'CONA#069900')
+        with open(con_file, 'wb') as f:
+            f.write(sample_con_bytes)
+        args = type('Args', (), {
+            'file': con_file,
+            'output': None, 'backup': False, 'dry_run': True,
+            'validate': True,
+            'tile': [5, 5, 0x20],
+            'monster_pos': None, 'pc_pos': None,
+        })()
+        # Should not raise
+        cmd_edit(args)
+
+
+class TestHexIntArgParsing:
+    """Verify that CLI args for tiles, offsets, and flags accept hex (0x) prefix."""
+
+    def test_hex_int_helper(self):
+        from ult3edit.fileutil import hex_int
+        assert hex_int('10') == 10
+        assert hex_int('0x0A') == 10
+        assert hex_int('0xFF') == 255
+        assert hex_int('0') == 0
+
+    def test_hex_int_rejects_garbage(self):
+        from ult3edit.fileutil import hex_int
+        with pytest.raises(ValueError):
+            hex_int('xyz')
+
+    def test_map_tile_accepts_hex(self, tmp_dir):
+        """map set --tile 0x01 should parse without error."""
+        import argparse
+        from ult3edit.map import cmd_set
+        from ult3edit.constants import MAP_OVERWORLD_SIZE
+        path = os.path.join(tmp_dir, 'MAP')
+        data = bytes(MAP_OVERWORLD_SIZE)
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = argparse.Namespace(
+            file=path, x=0, y=0, tile=0x01,
+            output=None, backup=False, dry_run=True)
+        cmd_set(args)  # Should not raise
+
+    def test_combat_tile_accepts_hex(self, tmp_dir):
+        """combat edit --tile 0x08 should parse without error."""
+        from ult3edit.combat import cmd_edit as combat_cmd_edit
+        from ult3edit.constants import CON_FILE_SIZE
+        path = os.path.join(tmp_dir, 'CON')
+        data = bytearray(CON_FILE_SIZE)
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = type('Args', (), {
+            'file': path, 'tile': [0, 0, 0x08],
+            'monster_pos': None, 'pc_pos': None,
+            'output': None, 'backup': False, 'dry_run': True,
+        })()
+        combat_cmd_edit(args)  # Should not raise
+
+    def test_bestiary_flags_accept_hex(self, tmp_dir):
+        """bestiary edit --flags1 0x80 should parse without error."""
+        from ult3edit.bestiary import cmd_edit as bestiary_cmd_edit
+        from ult3edit.constants import MON_FILE_SIZE
+        path = os.path.join(tmp_dir, 'MON')
+        data = bytearray(MON_FILE_SIZE)
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = type('Args', (), {
+            'file': path, 'monster': 0,
+            'tile1': None, 'tile2': None,
+            'flags1': 0x80, 'flags2': None,
+            'hp': None, 'attack': None, 'defense': None, 'speed': None,
+            'ability1': None, 'ability2': None,
+            'output': None, 'backup': False, 'dry_run': True,
+        })()
+        bestiary_cmd_edit(args)  # Should not raise
+
+    def test_special_tile_accepts_hex(self, tmp_dir):
+        """special edit --tile 0x00 0x00 0x08 should parse without error."""
+        from ult3edit.special import cmd_edit as special_cmd_edit
+        from ult3edit.constants import SPECIAL_FILE_SIZE
+        path = os.path.join(tmp_dir, 'BRND')
+        data = bytearray(SPECIAL_FILE_SIZE)
+        with open(path, 'wb') as f:
+            f.write(data)
+        args = type('Args', (), {
+            'file': path, 'tile': [0, 0, 0x08],
+            'output': None, 'backup': False, 'dry_run': True,
+        })()
+        special_cmd_edit(args)  # Should not raise
+
+    def test_argparser_accepts_hex_string(self):
+        """Verify argparse actually parses '0x0A' string to 10 via hex_int type."""
+        import argparse
+        from ult3edit.fileutil import hex_int
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--tile', type=hex_int)
+        args = parser.parse_args(['--tile', '0x0A'])
+        assert args.tile == 10
+
+    def test_argparser_accepts_decimal_string(self):
+        """hex_int still works with plain decimal strings."""
+        import argparse
+        from ult3edit.fileutil import hex_int
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--offset', type=hex_int)
+        args = parser.parse_args(['--offset', '240'])
+        assert args.offset == 240
+
+
+class TestDictKeyValidation:
+    """Verify non-numeric dict keys are handled gracefully."""
+
+    def test_bestiary_import_skips_bad_keys(self, tmp_path):
+        """Bestiary import skips non-numeric keys without crashing."""
+        from ult3edit.bestiary import cmd_import, load_mon_file
+        mon_data = bytearray(256)
+        mon_path = str(tmp_path / 'MONA')
+        with open(mon_path, 'wb') as f:
+            f.write(mon_data)
+
+        jdata = {
+            "monsters": {
+                "0": {"hp": 100},
+                "abc": {"hp": 200},  # non-numeric key
+                "1": {"hp": 150}
+            }
+        }
+        json_path = str(tmp_path / 'bestiary.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+
+        args = type('Args', (), {
+            'file': mon_path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': False
+        })()
+        cmd_import(args)  # Should not crash
+
+        monsters = load_mon_file(mon_path)
+        assert monsters[0].hp == 100
+        assert monsters[1].hp == 150
+
+    def test_combat_import_skips_bad_keys(self, tmp_path):
+        """Combat import skips non-numeric monster keys without crashing."""
+        from ult3edit.combat import cmd_import as combat_import
+        from ult3edit.constants import CON_FILE_SIZE
+        con_data = bytearray(CON_FILE_SIZE)
+        con_path = str(tmp_path / 'CONA')
+        with open(con_path, 'wb') as f:
+            f.write(con_data)
+
+        jdata = {
+            "tiles": [['.' for _ in range(11)] for _ in range(11)],
+            "monsters": {
+                "0": {"x": 3, "y": 4},
+                "bad": {"x": 5, "y": 6}  # non-numeric key
+            }
+        }
+        json_path = str(tmp_path / 'combat.json')
+        with open(json_path, 'w') as f:
+            json.dump(jdata, f)
+
+        args = type('Args', (), {
+            'file': con_path, 'json_file': json_path,
+            'output': None, 'backup': False, 'dry_run': False
+        })()
+        combat_import(args)  # Should not crash
 

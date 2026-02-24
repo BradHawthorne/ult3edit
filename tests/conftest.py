@@ -21,12 +21,16 @@ from ult3edit.constants import (
 )
 
 
+# ---- General utilities ----
+
 @pytest.fixture
 def tmp_dir():
     """Provide a temporary directory for test files."""
     with tempfile.TemporaryDirectory() as d:
         yield d
 
+
+# ---- Character / Roster ----
 
 @pytest.fixture
 def sample_character_bytes():
@@ -82,6 +86,8 @@ def sample_roster_file(tmp_dir, sample_roster_bytes):
     return path
 
 
+# ---- Bestiary ----
+
 @pytest.fixture
 def sample_mon_bytes():
     """Build a 256-byte MON file with 3 monsters."""
@@ -120,6 +126,8 @@ def sample_mon_file(tmp_dir, sample_mon_bytes):
     return path
 
 
+# ---- Maps ----
+
 @pytest.fixture
 def sample_overworld_bytes():
     """Build a 4096-byte overworld map (64x64, all grass)."""
@@ -133,14 +141,6 @@ def sample_overworld_bytes():
     # Town at (10, 10)
     data[10 * 64 + 10] = 0x18  # Town
     return bytes(data)
-
-
-@pytest.fixture
-def sample_map_file(tmp_dir, sample_overworld_bytes):
-    path = os.path.join(tmp_dir, 'MAPA#061000')
-    with open(path, 'wb') as f:
-        f.write(sample_overworld_bytes)
-    return path
 
 
 @pytest.fixture
@@ -159,6 +159,8 @@ def sample_dungeon_bytes():
         data[base + 8 * 16 + 1] = 0x02
     return bytes(data)
 
+
+# ---- Dialog (TLK) ----
 
 @pytest.fixture
 def sample_tlk_bytes():
@@ -187,6 +189,8 @@ def sample_tlk_file(tmp_dir, sample_tlk_bytes):
     return path
 
 
+# ---- Combat ----
+
 @pytest.fixture
 def sample_con_bytes():
     """Build a 192-byte combat map."""
@@ -208,6 +212,8 @@ def sample_con_bytes():
     return bytes(data)
 
 
+# ---- Special locations ----
+
 @pytest.fixture
 def sample_special_bytes():
     """Build a 128-byte special location file."""
@@ -217,6 +223,8 @@ def sample_special_bytes():
         data[i] = 0x20  # Floor
     return bytes(data)
 
+
+# ---- Text ----
 
 @pytest.fixture
 def sample_text_bytes():
@@ -231,6 +239,8 @@ def sample_text_bytes():
         offset += 1
     return bytes(data)
 
+
+# ---- Save / Party ----
 
 @pytest.fixture
 def sample_prty_bytes():

@@ -7,7 +7,7 @@ import tempfile
 
 import pytest
 
-from ult3edit.roster import Character, load_roster, save_roster, cmd_edit, cmd_create, cmd_import, check_progress, validate_character
+from ult3edit.roster import Character, load_roster, save_roster, cmd_edit, cmd_create, cmd_import, cmd_check_progress, check_progress, validate_character
 from ult3edit.bcd import int_to_bcd, int_to_bcd16
 from ult3edit.constants import (
     CHAR_CLASS, CHAR_GENDER, CHAR_HP_HI, CHAR_HP_LO, CHAR_IN_PARTY,
@@ -2264,4 +2264,134 @@ class TestRosterNoDeadImport:
         import ult3edit.roster as r
         # Should NOT have encode_high_ascii as a module-level name
         assert not hasattr(r, 'encode_high_ascii')
+
+
+class TestDryRun:
+    def test_roster_dry_run(self, tmp_dir, sample_roster_file):
+        """Verify dry-run doesn't modify the file."""
+        with open(sample_roster_file, 'rb') as f:
+            before = f.read()
+
+        chars, original = load_roster(sample_roster_file)
+        chars[0].gold = 9999
+        # Don't save (simulating dry-run)
+
+        with open(sample_roster_file, 'rb') as f:
+            after = f.read()
+        assert before == after
+
+    def test_map_dry_run(self, tmp_dir, sample_overworld_bytes):
+        path = os.path.join(tmp_dir, 'MAPA')
+        with open(path, 'wb') as f:
+            f.write(sample_overworld_bytes)
+        with open(path, 'rb') as f:
+            before = f.read()
+
+        # Modify in memory but don't write (dry-run)
+        data = bytearray(before)
+        data[0] = 0xFF
+
+        with open(path, 'rb') as f:
+            after = f.read()
+        assert before == after
+
+
+class TestImportTypeErrorHandling:
+    """Tests for TypeError handling in weapon/armor import with bad count types."""
+
+    def test_roster_import_bad_weapon_count_warns(self, tmp_path, capsys):
+        """Non-integer weapon count in JSON warns instead of crashing."""
+        rost = tmp_path / 'ROST'
+        data = bytearray(ROSTER_FILE_SIZE)
+        for i, ch in enumerate('HERO'):
+            data[i] = ord(ch) | 0x80
+        data[0x0D] = 0x00
+        rost.write_bytes(bytes(data))
+        json_path = tmp_path / 'chars.json'
+        json_path.write_text(json.dumps([{
+            'slot': 0, 'name': 'HERO',
+            'weapons': {'Dagger': 'five'}  # bad type
+        }]))
+        args = argparse.Namespace(
+            file=str(rost), json_file=str(json_path),
+            dry_run=True, backup=False, output=None, all=False)
+        cmd_import(args)  # should not crash
+        err = capsys.readouterr().err
+        assert 'Warning' in err
+
+    def test_roster_import_bad_armor_count_warns(self, tmp_path, capsys):
+        """Non-integer armor count in JSON warns instead of crashing."""
+        rost = tmp_path / 'ROST'
+        data = bytearray(ROSTER_FILE_SIZE)
+        for i, ch in enumerate('HERO'):
+            data[i] = ord(ch) | 0x80
+        data[0x0D] = 0x00
+        rost.write_bytes(bytes(data))
+        json_path = tmp_path / 'chars.json'
+        json_path.write_text(json.dumps([{
+            'slot': 0, 'name': 'HERO',
+            'armors': {'Cloth': 'many'}  # bad type
+        }]))
+        args = argparse.Namespace(
+            file=str(rost), json_file=str(json_path),
+            dry_run=True, backup=False, output=None, all=False)
+        cmd_import(args)  # should not crash
+        err = capsys.readouterr().err
+        assert 'Warning' in err
+
+
+class TestRosterCmdCheckProgress:
+    """Test cmd_check_progress CLI command."""
+
+    def _make_roster_with_chars(self, tmp_path, count=4, marks=0xF,
+                                 cards=0xF, weapon=15, armor=7):
+        """Create a roster file with specified characters."""
+        data = bytearray(ROSTER_FILE_SIZE)
+        for i in range(count):
+            off = i * CHAR_RECORD_SIZE
+            name = f'HERO{i}'
+            for j, ch in enumerate(name):
+                data[off + j] = ord(ch) | 0x80
+            data[off + CHAR_STATUS] = ord('G')
+            data[off + CHAR_HP_HI] = 0x01
+            data[off + CHAR_MARKS_CARDS] = (marks << 4) | cards
+            data[off + CHAR_READIED_WEAPON] = weapon
+            data[off + CHAR_WORN_ARMOR] = armor
+        path = os.path.join(str(tmp_path), 'ROST')
+        with open(path, 'wb') as f:
+            f.write(data)
+        return path
+
+    def test_check_progress_text_ready(self, tmp_path, capsys):
+        """cmd_check_progress shows READY verdict for complete party."""
+        path = self._make_roster_with_chars(tmp_path)
+        args = argparse.Namespace(
+            file=path, json=False, output=None)
+        cmd_check_progress(args)
+        captured = capsys.readouterr()
+        assert 'READY TO FACE EXODUS' in captured.out
+
+    def test_check_progress_text_not_ready(self, tmp_path, capsys):
+        """cmd_check_progress shows not-ready for incomplete party."""
+        path = self._make_roster_with_chars(
+            tmp_path, count=2, marks=0, cards=0, weapon=0, armor=0)
+        args = argparse.Namespace(
+            file=path, json=False, output=None)
+        cmd_check_progress(args)
+        captured = capsys.readouterr()
+        assert 'Not yet ready' in captured.out
+        assert 'Need 4 alive characters' in captured.out
+
+    def test_check_progress_json(self, tmp_path):
+        """cmd_check_progress JSON mode produces valid output."""
+        path = self._make_roster_with_chars(tmp_path)
+        out_path = os.path.join(str(tmp_path), 'progress.json')
+        args = argparse.Namespace(
+            file=path, json=True, output=out_path)
+        cmd_check_progress(args)
+        with open(out_path) as f:
+            data = json.load(f)
+        assert data['exodus_ready'] is True
+        assert data['marks_complete'] is True
+        assert data['cards_complete'] is True
 

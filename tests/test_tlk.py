@@ -971,3 +971,43 @@ class TestTlkIsTextRecordEdgeCases:
         data = bytes([0xC1] * 8 + [0x10] * 3)
         assert is_text_record(data) is True
 
+
+# ── Migrated from test_new_features.py ──
+
+class TestDialogEditorEmptyRecord:
+    """Tests for DialogEditor save with empty records."""
+
+    def test_encode_empty_lines_produces_nonzero(self):
+        """encode_record(['']) produces at least 1 byte before stripping."""
+        result = encode_record([''])
+        # Empty line should produce just TLK_RECORD_END (0x00)
+        assert len(result) >= 1
+        # After stripping (encoded[:-1]), should not be empty
+        # The dialog editor now guards against this
+        stripped = result[:-1] if len(result) > 1 else result
+        assert len(stripped) >= 1
+
+    def test_dialog_editor_save_preserves_records(self):
+        """DialogEditor save doesn't collapse null separators."""
+        from ult3edit.tui.dialog_editor import DialogEditor
+        from ult3edit.constants import TLK_RECORD_END
+        # Build a TLK-like blob with 3 records
+        records = [
+            encode_record(['HELLO'])[:-1],  # strip trailing null
+            encode_record(['WORLD'])[:-1],
+            encode_record(['END'])[:-1],
+        ]
+        data = bytes([TLK_RECORD_END]).join(records)
+        saved_data = []
+        editor = DialogEditor('test', data, save_callback=lambda d: saved_data.append(d))
+        assert len(editor.records) == 3
+        # Mark record 0 as modified and save
+        editor._modified_records.add(0)
+        editor.dirty = True
+        editor._save()
+        # Should still produce valid data with 3 records
+        assert len(saved_data) == 1
+        # Re-parse should yield 3 records
+        reloaded = DialogEditor('test', saved_data[0])
+        assert len(reloaded.records) == 3
+
